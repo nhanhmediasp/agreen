@@ -58,6 +58,46 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
   }
 });
 
+// List all uploaded media files
+app.get('/api/uploads', (req, res) => {
+  try {
+    if (!fs.existsSync(UPLOAD_DIR)) {
+      return res.json({ success: true, data: [] });
+    }
+    const files = fs.readdirSync(UPLOAD_DIR);
+    const mediaFiles = files
+      .filter(file => {
+        const ext = path.extname(file).toLowerCase();
+        return ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf'].includes(ext);
+      })
+      .map((file, index) => ({
+        id: `upload-${index}-${file}`,
+        url: `/uploads/${file}`,
+        name: file,
+        usedIn: null
+      }));
+    res.json({ success: true, data: mediaFiles });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete an uploaded file
+app.delete('/api/uploads/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const filepath = path.join(UPLOAD_DIR, filename);
+    if (fs.existsSync(filepath)) {
+      fs.unlinkSync(filepath);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ success: false, error: 'File not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ============================================================
 // HEALTH CHECK
 // ============================================================

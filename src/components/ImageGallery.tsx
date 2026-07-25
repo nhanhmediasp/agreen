@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, X, Check, Trash2, AlertCircle, FileText } from 'lucide-react';
 
 interface ImageGalleryProps {
@@ -7,18 +7,25 @@ interface ImageGalleryProps {
   multiple?: boolean;
 }
 
-const DUMMY_IMAGES = [
-  { id: '1', url: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80', name: 'Anh_Xe_Sedan.jpg', usedIn: 'Đơn thuê #1024' },
-  { id: '2', url: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&w=400&q=80', name: 'Anh_Xe_SUV.jpg', usedIn: 'Xe 51F-123.45' },
-  { id: '3', url: 'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=400&q=80', name: 'Anh_Ngoai_That.jpg', usedIn: null },
-  { id: '4', url: 'https://images.unsplash.com/photo-1502877338535-494e508892f3?auto=format&fit=crop&w=400&q=80', name: 'Anh_Dong_Ho_KM.jpg', usedIn: 'Xe 30G-789.10' },
-];
-
 export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalleryProps) => {
-  const [images, setImages] = useState(DUMMY_IMAGES);
+  const [images, setImages] = useState<{ id: string; url: string; name: string; usedIn: string | null }[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load uploaded files from the Express backend API on mount
+  useEffect(() => {
+    fetch('/api/uploads')
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          setImages(res.data);
+        }
+      })
+      .catch(err => {
+        console.error('Lỗi khi tải danh sách ảnh từ server:', err);
+      });
+  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -73,17 +80,39 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
     onClose();
   };
 
+  const deleteFromServer = (imgUrl: string) => {
+    const filename = imgUrl.split('/').pop();
+    if (!filename) return;
+    fetch(`/api/uploads/${filename}`, { method: 'DELETE' })
+      .then(res => res.json())
+      .then(res => {
+        if (!res.success) {
+          console.error('Không thể xóa file trên server:', res.error);
+        }
+      })
+      .catch(err => {
+        console.error('Lỗi mạng khi xóa file:', err);
+      });
+  };
+
   const handleDeleteAttempt = (id: string) => {
     const img = images.find(i => i.id === id);
     if (img?.usedIn) {
       setDeleteWarning(img.id);
     } else {
+      if (img && img.url.startsWith('/uploads/')) {
+        deleteFromServer(img.url);
+      }
       setImages(prev => prev.filter(i => i.id !== id));
       setSelectedIds(prev => prev.filter(i => i !== id));
     }
   };
 
   const confirmDelete = (id: string) => {
+    const img = images.find(i => i.id === id);
+    if (img && img.url.startsWith('/uploads/')) {
+      deleteFromServer(img.url);
+    }
     setImages(prev => prev.filter(i => i.id !== id));
     setSelectedIds(prev => prev.filter(i => i !== id));
     setDeleteWarning(null);
