@@ -1,23 +1,28 @@
-# Node dependencies
-node_modules/
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Build artifacts
-dist/
-build/
-
-# Environment variables & secrets
+node_modules
+dist
+dist-ssr
+# Environment variables
 .env
 .env.*
 !.env.example
 
-# Logs
-*.log
-logs/
-
-# IDE & OS files
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
-.idea/
-.vscode/
-.agents/
-.claude-plugin/
-awesome-design-systems/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
