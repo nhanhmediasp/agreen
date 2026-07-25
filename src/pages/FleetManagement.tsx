@@ -482,9 +482,21 @@ const FleetManagement = () => {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
                   <button className="btn-primary" onClick={handleOpenEdit} style={{ flex: 1, justifyContent: 'center', background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)' }}>
                     <Edit size={16} style={{ marginRight: '6px' }} /> Chỉnh sửa xe
+                  </button>
+                  <button className="btn-primary" onClick={() => {
+                    if (activeCar.status === 'rented') {
+                      showToast('Không thể xóa xe đang cho thuê!', 'error');
+                      return;
+                    }
+                    if (confirm(`Bạn có chắc chắn muốn xóa xe ${activeCar.name} (${activeCar.id})?`)) {
+                      deleteCar(activeCar.id);
+                      setSelectedCarId(null);
+                    }
+                  }} style={{ flex: 1, justifyContent: 'center', background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5' }}>
+                    <Trash2 size={16} style={{ marginRight: '6px' }} /> Xóa xe
                   </button>
                   {activeCar.status === 'ready' && (
                     <Link to={`/rental/new?car=${activeCar.id}`} style={{ flex: 1, textDecoration: 'none', display: 'flex' }}>

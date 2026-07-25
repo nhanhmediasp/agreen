@@ -32,7 +32,7 @@ import Reports from './pages/Reports';
 import Contracts from './pages/Contracts';
 import Owners from './pages/Owners';
 import ServiceOrders from './pages/ServiceOrders';
-import Login, { checkLogin, doLogout, getAdminCredentials, updateAdminCredentials } from './pages/Login';
+import Login, { checkLogin, doLogout, updateAdminCredentials } from './pages/Login';
 import { ImageGallery } from './components/ImageGallery';
 
 const isImageUrl = (url: string) => {
@@ -72,7 +72,7 @@ function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
         <div className="sidebar-header">
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
             {isImageUrl(settings.logo) ? (
-              <img src={settings.logo} alt="Logo" style={{ width: '34px', height: '34px', borderRadius: '9px', objectFit: 'cover', flexShrink: 0 }} />
+              <img src={settings.logo} alt="Logo" style={{ width: '34px', height: '34px', borderRadius: '9px', objectFit: 'contain', flexShrink: 0 }} />
             ) : (
               <div className="sidebar-logo-icon">{settings.logo.slice(0, 1).toUpperCase()}</div>
             )}
@@ -179,14 +179,15 @@ function AccountDropdown() {
   const [showGallery, setShowGallery] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const creds = getAdminCredentials();
-  const [editUsername, setEditUsername] = useState(creds.username);
+  const currentUsername = localStorage.getItem('agreen_admin_username') || 'admin';
+  const [editUsername, setEditUsername] = useState(currentUsername);
   const [editPassword, setEditPassword] = useState('');
+  const [editOldPassword, setEditOldPassword] = useState('');
   const [editAvatar, setEditAvatar] = useState<string>(() => localStorage.getItem('agreen_admin_avatar') || '');
   const [saveMsg, setSaveMsg] = useState('');
 
   const avatar = localStorage.getItem('agreen_admin_avatar') || '';
-  const initials = (getAdminCredentials().username || 'A').slice(0, 1).toUpperCase();
+  const initials = (localStorage.getItem('agreen_admin_username') || 'A').slice(0, 1).toUpperCase();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -197,20 +198,32 @@ function AccountDropdown() {
   }, []);
 
   const openEdit = () => {
-    const c = getAdminCredentials();
-    setEditUsername(c.username);
+    setEditUsername(localStorage.getItem('agreen_admin_username') || 'admin');
     setEditPassword('');
+    setEditOldPassword('');
     setEditAvatar(localStorage.getItem('agreen_admin_avatar') || '');
     setSaveMsg('');
     setOpen(false);
     setShowEditModal(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUsername.trim()) return;
-    const newPass = editPassword.trim() || getAdminCredentials().password;
-    updateAdminCredentials(editUsername.trim(), newPass);
+    
+    // Only attempt to change password if they enter a new one
+    if (editPassword.trim()) {
+      if (!editOldPassword.trim()) {
+        setSaveMsg('Vui lòng nhập mật khẩu cũ để đổi mật khẩu!');
+        return;
+      }
+      const res = await updateAdminCredentials(editUsername.trim(), editOldPassword.trim(), editPassword.trim());
+      if (!res.success) {
+        setSaveMsg(res.error || 'Đổi mật khẩu thất bại!');
+        return;
+      }
+    }
+    
     localStorage.setItem('agreen_admin_avatar', editAvatar);
     setSaveMsg('Đã lưu thay đổi!');
     setTimeout(() => { setShowEditModal(false); window.location.reload(); }, 900);
@@ -247,7 +260,7 @@ function AccountDropdown() {
           border: '1px solid var(--border)', minWidth: '192px', zIndex: 500, padding: '6px',
         }}>
           <div style={{ padding: '10px 12px 10px', borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>
-            <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--text-primary)' }}>{getAdminCredentials().username}</div>
+            <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--text-primary)' }}>{localStorage.getItem('agreen_admin_username') || 'admin'}</div>
             <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Quản trị viên</div>
           </div>
           <button onClick={openEdit} style={{
@@ -297,25 +310,20 @@ function AccountDropdown() {
                   <ImageIcon size={13} /> Đổi ảnh đại diện
                 </button>
               </div>
-
-              <div className="form-group">
-                <label className="form-label">Tên đăng nhập</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={15} color="#9ca3af" style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                  <input type="text" value={editUsername} onChange={e => setEditUsername(e.target.value)} required
-                    className="form-input" style={{ paddingLeft: '34px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '20px' }}>
+                <div className="form-group">
+                  <label className="form-label">Tên hiển thị</label>
+                  <input type="text" className="form-input" value={editUsername} onChange={e => setEditUsername(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Mật khẩu cũ (bắt buộc khi đổi mk)</label>
+                  <input type="password" className="form-input" placeholder="Nhập mật khẩu hiện tại..." value={editOldPassword} onChange={e => setEditOldPassword(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Mật khẩu mới</label>
+                  <input type="password" className="form-input" placeholder="Bỏ trống nếu không đổi..." value={editPassword} onChange={e => setEditPassword(e.target.value)} />
                 </div>
               </div>
-
-              <div className="form-group">
-                <label className="form-label">Mật khẩu mới <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(để trống = giữ nguyên)</span></label>
-                <div style={{ position: 'relative' }}>
-                  <Lock size={15} color="#9ca3af" style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                  <input type="password" value={editPassword} onChange={e => setEditPassword(e.target.value)} placeholder="Nhập mật khẩu mới..."
-                    className="form-input" style={{ paddingLeft: '34px' }} />
-                </div>
-              </div>
-
               {saveMsg && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: '#16a34a', fontWeight: 600, fontSize: '13px' }}>
                   <Check size={15} /> {saveMsg}

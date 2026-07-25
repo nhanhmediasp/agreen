@@ -44,32 +44,33 @@ export function clearSecurityLogs() {
   localStorage.removeItem(SECURITY_LOGS_KEY);
 }
 
-function getStoredCredentials() {
-  const stored = localStorage.getItem(ADMIN_CREDENTIALS_KEY);
-  if (stored) return JSON.parse(stored);
-  return { username: 'admin', password: 'agreen2024' };
-}
-
 export function checkLogin(): boolean {
   return localStorage.getItem('agreen_auth') === 'true';
 }
 
 export function doLogout() {
   localStorage.removeItem('agreen_auth');
+  localStorage.removeItem('agreen_admin_username');
 }
 
-export function getAdminCredentials() {
-  return getStoredCredentials();
-}
-
-export function updateAdminCredentials(username: string, password: string) {
-  localStorage.setItem(ADMIN_CREDENTIALS_KEY, JSON.stringify({ username, password }));
-  fetch('/api/credentials', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  }).catch(err => console.error('Failed to sync credentials to server', err));
-  logSecurityEvent('PASSWORD_CHANGE', `Tài khoản '${username}' đã đổi mật khẩu thành công.`, username);
+export async function updateAdminCredentials(username: string, oldPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, oldPassword, newPassword })
+    });
+    const data = await res.json();
+    if (data.success) {
+      logSecurityEvent('PASSWORD_CHANGE', `Tài khoản '${username}' đã đổi mật khẩu thành công.`, username);
+      return { success: true };
+    } else {
+      return { success: false, error: data.error || 'Đổi mật khẩu thất bại' };
+    }
+  } catch (err) {
+    console.error('Failed to sync credentials to server', err);
+    return { success: false, error: 'Lỗi kết nối máy chủ' };
+  }
 }
 
 export default function Login({ onLogin }: { onLogin: () => void }) {
@@ -121,17 +122,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Sync credentials from server on mount
-  useEffect(() => {
-    fetch('/api/credentials')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.data) {
-          localStorage.setItem(ADMIN_CREDENTIALS_KEY, JSON.stringify(data.data));
-        }
-      })
-      .catch(err => console.error('Failed to sync server credentials on mount', err));
-  }, []);
+  // Sync credentials check removed as it's now PostgreSQL
 
   // Generate CAPTCHA when failed attempts reach 3
   useEffect(() => {
@@ -140,7 +131,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     }
   }, [failedCount]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Check Lockout
@@ -161,13 +152,19 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     setLoading(true);
     setError('');
 
-    setTimeout(() => {
-      const creds = getStoredCredentials();
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
 
-      if (username === creds.username && password === creds.password) {
+      if (data.success) {
         // SUCCESSFUL LOGIN
         localStorage.setItem('agreen_auth', 'true');
         localStorage.setItem('agreen_auth_time', Date.now().toString());
+        localStorage.setItem('agreen_admin_username', data.data.username);
         localStorage.removeItem(FAILED_LOGINS_KEY);
         localStorage.removeItem(LOCKOUT_UNTIL_KEY);
         logSecurityEvent('LOGIN_SUCCESS', `Đăng nhập thành công từ tài khoản '${username}'`, username);
@@ -188,14 +185,17 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
           logSecurityEvent('LOCKOUT', `KÍCH HOẠT KHÓA ĐĂNG NHẬP 60s do nhập sai mật khẩu 5 lần liên tiếp!`, username);
           setError(`🔒 Tài khoản tạm bị KHÓA 60 giây do đăng nhập sai 5 lần liên tiếp để phòng chống Brute-force spam phá hoại.`);
         } else if (newFailed >= 3) {
-          setError(`Tên đăng nhập hoặc mật khẩu không đúng (Sai ${newFailed}/5 lần). Kích hoạt mã xác thực CAPTCHA.`);
+          setError(data.error + ` (Sai ${newFailed}/5 lần). Kích hoạt mã xác thực CAPTCHA.`);
           generateCaptcha();
         } else {
-          setError(`Tên đăng nhập hoặc mật khẩu không đúng (Sai ${newFailed}/5 lần). Vui lòng thử lại.`);
+          setError(data.error + ` (Sai ${newFailed}/5 lần). Vui lòng thử lại.`);
         }
       }
+    } catch (err) {
+      setError('Lỗi kết nối đến máy chủ xác thực.');
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   const isLocked = lockoutRemaining > 0;

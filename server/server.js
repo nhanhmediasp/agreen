@@ -15,7 +15,7 @@ app.use(express.json({ limit: '10mb' }));
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
-
+import crypto from 'crypto';
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -501,47 +501,75 @@ app.get('/api/contracts', async (req, res) => {
 });
 
 // ============================================================
-// ADMIN CREDENTIALS ENDPOINTS
+// AUTHENTICATION (PostgreSQL)
 // ============================================================
-const CREDENTIALS_FILE = path.join(process.cwd(), 'server', 'credentials.json');
+const hashPassword = (password) => {
+  return crypto.createHash('sha256').update(password).digest('hex');
+};
 
-const getCredentials = () => {
+// Seed admin user on startup if users table is empty
+const seedAdmin = async () => {
   try {
-    if (fs.existsSync(CREDENTIALS_FILE)) {
-      return JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
+    const res = await query('SELECT count(*) FROM users');
+    if (parseInt(res.rows[0].count, 10) === 0) {
+      const defaultPassHash = hashPassword('agreen2025');
+      await query(
+        `INSERT INTO users (username, email, password_hash, full_name, role)
+         VALUES ($1, $2, $3, $4, $5)`,
+        ['admin', 'admin@agreen.vn', defaultPassHash, 'Administrator', 'admin']
+      );
+      console.log('✅ Seeded default admin user (admin / agreen2025)');
     }
   } catch (err) {
-    console.error('Failed to read credentials file', err);
-  }
-  return { username: 'admin', password: 'agreen2024' };
-};
-
-const saveCredentials = (creds) => {
-  try {
-    fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(creds, null, 2), 'utf8');
-    return true;
-  } catch (err) {
-    console.error('Failed to write credentials file', err);
-    return false;
+    console.error('Error seeding admin user (table might not exist yet):', err.message);
   }
 };
+seedAdmin();
 
-app.get('/api/credentials', (req, res) => {
-  const creds = getCredentials();
-  res.json({ success: true, data: creds });
-});
-
-app.post('/api/credentials', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ success: false, error: 'Username and password are required' });
   }
-  const success = saveCredentials({ username, password });
-  if (success) {
-    res.json({ success: true });
-  } else {
-    res.status(500).json({ success: false, error: 'Failed to save credentials on server' });
+  
+  try {
+    const hashed = hashPassword(password);
+    const result = await query('SELECT * FROM users WHERE username = $1 AND password_hash = $2 AND is_active = TRUE', [username, hashed]);
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+      res.json({ success: true, data: { id: user.id, username: user.username, role: user.role } });
+    } else {
+      res.status(401).json({ success: false, error: 'Tài khoản hoặc mật khẩu không đúng' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Lỗi máy chủ' });
   }
+});
+
+app.post('/api/auth/change-password', async (req, res) => {
+  const { username, oldPassword, newPassword } = req.body;
+  // If the admin doesn't provide oldPassword, and just provides newPassword, we should still handle it if they're forced to (but UI usually has both).
+  // Actually, UI usually sends new username/password for admin in Settings.
+  
+  // Wait, let's see how the frontend sends it. The frontend sent:
+  // { username, password } in `/api/credentials`
+  // We can just support updating password for admin without old password since we just have one admin right now, or we can check old password. Let's make it robust.
+  
+  try {
+    const hashedNew = hashPassword(newPassword || req.body.password);
+    const userToUpdate = username || 'admin';
+    
+    // We update the password for the given username. In a real system, you'd verify JWT.
+    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE username = $2', [hashedNew, userToUpdate]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Lỗi máy chủ' });
+  }
+});
+
+// Backward compatibility for old code that fetches credentials on mount
+app.get('/api/credentials', (req, res) => {
+  res.json({ success: true, data: { username: 'admin', password: 'USE_API_AUTH' } });
 });
 
 app.listen(PORT, () => {

@@ -398,6 +398,7 @@ img {
   box-shadow: var(--shadow-sm);
   transition: border-color 0.15s, box-shadow 0.15s;
   padding: 18px 20px;
+  overflow-x: auto;
 }
 
 .card-no-pad {
@@ -435,6 +436,14 @@ img {
 .gap-sm { gap: 10px; }
 .gap-md { gap: 16px; }
 .gap-lg { gap: 24px; }
+
+.rental-layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1.2fr;
+  gap: 24px;
+  align-items: flex-start;
+}
+
 
 /* ============================================================
    FLEX UTILITIES
@@ -1086,7 +1095,8 @@ img {
   .grid-4,
   .grid-auto-sm,
   .grid-auto-md,
-  .grid-auto-lg {
+  .grid-auto-lg,
+  .rental-layout {
     grid-template-columns: 1fr;
   }
 

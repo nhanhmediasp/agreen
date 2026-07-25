@@ -304,7 +304,7 @@ const CreateRental = () => {
       </div>
 
       {/* Unified 2-Column Layout Grid for ALL steps */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.2fr', gap: '24px', alignItems: 'flex-start' }}>
+      <div className="rental-layout">
         
         {/* Left Column: Form content based on current Step */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -370,7 +370,7 @@ const CreateRental = () => {
                 ) : (
                   /* Selected Car Summary Card */
                   <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                       <img src={selectedCarObj?.image} style={{ width: '70px', height: '46px', borderRadius: '4px', objectFit: 'cover' }} />
                       <div style={{ fontSize: '14px' }}>
                         <div>Xe đã chọn: <strong>{selectedCarObj?.name}</strong></div>
@@ -388,7 +388,7 @@ const CreateRental = () => {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1.2 }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Bảng giá áp dụng</label>
                   <select 
@@ -423,7 +423,7 @@ const CreateRental = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Phụ phí Cuối tuần / Lễ tết (%)</label>
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
                     <input type="checkbox" checked={isWeekend} onChange={e => { setIsWeekend(e.target.checked); setCustomRentalFeeInput(''); }} style={{ width: '18px', height: '18px' }} />
                     Áp dụng phụ phí
@@ -444,7 +444,7 @@ const CreateRental = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Thời gian nhận & trả xe (Tự động tính)</label>
-                <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1 }}>
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Ngày nhận xe</span>
                     <input 
@@ -466,7 +466,7 @@ const CreateRental = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc bàn giao</label>
                   <input 
@@ -622,7 +622,7 @@ const CreateRental = () => {
                     />
                   </div>
                   
-                  <div style={{ display: 'flex', gap: '16px' }}>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Họ và tên *</label>
                       <input 
@@ -645,7 +645,7 @@ const CreateRental = () => {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '16px' }}>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số GPLX (Bằng lái xe) *</label>
                       <input 
@@ -696,7 +696,7 @@ const CreateRental = () => {
               {/* Loại Hợp Đồng */}
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Loại Hợp đồng thuê</label>
-                <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '10px 16px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', flex: 1, background: contractSource === 'system' ? 'var(--status-ready-bg)' : 'white' }}>
                     <input type="radio" checked={contractSource === 'system'} onChange={() => setContractSource('system')} />
                     Hệ thống tự tạo mẫu hợp đồng
@@ -748,7 +748,7 @@ const CreateRental = () => {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1.2 }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Tiền cọc giữ xe (Bắt buộc)</label>
                   <MoneyInput
@@ -926,7 +926,7 @@ const CreateRental = () => {
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Biển số xe *</label>
                 <input type="text" placeholder="VD: 51F-123.45" value={quickPlate} onChange={e => setQuickPlate(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
@@ -937,7 +937,7 @@ const CreateRental = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1.5 }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Dòng xe *</label>
                 <input type="text" placeholder="VD: Mazda 3" value={quickName} onChange={e => setQuickName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
@@ -948,7 +948,7 @@ const CreateRental = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Màu sắc *</label>
                 <input type="text" placeholder="VD: Trắng" value={quickColor} onChange={e => setQuickColor(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
@@ -975,7 +975,7 @@ const CreateRental = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Số KM ban đầu *</label>
                 <input type="number" placeholder="VD: 15000" value={quickKm} onChange={e => setQuickKm(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />

@@ -1126,6 +1126,29 @@ const Contracts = () => {
             )}
           </div>
 
+          {/* Bulk Actions */}
+          {selectedRentalIds.length > 0 && (
+            <div style={{ padding: '12px 16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <span style={{ fontSize: '14px', fontWeight: 600, color: '#991b1b' }}>
+                Đã chọn {selectedRentalIds.length} hợp đồng
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  onClick={() => {
+                    if (confirm(`Bạn có chắc chắn muốn xóa ${selectedRentalIds.length} hợp đồng đã chọn? Hành động này không thể hoàn tác.`)) {
+                      selectedRentalIds.forEach(id => deleteRental(id));
+                      setSelectedRentalIds([]);
+                      showToast(`Đã xóa ${selectedRentalIds.length} hợp đồng!`, 'success');
+                    }
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#ef4444', color: 'white', borderRadius: 'var(--radius-sm)', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                >
+                  <Trash size={14} /> Xóa hàng loạt
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Table list */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
