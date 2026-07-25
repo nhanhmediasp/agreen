@@ -836,6 +836,349 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
     );
   }
 
+  // ============================================================
+  // DRIVER DETAIL PAGE VIEW (TRANG CHI TIẾT TÀI XẾ RIÊNG BIỆT)
+  // ============================================================
+  if (selectedDriverIdPage) {
+    const selectedDriver = drivers.find(d => d.id === selectedDriverIdPage);
+    if (!selectedDriver) {
+      return (
+        <div style={{ padding: '24px' }}>
+          <button onClick={() => setSelectedDriverIdPage(null)} className="btn btn-secondary">
+            <ArrowLeft size={16} /> Quay lại danh sách
+          </button>
+          <div style={{ marginTop: '20px', color: '#EF4444', fontWeight: 600 }}>Không tìm thấy thông tin tài xế trong hệ thống!</div>
+        </div>
+      );
+    }
+
+    const assignedCar = cars.find(c => c.id === selectedDriver.assignedCarId);
+    const driverOrders = serviceOrders.filter(o => o.driverId === selectedDriver.id || o.driverName === selectedDriver.name);
+    
+    // Date filtered orders for this driver
+    const filteredDriverOrders = driverOrders.filter(o => {
+      if (!driverPageDateFilter) return true;
+      return o.serviceDate.slice(0, 10) === driverPageDateFilter;
+    });
+
+    const totalKm = driverOrders.reduce((sum, o) => sum + Math.max(0, o.endKm - o.startKm), 0);
+    const totalFareRevenue = driverOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const totalDriverEarnings = driverOrders.reduce((sum, o) => sum + (o.driverCommissionAmount || Math.round(o.totalAmount * ((selectedDriver.commissionRate || 80)/100))), 0);
+    const totalCompanyRevenue = totalFareRevenue - totalDriverEarnings;
+    const paidOrdersCount = driverOrders.filter(o => o.paymentStatus === 'paid').length;
+
+    const statusLabels = {
+      available: { text: '🟢 Sẵn sàng chạy chuyến', bg: '#DCFCE7', color: '#15803D' },
+      on_trip: { text: '🔵 Đang trên chuyến đi', bg: '#DBEAFE', color: '#1E40AF' },
+      off: { text: '⚪ Đang tạm nghỉ', bg: '#F1F5F9', color: '#64748B' }
+    };
+    const currentStatus = statusLabels[selectedDriver.status] || statusLabels.available;
+
+    return (
+      <div className="page-container" style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+        
+        {/* Navigation Top Bar */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+          <button
+            onClick={() => setSelectedDriverIdPage(null)}
+            style={{
+              padding: '9px 16px',
+              borderRadius: '10px',
+              border: '1px solid #CBD5E1',
+              background: '#FFFFFF',
+              color: '#334155',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <ArrowLeft size={18} /> Quay lại danh sách tài xế
+          </button>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => handleOpenDriverModal(selectedDriver)}
+              style={{
+                padding: '9px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                background: '#006837',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 6px rgba(0,104,55,0.25)'
+              }}
+            >
+              <Edit size={16} /> Chỉnh sửa thông tin & Ảnh đại diện
+            </button>
+
+            <button
+              onClick={() => {
+                handleDeleteDriver(selectedDriver.id, selectedDriver.name);
+                setSelectedDriverIdPage(null);
+              }}
+              style={{
+                padding: '9px 14px',
+                borderRadius: '10px',
+                border: '1px solid #FCA5A5',
+                background: '#FEF2F2',
+                color: '#EF4444',
+                fontWeight: 700,
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Trash2 size={16} /> Xóa tài xế
+            </button>
+          </div>
+        </div>
+
+        {/* Hero Driver Profile Card */}
+        <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '24px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center' }}>
+            
+            {/* Avatar image with upload trigger overlay */}
+            <div style={{ position: 'relative', width: '90px', height: '90px', borderRadius: '50%', flexShrink: 0, overflow: 'hidden', border: '3px solid #006837', boxShadow: '0 4px 10px rgba(0,104,55,0.2)' }}>
+              {selectedDriver.avatar ? (
+                <img src={selectedDriver.avatar} alt={selectedDriver.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', background: '#006837', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', fontWeight: '800' }}>
+                  {selectedDriver.name.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              
+              <button
+                onClick={() => handleOpenDriverModal(selectedDriver)}
+                style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  background: 'rgba(0,0,0,0.65)', color: '#FFF', border: 'none',
+                  fontSize: '10px', padding: '4px 0', textAlign: 'center', cursor: 'pointer',
+                  fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px'
+                }}
+                title="Bấm để đổi ảnh đại diện"
+              >
+                <Camera size={11} /> Đổi ảnh
+              </button>
+            </div>
+
+            {/* Profile Info */}
+            <div style={{ flex: 1, minWidth: '260px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0F172A', margin: 0 }}>
+                  {selectedDriver.name}
+                </h2>
+                <span style={{ fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '16px', background: currentStatus.bg, color: currentStatus.color }}>
+                  {currentStatus.text}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginTop: '10px', fontSize: '13.5px', color: '#475569' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Phone size={15} style={{ color: '#006837' }} />
+                  <strong>SĐT:</strong> <a href={`tel:${selectedDriver.phone}`} style={{ color: '#006837', fontWeight: 700 }}>{selectedDriver.phone}</a>
+                </div>
+
+                <div>
+                  <strong>GPLX:</strong> {selectedDriver.licenseNumber ? `${selectedDriver.licenseNumber} (Hạng ${selectedDriver.licenseClass})` : 'Chưa cập nhật'}
+                </div>
+
+                <div>
+                  <strong>Chiết khấu mặc định:</strong> <span style={{ color: '#D97706', fontWeight: 800 }}>{selectedDriver.commissionRate || 80}%</span>
+                </div>
+              </div>
+
+              {(assignedCar || selectedDriver.address || selectedDriver.notes) && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #F1F5F9', fontSize: '13px', display: 'flex', flexWrap: 'wrap', gap: '16px', color: '#64748B' }}>
+                  {assignedCar && (
+                    <div style={{ color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Car size={14} /> Xe đang phụ trách: <strong>{assignedCar.id} - {assignedCar.name}</strong>
+                    </div>
+                  )}
+                  {selectedDriver.address && <div>📍 Địa chỉ: {selectedDriver.address}</div>}
+                  {selectedDriver.notes && <div>📝 Ghi chú: {selectedDriver.notes}</div>}
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+        {/* Driver Performance KPI Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          
+          <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>Tổng số chuyến xe</div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#0F172A', marginTop: '4px' }}>
+              {driverOrders.length} <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 400 }}>chuyến</span>
+            </div>
+            <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px' }}>Đã thanh toán {paidOrdersCount}/{driverOrders.length} đơn</div>
+          </div>
+
+          <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>Tổng quãng đường đã chạy</div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#7C3AED', marginTop: '4px' }}>
+              {totalKm.toLocaleString('vi-VN')} <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 400 }}>KM</span>
+            </div>
+            <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>Tính theo Odometer đơn</div>
+          </div>
+
+          <div style={{ background: '#FEF3C7', padding: '16px 20px', borderRadius: '12px', border: '1px solid #F59E0B' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#B45309' }}>💰 Tổng Thu Nhập Tài Xế</div>
+            <div style={{ fontSize: '22px', fontWeight: '900', color: '#D97706', marginTop: '4px' }}>
+              {totalDriverEarnings.toLocaleString('vi-VN')} ₫
+            </div>
+            <div style={{ fontSize: '11px', color: '#B45309', marginTop: '2px' }}>Thu nhập chiết khấu thực nhận</div>
+          </div>
+
+          <div style={{ background: '#ECFDF5', padding: '16px 20px', borderRadius: '12px', border: '1px solid #A7F3D0' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#047857' }}>🏢 Doanh Thu Mang Về Cty</div>
+            <div style={{ fontSize: '22px', fontWeight: '900', color: '#006837', marginTop: '4px' }}>
+              {totalCompanyRevenue.toLocaleString('vi-VN')} ₫
+            </div>
+            <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px' }}>Công ty thu về sau chiết khấu</div>
+          </div>
+
+        </div>
+
+        {/* Trips & Service Orders History of Driver */}
+        <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '20px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText size={18} color="#006837" /> Lịch sử & Chi tiết Chuyến xe của Tài xế ({filteredDriverOrders.length})
+            </h3>
+
+            {/* Date filter for driver trips */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#64748B' }}>Lọc theo ngày:</span>
+              <input
+                type="date"
+                value={driverPageDateFilter}
+                onChange={e => setDriverPageDateFilter(e.target.value)}
+                style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+              />
+              {driverPageDateFilter && (
+                <button onClick={() => setDriverPageDateFilter('')} style={{ background: '#F1F5F9', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                  Xóa lọc
+                </button>
+              )}
+            </div>
+          </div>
+
+          {filteredDriverOrders.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
+              Tài xế này chưa có chuyến xe nào trong hệ thống!
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', color: '#475569', fontSize: '11.5px', textTransform: 'uppercase', borderBottom: '1px solid #E2E8F0' }}>
+                    <th style={{ padding: '12px 14px' }}>Mã đơn & Ngày</th>
+                    <th style={{ padding: '12px 14px' }}>Xe chạy</th>
+                    <th style={{ padding: '12px 14px' }}>Lộ trình di chuyển</th>
+                    <th style={{ padding: '12px 14px' }}>Quãng đường</th>
+                    <th style={{ padding: '12px 14px' }}>Cước thu khách</th>
+                    <th style={{ padding: '12px 14px' }}>Chiết khấu Tài xế</th>
+                    <th style={{ padding: '12px 14px' }}>Thanh toán</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDriverOrders.map(order => {
+                    const dist = Math.max(0, order.endKm - order.startKm);
+                    const commRate = order.driverCommissionRate || selectedDriver.commissionRate || 80;
+                    const commAmount = order.driverCommissionAmount || Math.round(order.totalAmount * (commRate / 100));
+                    const isPaid = order.paymentStatus === 'paid';
+
+                    return (
+                      <tr key={order.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '12px 14px' }}>
+                          <strong style={{ color: '#006837', fontSize: '14px' }}>{order.id}</strong>
+                          <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>
+                            {new Date(order.serviceDate).toLocaleString('vi-VN')}
+                          </div>
+                        </td>
+
+                        <td style={{ padding: '12px 14px' }}>
+                          <span className="license-plate" style={{ fontSize: '12px', padding: '2px 8px' }}>
+                            {order.carId}
+                          </span>
+                        </td>
+
+                        <td style={{ padding: '12px 14px', maxWidth: '220px' }}>
+                          {(order.pickupLocation || order.dropoffLocation) ? (
+                            <div>
+                              {order.pickupLocation && <div>📍 Đón: {order.pickupLocation}</div>}
+                              {order.dropoffLocation && <div>➔ Trả: {order.dropoffLocation}</div>}
+                            </div>
+                          ) : (
+                            <span style={{ color: '#94A3B8' }}>---</span>
+                          )}
+                        </td>
+
+                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#7C3AED' }}>
+                          {dist} KM
+                          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 400 }}>({order.startKm} ➔ {order.endKm})</div>
+                        </td>
+
+                        <td style={{ padding: '12px 14px', fontWeight: 800, color: '#0F172A' }}>
+                          {order.totalAmount.toLocaleString('vi-VN')} ₫
+                        </td>
+
+                        <td style={{ padding: '12px 14px' }}>
+                          <strong style={{ color: '#D97706', fontSize: '14px' }}>{commAmount.toLocaleString('vi-VN')} ₫</strong>
+                          <div style={{ fontSize: '11px', color: '#B45309' }}>Tỷ lệ: {commRate}%</div>
+                        </td>
+
+                        <td style={{ padding: '12px 14px' }}>
+                          <button
+                            onClick={() => toggleServiceOrderPayment(order.id)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              border: 'none',
+                              cursor: 'pointer',
+                              background: isPaid ? '#DCFCE7' : '#FEE2E2',
+                              color: isPaid ? '#15803D' : '#991B1B'
+                            }}
+                          >
+                            {isPaid ? '🟢 ĐÃ THANH TOÁN' : '🔴 CHƯA THANH TOÁN'}
+                          </button>
+                        </td>
+
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleOpenQuoteModal(order)}
+                            style={{ padding: '6px 12px', background: '#006837', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Eye size={13} /> Xem đơn & Gửi báo giá
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+      </div>
+    );
+  }
+
   // STANDARD MAIN VIEW (ORDERS LIST & DRIVERS LIST)
   return (
     <div className="page-container" style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
