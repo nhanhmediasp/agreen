@@ -495,6 +495,81 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   });
 
+  // Helper DB mapper functions
+  const mapCustomerFromDB = (dbCust: any): Customer => ({
+    id: dbCust.id,
+    name: dbCust.full_name || '',
+    phone: dbCust.phone || '',
+    license: dbCust.driver_license || '',
+    cccd: dbCust.id_card || '',
+    address: dbCust.address || '',
+    classification: dbCust.status === 'VIP' ? 'vip' : dbCust.status === 'Blacklisted' ? 'warning' : 'normal',
+    notes: dbCust.notes || '',
+    activeRentals: 0,
+    totalRentals: 0,
+    status: 'verified',
+    statusText: 'Đã xác minh',
+    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
+  });
+
+  const mapCarFromDB = (dbCar: any): Car => ({
+    id: dbCar.plate_number || dbCar.id,
+    name: `${dbCar.brand} ${dbCar.model}`,
+    brand: dbCar.brand || '',
+    year: String(dbCar.year || 2024),
+    seats: dbCar.seats || 4,
+    status: dbCar.status === 'Rented' ? 'rented' : dbCar.status === 'Maintenance' ? 'maintenance' : dbCar.status === 'Reserved' ? 'suspended' : 'ready',
+    color: dbCar.color || 'Trắng',
+    image: dbCar.image_url || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
+    km: dbCar.current_mileage || 0,
+    ownerPhone: '',
+    expiryRegistration: dbCar.registration_expiry ? dbCar.registration_expiry.split('T')[0] : '2026-12-31',
+    expiryInsurance: dbCar.insurance_expiry ? dbCar.insurance_expiry.split('T')[0] : '2026-12-31',
+    expiryLicense: '2026-12-31',
+    pricePerDay: Number(dbCar.daily_rate) || 800000,
+    pricePerHour: 100000,
+    pricePerWeek: Number(dbCar.monthly_rate) || 5000000
+  });
+
+  const mapOwnerFromDB = (dbOwner: any): Owner => ({
+    id: dbOwner.id,
+    name: dbOwner.name || '',
+    phone: dbOwner.phone || '',
+    address: dbOwner.address || '',
+    notes: dbOwner.notes || '',
+    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80'
+  });
+
+  // Fetch real data from PostgreSQL Backend API on mount
+  useEffect(() => {
+    fetch('/api/customers')
+      .then(r => r.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setCustomers(res.data.map(mapCustomerFromDB));
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/vehicles')
+      .then(r => r.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setCars(res.data.map(mapCarFromDB));
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/owners')
+      .then(r => r.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setOwners(res.data.map(mapOwnerFromDB));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Sync to localStorage
   useEffect(() => { localStorage.setItem('agreen_cars', JSON.stringify(cars)); }, [cars]);
   useEffect(() => { localStorage.setItem('agreen_customers', JSON.stringify(customers)); }, [customers]);
@@ -538,6 +613,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (car.image && !images.some(img => img.url === car.image)) {
       setImages(prev => [...prev, { id: Date.now().toString(), url: car.image, usedIn: `Xe ${car.id}` }]);
     }
+    fetch('/api/vehicles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        plate_number: car.id,
+        brand: car.brand,
+        model: car.name.replace(car.brand, '').trim() || car.name,
+        year: Number(car.year) || 2024,
+        color: car.color,
+        seats: car.seats,
+        daily_rate: car.pricePerDay,
+        monthly_rate: car.pricePerWeek,
+        status: car.status === 'rented' ? 'Rented' : car.status === 'maintenance' ? 'Maintenance' : 'Available',
+        current_mileage: car.km,
+        image_url: car.image
+      })
+    }).catch(() => {});
   };
 
   const updateCar = (id: string, updatedFields: Partial<Car>) => {
@@ -553,7 +645,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addCustomer = (customer: Customer) => {
-    setCustomers(prev => [...prev, customer]);
+    setCustomers(prev => [customer, ...prev]);
+    fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        full_name: customer.name,
+        phone: customer.phone,
+        id_card: customer.cccd,
+        driver_license: customer.license,
+        address: customer.address,
+        status: customer.classification === 'vip' ? 'VIP' : customer.classification === 'warning' ? 'Blacklisted' : 'Active',
+        notes: customer.notes
+      })
+    }).catch(() => {});
   };
 
   const updateCustomer = (id: string, updatedFields: Partial<Customer>) => {
@@ -561,7 +666,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addOwner = (owner: Owner) => {
-    setOwners(prev => [...prev, owner]);
+    setOwners(prev => [owner, ...prev]);
+    fetch('/api/owners', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: owner.name,
+        phone: owner.phone,
+        address: owner.address,
+        notes: owner.notes
+      })
+    }).catch(() => {});
   };
 
   const updateOwner = (id: string, updatedFields: Partial<Owner>) => {
