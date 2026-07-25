@@ -64,6 +64,11 @@ export function getAdminCredentials() {
 
 export function updateAdminCredentials(username: string, password: string) {
   localStorage.setItem(ADMIN_CREDENTIALS_KEY, JSON.stringify({ username, password }));
+  fetch('/api/credentials', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  }).catch(err => console.error('Failed to sync credentials to server', err));
   logSecurityEvent('PASSWORD_CHANGE', `Tài khoản '${username}' đã đổi mật khẩu thành công.`, username);
 }
 
@@ -114,6 +119,18 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     }, 1000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Sync credentials from server on mount
+  useEffect(() => {
+    fetch('/api/credentials')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          localStorage.setItem(ADMIN_CREDENTIALS_KEY, JSON.stringify(data.data));
+        }
+      })
+      .catch(err => console.error('Failed to sync server credentials on mount', err));
   }, []);
 
   // Generate CAPTCHA when failed attempts reach 3

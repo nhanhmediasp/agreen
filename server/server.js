@@ -500,6 +500,50 @@ app.get('/api/contracts', async (req, res) => {
   }
 });
 
+// ============================================================
+// ADMIN CREDENTIALS ENDPOINTS
+// ============================================================
+const CREDENTIALS_FILE = path.join(process.cwd(), 'server', 'credentials.json');
+
+const getCredentials = () => {
+  try {
+    if (fs.existsSync(CREDENTIALS_FILE)) {
+      return JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
+    }
+  } catch (err) {
+    console.error('Failed to read credentials file', err);
+  }
+  return { username: 'admin', password: 'agreen2024' };
+};
+
+const saveCredentials = (creds) => {
+  try {
+    fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(creds, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    console.error('Failed to write credentials file', err);
+    return false;
+  }
+};
+
+app.get('/api/credentials', (req, res) => {
+  const creds = getCredentials();
+  res.json({ success: true, data: creds });
+});
+
+app.post('/api/credentials', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'Username and password are required' });
+  }
+  const success = saveCredentials({ username, password });
+  if (success) {
+    res.json({ success: true });
+  } else {
+    res.status(500).json({ success: false, error: 'Failed to save credentials on server' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Agreen API Server running on port ${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
