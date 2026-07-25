@@ -12,48 +12,26 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [apiAvailable, setApiAvailable] = useState(true);
 
-  // Load uploaded files – try API first, fallback to localStorage
+  // Load uploaded files from the Express backend API on mount
   useEffect(() => {
     fetch('/api/uploads')
       .then(res => {
         const ct = res.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) throw new Error('not json');
+        if (!ct.includes('application/json')) {
+          throw new Error('API không khả dụng – backend chưa chạy');
+        }
         return res.json();
       })
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
           setImages(res.data);
-          setApiAvailable(true);
         }
       })
-      .catch(() => {
-        setApiAvailable(false);
-        // Load from localStorage fallback
-        try {
-          const saved = localStorage.getItem('agreen_gallery_images');
-          if (saved) setImages(JSON.parse(saved));
-        } catch { /* ignore */ }
+      .catch(err => {
+        console.error('Lỗi khi tải danh sách ảnh từ server:', err);
       });
   }, []);
-
-  // Persist to localStorage whenever images change (for offline/fallback mode)
-  useEffect(() => {
-    if (!apiAvailable && images.length > 0) {
-      localStorage.setItem('agreen_gallery_images', JSON.stringify(images));
-    }
-  }, [images, apiAvailable]);
-
-  // Helper: read file as base64 Data URL
-  const readFileAsDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -61,42 +39,26 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
 
     files.forEach(async (file) => {
       const id = Date.now().toString() + Math.random().toString(36).substring(2, 7);
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // Always try API upload first
-      if (apiAvailable) {
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          const res = await fetch('/api/upload', { method: 'POST', body: formData });
-          const ct = res.headers.get('content-type') || '';
-          if (ct.includes('application/json')) {
-            const json = await res.json();
-            if (json.success && json.data) {
-              const newItem = { id, url: json.data.url, name: json.data.filename || file.name, usedIn: null };
-              setImages(prev => [newItem, ...prev]);
-              if (!multiple) { setSelectedIds([id]); } else { setSelectedIds(prev => [id, ...prev]); }
-              return; // success – done
-            }
-          }
-          // If we reach here, the API returned non-JSON (HTML fallback page)
-          setApiAvailable(false);
-        } catch {
-          setApiAvailable(false);
-        }
-      }
-
-      // Fallback: read as base64 Data URL (works without backend)
       try {
-        const dataUrl = await readFileAsDataURL(file);
-        const newItem = { id, url: dataUrl, name: file.name, usedIn: null };
-        setImages(prev => {
-          const next = [newItem, ...prev];
-          localStorage.setItem('agreen_gallery_images', JSON.stringify(next));
-          return next;
-        });
-        if (!multiple) { setSelectedIds([id]); } else { setSelectedIds(prev => [id, ...prev]); }
-      } catch (readErr) {
-        alert(`Không thể đọc file: ${readErr instanceof Error ? readErr.message : readErr}`);
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+          alert('Lỗi: Backend API chưa chạy. Kiểm tra Node.js server (pm2 status) trên aaPanel.');
+          return;
+        }
+        const json = await res.json();
+        if (json.success && json.data) {
+          const newItem = { id, url: json.data.url, name: json.data.filename || file.name, usedIn: null };
+          setImages(prev => [newItem, ...prev]);
+          if (!multiple) { setSelectedIds([id]); } else { setSelectedIds(prev => [id, ...prev]); }
+        } else {
+          alert(`Lỗi upload ảnh: ${json.error || 'Lỗi không xác định'}`);
+        }
+      } catch (err) {
+        alert(`Lỗi kết nối API: ${err instanceof Error ? err.message : err}`);
       }
     });
     e.target.value = '';
@@ -122,7 +84,6 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
   };
 
   const deleteFromServer = (imgUrl: string) => {
-    if (!apiAvailable) return;
     const filename = imgUrl.split('/').pop();
     if (!filename) return;
     fetch(`/api/uploads/${filename}`, { method: 'DELETE' })
@@ -142,13 +103,7 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
   };
 
   const removeImageAndPersist = (id: string) => {
-    setImages(prev => {
-      const next = prev.filter(i => i.id !== id);
-      if (!apiAvailable) {
-        localStorage.setItem('agreen_gallery_images', JSON.stringify(next));
-      }
-      return next;
-    });
+    setImages(prev => prev.filter(i => i.id !== id));
     setSelectedIds(prev => prev.filter(i => i !== id));
   };
 

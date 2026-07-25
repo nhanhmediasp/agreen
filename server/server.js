@@ -636,6 +636,20 @@ app.get('/api/credentials', (req, res) => {
   res.json({ success: true, data: { username: 'admin', password: 'USE_API_AUTH' } });
 });
 
+// ============================================================
+// SERVE FRONTEND (dist/) – cho phép Express phục vụ cả API lẫn frontend
+// trên cùng 1 cổng, không cần Nginx proxy cho /api/
+// ============================================================
+const DIST_DIR = path.join(process.cwd(), 'dist');
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  // SPA fallback: mọi route không phải /api/ hoặc /uploads/ → trả về index.html
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(DIST_DIR, 'index.html'));
+  });
+  console.log(`📁 Serving frontend from: ${DIST_DIR}`);
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 Agreen API Server running on port ${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);

@@ -85,26 +85,24 @@ npm run build
 1. Trên aaPanel ➔ Chọn mục **Website** ➔ **Add site**:
    - **Domain:** `agreen.info.vn` (hoặc tên miền của bạn).
    - **Document Root:** `/www/wwwroot/agreen`
-2. Nhấp vào tên miền vừa tạo ➔ Chọn mục **Site Directory**:
-   - Đổi **Running directory** thành: `/dist`
-   - Nhấn **Save**.
-3. Vào mục **URL Rewrite / Config (Cấu hình Nginx)** dán đoạn mã sau vào:
+2. Nhấp vào tên miền vừa tạo ➔ Vào mục **Config (Cấu hình Nginx)** dán đoạn mã sau vào:
    ```nginx
    client_max_body_size 20M;
 
+   # Proxy mọi thứ sang Node.js Express (cổng 5000)
+   # Express phục vụ cả API (/api/*) lẫn Frontend (dist/) trên cùng 1 cổng
    location / {
-       try_files $uri $uri/ /index.html;
-   }
-
-   location /api/ {
-       proxy_pass http://127.0.0.1:5000/api/;
+       proxy_pass http://127.0.0.1:5000;
        proxy_http_version 1.1;
        proxy_set_header Upgrade $http_upgrade;
        proxy_set_header Connection 'upgrade';
        proxy_set_header Host $host;
        proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
    }
    ```
+   > **Lưu ý:** Không cần đổi Running Directory thành `/dist` nữa vì Express tự phục vụ thư mục `dist/`.
 4. Vào mục **SSL** ➔ Chọn tab **Let's Encrypt** ➔ Tích chọn tên miền ➔ Nhấn **Apply** để bật HTTPS miễn phí!
 
 ---
