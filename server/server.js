@@ -10,6 +10,55 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '10mb' }));
 
 // ============================================================
+// FILE UPLOAD SYSTEM (MULTER)
+// ============================================================
+import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
+
+const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+// Serve uploaded files statically via Express
+app.use('/uploads', express.static(UPLOAD_DIR));
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, '_');
+    cb(null, `${basename}_${Date.now()}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    res.json({
+      success: true,
+      data: {
+        url: `/uploads/${req.file.filename}`,
+        filename: req.file.filename,
+        size: req.file.size
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
 // HEALTH CHECK
 // ============================================================
 app.get('/api/health', async (req, res) => {

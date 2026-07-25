@@ -23,30 +23,33 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const files = Array.from(e.target.files);
-    const newItems: { id: string; url: string; name: string; usedIn: string | null }[] = [];
-    const newIds: string[] = [];
 
-    let processed = 0;
     files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        if (evt.target?.result) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && res.data) {
           const id = Date.now().toString() + Math.random().toString(36).substring(2, 7);
-          const url = evt.target.result as string;
-          newItems.push({ id, url, name: file.name, usedIn: null });
-          newIds.push(id);
-        }
-        processed++;
-        if (processed === files.length) {
-          setImages(prev => [...newItems, ...prev]);
+          const newItem = { id, url: res.data.url, name: res.data.filename || file.name, usedIn: null };
+          setImages(prev => [newItem, ...prev]);
           if (!multiple) {
-            setSelectedIds([newIds[0]]);
+            setSelectedIds([id]);
           } else {
-            setSelectedIds(prev => [...newIds, ...prev]);
+            setSelectedIds(prev => [id, ...prev]);
           }
+        } else {
+          alert(`Lỗi upload ảnh: ${res.error || 'Lỗi không xác định'}`);
         }
-      };
-      reader.readAsDataURL(file);
+      })
+      .catch(err => {
+        alert(`Lỗi kết nối khi upload ảnh: ${err.message || err}`);
+      });
     });
     e.target.value = '';
   };
