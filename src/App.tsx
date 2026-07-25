@@ -35,6 +35,15 @@ import ServiceOrders from './pages/ServiceOrders';
 import Login, { checkLogin, doLogout, getAdminCredentials, updateAdminCredentials } from './pages/Login';
 import { ImageGallery } from './components/ImageGallery';
 
+const isImageUrl = (url: string) => {
+  if (!url || url === 'Auto') return false;
+  return url.startsWith('http') || 
+         url.startsWith('data:') || 
+         url.startsWith('/uploads') || 
+         url.startsWith('/') || 
+         /\.(jpg|jpeg|png|gif|webp|svg|ico)$/i.test(url);
+};
+
 const PAGE_TITLES: Record<string, string> = {
   '/':           'Tổng quan Vận hành',
   '/fleet':      'Quản lý Đội xe',
@@ -62,14 +71,14 @@ function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
         {/* Brand Header */}
         <div className="sidebar-header">
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
-            {settings.logo.startsWith('http') || settings.logo.startsWith('data:') ? (
+            {isImageUrl(settings.logo) ? (
               <img src={settings.logo} alt="Logo" style={{ width: '34px', height: '34px', borderRadius: '9px', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
               <div className="sidebar-logo-icon">{settings.logo.slice(0, 1).toUpperCase()}</div>
             )}
             <div style={{ minWidth: 0 }}>
               <div className="sidebar-brand-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {settings.logo.startsWith('http') ? 'AutoManage' : settings.logo}
+                {isImageUrl(settings.logo) ? 'AGREEN' : settings.logo}
               </div>
               <div style={{ fontSize: '10.5px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                 <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10B981', display: 'inline-block', flexShrink: 0 }}></span>

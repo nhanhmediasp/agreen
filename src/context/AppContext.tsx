@@ -731,9 +731,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       faviconLink.rel = 'icon';
       document.getElementsByTagName('head')[0].appendChild(faviconLink);
     }
+    const isImage = (url: string) => {
+      if (!url || url === 'Auto') return false;
+      return url.startsWith('http') || 
+             url.startsWith('data:') || 
+             url.startsWith('/uploads') || 
+             url.startsWith('/') || 
+             /\.(jpg|jpeg|png|gif|webp|svg|ico)$/i.test(url);
+    };
+
     if (settings.favicon && settings.favicon !== 'Auto') {
       faviconLink.href = settings.favicon;
-    } else if (settings.logo && settings.logo !== 'Auto' && (settings.logo.startsWith('http') || settings.logo.startsWith('data:'))) {
+    } else if (settings.logo && settings.logo !== 'Auto' && isImage(settings.logo)) {
       faviconLink.href = settings.logo;
     } else {
       faviconLink.href = '/favicon.ico';

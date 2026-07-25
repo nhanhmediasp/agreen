@@ -4,6 +4,15 @@ import { useApp } from '../context/AppContext';
 import { getSecurityLogs, clearSecurityLogs, type SecurityLog } from './Login';
 import { ImageGallery } from '../components/ImageGallery';
 
+const isImageUrl = (url: string) => {
+  if (!url || url === 'Auto') return false;
+  return url.startsWith('http') || 
+         url.startsWith('data:') || 
+         url.startsWith('/uploads') || 
+         url.startsWith('/') || 
+         /\.(jpg|jpeg|png|gif|webp|svg|ico)$/i.test(url);
+};
+
 const SettingsPage = () => {
   const { settings, updateSettings, rollbackLogo, showToast } = useApp();
   const [activeTab, setActiveTab] = useState<'interface' | 'contract' | 'security'>('interface');
@@ -144,8 +153,8 @@ const SettingsPage = () => {
                 <h2 style={{ fontSize: '18px', marginBottom: '16px' }}>Logo Thương hiệu</h2>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
                   <div style={{ width: '120px', height: '120px', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                    {localLogo.startsWith('http') || localLogo.startsWith('data:') ? (
-                      <img src={localLogo} alt="Preview Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {isImageUrl(localLogo) ? (
+                      <img src={localLogo} alt="Preview Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     ) : (
                       <div style={{ width: '100%', height: '100%', background: localColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '28px' }}>
                         {localLogo.slice(0, 2).toUpperCase()}
@@ -180,8 +189,8 @@ const SettingsPage = () => {
                 <h2 style={{ fontSize: '18px', marginBottom: '16px' }}>Favicon Website</h2>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
                   <div style={{ width: '120px', height: '120px', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                    {localFavicon && localFavicon !== 'Auto' && (localFavicon.startsWith('http') || localFavicon.startsWith('data:')) ? (
-                      <img src={localFavicon} alt="Preview Favicon" style={{ width: '64px', height: '64px', objectFit: 'contain' }} />
+                    {localFavicon && localFavicon !== 'Auto' && isImageUrl(localFavicon) ? (
+                      <img src={localFavicon} alt="Preview Favicon" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '16px' }} />
                     ) : (
                       <div style={{ width: '100%', height: '100%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px' }}>
                         Tự động
