@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Eye, EyeOff, Car, Lock, User, ShieldAlert, Clock } from 'lucide-react';
 
-const ADMIN_CREDENTIALS_KEY = 'agreen_admin_credentials';
 const FAILED_LOGINS_KEY = 'agreen_failed_logins';
 const LOCKOUT_UNTIL_KEY = 'agreen_lockout_until';
 const SECURITY_LOGS_KEY = 'agreen_security_logs';

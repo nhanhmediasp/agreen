@@ -129,6 +129,11 @@ img {
   display: block;
 }
 
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
 /* ============================================================
    LAYOUT — APP SHELL
    ============================================================ */
@@ -136,8 +141,9 @@ img {
   display: flex;
   min-height: 100vh;
   width: 100%;
+  max-width: 100vw;
   background-color: var(--bg-page);
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 /* ============================================================
@@ -1204,6 +1210,22 @@ img {
   /* Hide search bar in topbar on mobile (it's inline style) */
   .topbar .search-bar,
   header.topbar > div:first-child .search-bar {
+    display: none !important;
+  }
+
+  .desktop-only-table {
+    display: none !important;
+  }
+
+  .mobile-only-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-only-cards {
     display: none !important;
   }
 }

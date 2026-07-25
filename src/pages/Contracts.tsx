@@ -1149,9 +1149,9 @@ const Contracts = () => {
             </div>
           )}
 
-          {/* Table list */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          {/* Desktop Table View */}
+          <div className="card desktop-only-table" style={{ padding: 0, overflowX: 'auto', width: '100%' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
                   <th style={{ padding: '16px 20px', width: '50px', textAlign: 'center' }}>
@@ -1189,8 +1189,12 @@ const Contracts = () => {
                   paginatedRentals.map((rental, idx) => {
                     const sttNumber = (currentPage - 1) * itemsPerPage + idx + 1;
                     return (
-                      <tr key={rental.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                      <tr 
+                        key={rental.id} 
+                        onClick={() => setSelectedDetailRentalId(rental.id)}
+                        style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                      >
+                        <td style={{ padding: '16px 20px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                           <input 
                             type="checkbox"
                             checked={selectedRentalIds.includes(rental.id)}
@@ -1205,7 +1209,7 @@ const Contracts = () => {
                         </td>
                         <td style={{ padding: '16px 20px', fontWeight: 600, color: 'var(--text-secondary)' }}>{sttNumber}</td>
                         <td style={{ padding: '16px 20px', fontWeight: 700 }} className="font-mono">{rental.id}</td>
-                        <td style={{ padding: '16px 20px' }}>
+                        <td style={{ padding: '16px 20px' }} onClick={e => e.stopPropagation()}>
                           <Link to={`/fleet?id=${rental.carId}`} style={{ textDecoration: 'none' }}>
                             <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px', cursor: 'pointer', textDecoration: 'underline' }}>{rental.carId}</span>
                           </Link>
@@ -1231,7 +1235,7 @@ const Contracts = () => {
                         <td style={{ padding: '16px 20px', fontSize: '12px', color: 'var(--text-secondary)' }} className="font-mono">
                           {new Date(rental.startDate).toLocaleDateString('vi-VN')} → {new Date(rental.endDate).toLocaleDateString('vi-VN')}
                         </td>
-                        <td style={{ padding: '16px 20px' }}>
+                        <td style={{ padding: '16px 20px' }} onClick={e => e.stopPropagation()}>
                           <select
                             value={rental.status}
                             onChange={e => {
@@ -1271,7 +1275,7 @@ const Contracts = () => {
                             <option value="cancelled">🔴 Đã hủy đơn</option>
                           </select>
                         </td>
-                        <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                        <td style={{ padding: '16px 20px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
                             <button 
                               onClick={() => setSelectedDetailRentalId(rental.id)}
@@ -1312,7 +1316,108 @@ const Contracts = () => {
               </tbody>
             </table>
 
-            {/* Pagination Controls Footer */}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredRentals.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              unitName="đơn thuê"
+            />
+          </div>
+
+          {/* Mobile Only Cards View */}
+          <div className="mobile-only-cards">
+            {paginatedRentals.length === 0 ? (
+              <div className="card" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                Không tìm thấy đơn thuê nào phù hợp.
+              </div>
+            ) : (
+              paginatedRentals.map((rental) => (
+                <div 
+                  key={rental.id} 
+                  className="card"
+                  style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', border: '1px solid var(--border-strong)', background: 'white' }}
+                >
+                  {/* Card Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input 
+                        type="checkbox"
+                        checked={selectedRentalIds.includes(rental.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedRentalIds(prev => [...prev, rental.id]);
+                          } else {
+                            setSelectedRentalIds(prev => prev.filter(id => id !== rental.id));
+                          }
+                        }}
+                      />
+                      <strong className="font-mono" style={{ fontSize: '15px', color: 'var(--primary)' }}>{rental.id}</strong>
+                      <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px' }}>{rental.carId}</span>
+                    </div>
+
+                    <span style={{ 
+                      padding: '3px 10px', 
+                      borderRadius: '100px', 
+                      fontSize: '11.5px', 
+                      fontWeight: 700,
+                      background: rental.status === 'pending' ? '#fef3c7' : rental.status === 'active' ? '#e0f2fe' : rental.status === 'completed' ? '#d1fae5' : '#fee2e2',
+                      color: rental.status === 'pending' ? '#b45309' : rental.status === 'active' ? '#0369a1' : rental.status === 'completed' ? '#047857' : '#b91c1c'
+                    }}>
+                      {rental.status === 'pending' ? '🟡 Chờ giao' : rental.status === 'active' ? '🔵 Đang thuê' : rental.status === 'completed' ? '🟢 Đã trả' : '🔴 Đã hủy'}
+                    </span>
+                  </div>
+
+                  {/* Card Content */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13.5px', borderTop: '1px solid var(--border-light)', paddingTop: '10px' }}>
+                    <div>👤 <strong>{rental.customerName}</strong> ({rental.customerPhone})</div>
+                    <div>📅 {new Date(rental.startDate).toLocaleDateString('vi-VN')} → {new Date(rental.endDate).toLocaleDateString('vi-VN')}</div>
+                    <div>💰 Tổng tiền: <strong className="font-mono" style={{ color: 'var(--primary)', fontSize: '15px' }}>{rental.totalAmount.toLocaleString()} ₫</strong></div>
+                  </div>
+
+                  {/* Mobile Actions */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border-light)', paddingTop: '10px' }}>
+                    <button 
+                      type="button"
+                      onClick={() => setSelectedDetailRentalId(rental.id)}
+                      style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }}
+                    >
+                      <Eye size={16} /> Xem thông tin chi tiết đơn
+                    </button>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        type="button"
+                        onClick={() => handleViewContract(rental)}
+                        style={{ flex: 1, padding: '8px', background: 'var(--bg-page)', color: 'var(--text-main)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
+                      >
+                        <FileText size={14} /> Xem HĐ
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleOpenEdit(rental)}
+                        style={{ flex: 1, padding: '8px', background: 'var(--bg-page)', color: 'var(--text-main)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
+                      >
+                        <Edit size={14} /> Sửa
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Bạn có chắc chắn muốn XÓA vĩnh viễn đơn thuê #${rental.id}?`)) {
+                            deleteRental(rental.id);
+                          }
+                        }}
+                        style={{ padding: '8px 12px', background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}

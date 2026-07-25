@@ -11,7 +11,6 @@ import {
   UserCheck,
   LogOut,
   User,
-  Lock,
   Image as ImageIcon,
   X,
   Check,
