@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Upload, Save, RefreshCw, ShieldCheck, ShieldAlert, Lock, Trash2, Key, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getSecurityLogs, clearSecurityLogs, type SecurityLog } from './Login';
+import { ImageGallery } from '../components/ImageGallery';
 
 const SettingsPage = () => {
   const { settings, updateSettings, rollbackLogo, showToast } = useApp();
@@ -10,6 +11,11 @@ const SettingsPage = () => {
   // Local state for settings preview before saving
   const [localColor, setLocalColor] = useState(settings.primaryColor);
   const [localLogo, setLocalLogo] = useState(settings.logo);
+  const [localFavicon, setLocalFavicon] = useState(settings.favicon || 'Auto');
+  const [localSiteTitle, setLocalSiteTitle] = useState(settings.siteTitle || 'Hệ thống Quản lý Vận hành Xe AGREEN');
+  const [localAllowIndexing, setLocalAllowIndexing] = useState(settings.allowIndexing !== false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryTarget, setGalleryTarget] = useState<'logo' | 'favicon'>('logo');
   const [showSavedNotification, setShowSavedNotification] = useState(false);
 
   // Security State
@@ -26,17 +32,26 @@ const SettingsPage = () => {
   const handleSave = () => {
     updateSettings({
       primaryColor: localColor,
-      logo: localLogo
+      logo: localLogo,
+      favicon: localFavicon,
+      siteTitle: localSiteTitle,
+      allowIndexing: localAllowIndexing
     });
     setShowSavedNotification(true);
+    showToast('Đã lưu cấu hình hệ thống thành công!', 'success');
     setTimeout(() => {
       setShowSavedNotification(false);
     }, 3000);
   };
 
-  const handleLogoChange = () => {
-    const newMockLogo = 'https://images.unsplash.com/photo-1614741118887-7a4ee193a5fa?auto=format&fit=crop&w=128&q=80';
-    setLocalLogo(newMockLogo);
+  const handleLogoChangeClick = () => {
+    setGalleryTarget('logo');
+    setShowGallery(true);
+  };
+
+  const handleFaviconChangeClick = () => {
+    setGalleryTarget('favicon');
+    setShowGallery(true);
   };
 
   const handleResetLogo = () => {
@@ -90,37 +105,108 @@ const SettingsPage = () => {
         {/* TAB 1: GIAO DIỆN */}
         {activeTab === 'interface' && (
           <>
-            {/* LOGO */}
+            {/* TIÊU ĐỀ TRANG & SEO */}
             <div>
-              <h2 style={{ fontSize: '18px', marginBottom: '16px' }}>Logo Thương hiệu</h2>
-              <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
-                <div style={{ width: '160px', height: '160px', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  {localLogo.startsWith('http') ? (
-                    <img src={localLogo} alt="Preview Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', background: localColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '32px' }}>
-                      {localLogo}
-                    </div>
-                  )}
+              <h2 style={{ fontSize: '18px', marginBottom: '16px' }}>Cấu hình SEO & Tiêu đề Trang</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '600px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Tiêu đề Trang Web (siteTitle)</label>
+                  <input 
+                    type="text"
+                    value={localSiteTitle}
+                    onChange={e => setLocalSiteTitle(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}
+                    placeholder="VD: AGREEN - Hệ thống Quản lý Vận hành xe tự lái"
+                  />
                 </div>
-                
-                <div style={{ flex: 1 }}>
-                  <div style={{ marginBottom: '16px' }}>
-                    <p style={{ fontWeight: 500, marginBottom: '4px' }}>Logo hiện tại</p>
-                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                      Kích thước đề xuất: 512×512px.<br/>Định dạng PNG nền trong suốt, tối đa 2MB.
-                    </p>
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>
+                    <input 
+                      type="checkbox"
+                      checked={localAllowIndexing}
+                      onChange={e => setLocalAllowIndexing(e.target.checked)}
+                    />
+                    Cho phép Công cụ tìm kiếm lập chỉ mục (Bật/Tắt Index trang Google/Bing)
+                  </label>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0 0 22px' }}>
+                    Nếu tắt, hệ thống sẽ chèn thẻ meta `noindex, nofollow` để ẩn trang khỏi các công cụ tìm kiếm công cộng.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ height: '1px', backgroundColor: 'var(--border-light)' }}></div>
+
+            {/* LOGO & FAVICON */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+              {/* LOGO */}
+              <div>
+                <h2 style={{ fontSize: '18px', marginBottom: '16px' }}>Logo Thương hiệu</h2>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '120px', height: '120px', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                    {localLogo.startsWith('http') || localLogo.startsWith('data:') ? (
+                      <img src={localLogo} alt="Preview Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', background: localColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '28px' }}>
+                        {localLogo.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button className="btn-secondary" style={{ gap: '8px' }} onClick={handleLogoChange}>
-                      <Upload size={16} />
-                      Tải logo mới
-                    </button>
-                    <button className="btn-ghost" style={{ gap: '8px' }} onClick={handleResetLogo}>
-                      <RefreshCw size={16} />
-                      Hoàn tác logo cũ
-                    </button>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <p style={{ fontWeight: 500, marginBottom: '2px', fontSize: '14px' }}>Logo hiện tại</p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        Kích thước: 512×512px. Nền trong suốt PNG.
+                      </p>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button className="btn-secondary" style={{ gap: '8px', padding: '6px 12px', fontSize: '13px' }} onClick={handleLogoChangeClick}>
+                        <Upload size={14} />
+                        Tải / Chọn Logo
+                      </button>
+                      <button className="btn-ghost" style={{ gap: '8px', padding: '6px 12px', fontSize: '13px' }} onClick={handleResetLogo}>
+                        <RefreshCw size={14} />
+                        Hoàn tác
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* FAVICON */}
+              <div>
+                <h2 style={{ fontSize: '18px', marginBottom: '16px' }}>Favicon Website</h2>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '120px', height: '120px', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                    {localFavicon && localFavicon !== 'Auto' && (localFavicon.startsWith('http') || localFavicon.startsWith('data:')) ? (
+                      <img src={localFavicon} alt="Preview Favicon" style={{ width: '64px', height: '64px', objectFit: 'contain' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px' }}>
+                        Tự động
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div style={{ flex: 1 }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <p style={{ fontWeight: 500, marginBottom: '2px', fontSize: '14px' }}>Favicon hiện tại</p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        Kích thước: 32×32px. Định dạng ICO hoặc PNG.
+                      </p>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button className="btn-secondary" style={{ gap: '8px', padding: '6px 12px', fontSize: '13px' }} onClick={handleFaviconChangeClick}>
+                        <Upload size={14} />
+                        Chọn Favicon
+                      </button>
+                      <button className="btn-ghost" style={{ gap: '8px', padding: '6px 12px', fontSize: '13px' }} onClick={() => setLocalFavicon('Auto')}>
+                        <RefreshCw size={14} />
+                        Sử dụng mặc định
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -165,7 +251,7 @@ const SettingsPage = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button className="btn-primary" style={{ gap: '8px' }} onClick={handleSave}>
                 <Save size={16} />
-                Lưu cấu hình giao diện
+                Lưu cấu hình hệ thống
               </button>
             </div>
           </>
@@ -303,6 +389,17 @@ const SettingsPage = () => {
 
       </div>
 
+      {showGallery && (
+        <ImageGallery 
+          onClose={() => setShowGallery(false)}
+          onSelect={(url) => {
+            const finalUrl = Array.isArray(url) ? url[0] : url;
+            if (galleryTarget === 'logo') setLocalLogo(finalUrl);
+            else setLocalFavicon(finalUrl);
+            setShowGallery(false);
+          }}
+        />
+      )}
 
     </div>
   );

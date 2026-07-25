@@ -155,9 +155,10 @@ const FleetManagement = () => {
   const [surcharge, setSurcharge] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'debt'>('paid');
 
-  const activeCar = cars.find(c => c.id === selectedCarId);
-  const activeRental = rentals.find(r => r.carId === selectedCarId && r.status === 'active');
-  const carRentals = rentals.filter(r => r.carId === selectedCarId).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  const normalizePlate = (str: string) => str ? str.toUpperCase().replace(/[-. ]/g, '') : '';
+  const activeCar = cars.find(c => normalizePlate(c.id) === normalizePlate(selectedCarId ?? ''));
+  const activeRental = rentals.find(r => normalizePlate(r.carId) === normalizePlate(selectedCarId ?? '') && r.status === 'active');
+  const carRentals = rentals.filter(r => normalizePlate(r.carId) === normalizePlate(selectedCarId ?? '')).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
 
   // Rental history pagination
   const [rentalPage, setRentalPage] = useState(1);

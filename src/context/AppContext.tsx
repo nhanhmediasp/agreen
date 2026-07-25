@@ -148,11 +148,13 @@ export interface ServiceOrder {
   createdAt: string;
 }
 
-interface AppSettings {
+export interface AppSettings {
   logo: string;
   logoHistory: string[];
   favicon: string;
   primaryColor: string;
+  siteTitle: string;
+  allowIndexing: boolean;
 }
 
 interface AppContextType {
@@ -612,10 +614,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [toasts, setToasts] = useState<Toast[]>([]);
   // Settings: localStorage only (theme, logo preferences)
   const [settings, setSettings] = useState<AppSettings>(() => {
+    const defaultSettings = { 
+      logo: 'Auto', 
+      logoHistory: ['Auto'], 
+      favicon: 'Auto', 
+      primaryColor: '#006837', 
+      siteTitle: 'Hệ thống Quản lý Vận hành Xe AGREEN', 
+      allowIndexing: true 
+    };
     try {
       const v = localStorage.getItem('agreen_settings');
-      return v ? JSON.parse(v) : { logo: 'Auto', logoHistory: ['Auto'], favicon: 'Auto', primaryColor: '#006837' };
-    } catch { return { logo: 'Auto', logoHistory: ['Auto'], favicon: 'Auto', primaryColor: '#006837' }; }
+      return v ? { ...defaultSettings, ...JSON.parse(v) } : defaultSettings;
+    } catch { return defaultSettings; }
   });
 
   // ============================================================
@@ -704,6 +714,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       document.documentElement.style.setProperty('--primary-hover', settings.primaryColor);
     }
   }, [settings.primaryColor]);
+
+  // Dynamically apply siteTitle, allowIndexing, and favicon
+  useEffect(() => {
+    // 1. Site Title
+    if (settings.siteTitle) {
+      document.title = settings.siteTitle;
+    } else {
+      document.title = 'Hệ thống Quản lý Vận hành Xe AGREEN';
+    }
+
+    // 2. Favicon
+    let faviconLink = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (!faviconLink) {
+      faviconLink = document.createElement('link');
+      faviconLink.rel = 'icon';
+      document.getElementsByTagName('head')[0].appendChild(faviconLink);
+    }
+    if (settings.favicon && settings.favicon !== 'Auto') {
+      faviconLink.href = settings.favicon;
+    } else if (settings.logo && settings.logo !== 'Auto' && (settings.logo.startsWith('http') || settings.logo.startsWith('data:'))) {
+      faviconLink.href = settings.logo;
+    } else {
+      faviconLink.href = '/favicon.ico';
+    }
+
+    // 3. Page Indexing (Robots meta tag)
+    let robotsMeta = document.querySelector("meta[name='robots']") as HTMLMetaElement;
+    if (!robotsMeta) {
+      robotsMeta = document.createElement('meta');
+      robotsMeta.name = 'robots';
+      document.getElementsByTagName('head')[0].appendChild(robotsMeta);
+    }
+    if (settings.allowIndexing === false) {
+      robotsMeta.content = 'noindex, nofollow';
+    } else {
+      robotsMeta.content = 'index, follow';
+    }
+  }, [settings.siteTitle, settings.favicon, settings.logo, settings.allowIndexing]);
 
   const showToast = (message: string, type: Toast['type'] = 'success') => {
     const id = Date.now().toString();

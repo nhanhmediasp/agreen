@@ -61,7 +61,7 @@ function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
       <aside className={`sidebar${isOpen ? ' open' : ''}`}>
         {/* Brand Header */}
         <div className="sidebar-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
             {settings.logo.startsWith('http') || settings.logo.startsWith('data:') ? (
               <img src={settings.logo} alt="Logo" style={{ width: '34px', height: '34px', borderRadius: '9px', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
@@ -76,7 +76,7 @@ function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
                 Hệ thống vận hành
               </div>
             </div>
-          </div>
+          </Link>
 
           {onClose && (
             <button onClick={onClose} className="sidebar-close-btn" style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: '4px', flexShrink: 0, alignItems: 'center' }}>

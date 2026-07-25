@@ -145,9 +145,11 @@ const Contracts = () => {
     reader.readAsDataURL(file);
   };
 
+  const normalizePlate = (str: string) => str ? str.toUpperCase().replace(/[-. ]/g, '') : '';
+  const normalizePhone = (str: string) => str ? str.replace(/\D/g, '') : '';
   const selectedDetailRental = rentals.find(r => r.id === selectedDetailRentalId);
-  const carObj = selectedDetailRental ? cars.find(c => c.id === selectedDetailRental.carId) : null;
-  const ownerObj = carObj ? owners.find(o => o.phone === carObj.ownerPhone) : null;
+  const carObj = selectedDetailRental ? cars.find(c => normalizePlate(c.id) === normalizePlate(selectedDetailRental.carId)) : null;
+  const ownerObj = carObj ? owners.find(o => normalizePhone(o.phone) === normalizePhone(carObj.ownerPhone)) : null;
 
   const filteredRentals = rentals.filter(r => {
     const matchesSearch = 
@@ -455,7 +457,7 @@ const Contracts = () => {
                   {ownerObj ? (
                     <div style={{ borderLeft: '1px solid var(--border-light)', paddingLeft: '20px', fontSize: '14px' }}>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>CHỦ XE GÓP</div>
-                      <Link to="/owners" style={{ textDecoration: 'none' }}>
+                      <Link to={`/owners?id=${ownerObj.id}`} style={{ textDecoration: 'none' }}>
                         <strong style={{ color: 'var(--primary)', fontSize: '15px', textDecoration: 'underline', cursor: 'pointer' }}>{ownerObj.name}</strong>
                       </Link>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>SĐT: {ownerObj.phone}</div>
@@ -1181,7 +1183,9 @@ const Contracts = () => {
                         <td style={{ padding: '16px 20px', fontWeight: 600, color: 'var(--text-secondary)' }}>{sttNumber}</td>
                         <td style={{ padding: '16px 20px', fontWeight: 700 }} className="font-mono">{rental.id}</td>
                         <td style={{ padding: '16px 20px' }}>
-                          <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px' }}>{rental.carId}</span>
+                          <Link to={`/fleet?id=${rental.carId}`} style={{ textDecoration: 'none' }}>
+                            <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px', cursor: 'pointer', textDecoration: 'underline' }}>{rental.carId}</span>
+                          </Link>
                         </td>
                         <td style={{ padding: '16px 20px' }}>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{rental.customerName}</div>
