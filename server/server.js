@@ -478,7 +478,8 @@ app.delete('/api/service-orders/:id', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
-  // ============================================================
+  }
+});
 // DRIVERS (Tài xế)
 // ============================================================
 app.get('/api/drivers', async (req, res) => {
