@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
+    emptyOutDir: false, // Prevents EPERM error on aaPanel/Linux caused by immutable .user.ini files
     target: 'es2022',
     cssCodeSplit: true,
     sourcemap: false,
@@ -26,5 +27,3 @@ export default defineConfig({
     },
   },
 })
-
-
