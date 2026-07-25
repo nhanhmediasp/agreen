@@ -451,133 +451,236 @@ const INITIAL_IMAGES: ImageItem[] = [
   { id: '4', url: 'https://images.unsplash.com/photo-1502877338535-494e508892f3?auto=format&fit=crop&w=400&q=80', usedIn: 'Xe 29A-456.78' },
 ];
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cars, setCars] = useState<Car[]>(() => {
-    const local = localStorage.getItem('agreen_cars');
-    return local ? JSON.parse(local) : INITIAL_CARS;
-  });
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const local = localStorage.getItem('agreen_customers');
-    return local ? JSON.parse(local) : INITIAL_CUSTOMERS;
-  });
-  const [owners, setOwners] = useState<Owner[]>(() => {
-    const local = localStorage.getItem('agreen_owners');
-    return local ? JSON.parse(local) : INITIAL_OWNERS;
-  });
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const local = localStorage.getItem('agreen_expenses');
-    return local ? JSON.parse(local) : INITIAL_EXPENSES;
-  });
-  const [rentals, setRentals] = useState<Rental[]>(() => {
-    const local = localStorage.getItem('agreen_rentals');
-    return local ? JSON.parse(local) : INITIAL_RENTALS;
-  });
-  const [drivers, setDrivers] = useState<Driver[]>(() => {
-    const local = localStorage.getItem('agreen_drivers');
-    return local ? JSON.parse(local) : INITIAL_DRIVERS;
-  });
-  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(() => {
-    const local = localStorage.getItem('agreen_service_orders');
-    return local ? JSON.parse(local) : INITIAL_SERVICE_ORDERS;
-  });
-  const [images, setImages] = useState<ImageItem[]>(() => {
-    const local = localStorage.getItem('agreen_images');
-    return local ? JSON.parse(local) : INITIAL_IMAGES;
-  });
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const local = localStorage.getItem('agreen_settings');
-    return local ? JSON.parse(local) : {
-      logo: 'Auto',
-      logoHistory: ['Auto'],
-      favicon: 'Auto',
-      primaryColor: '#006837',
-    };
-  });
+// ============================================================
+// API helper – dùng chung toàn bộ context
+// ============================================================
+const API_BASE = '/api';
 
-  // Helper DB mapper functions
-  const mapCustomerFromDB = (dbCust: any): Customer => ({
-    id: dbCust.id,
-    name: dbCust.full_name || '',
-    phone: dbCust.phone || '',
-    license: dbCust.driver_license || '',
-    cccd: dbCust.id_card || '',
-    address: dbCust.address || '',
-    classification: dbCust.status === 'VIP' ? 'vip' : dbCust.status === 'Blacklisted' ? 'warning' : 'normal',
-    notes: dbCust.notes || '',
-    activeRentals: 0,
-    totalRentals: 0,
+async function apiFetch(path: string, options?: RequestInit) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    ...options,
+  });
+  return res.json();
+}
+
+// ============================================================
+// DB mapper functions – chuyển đổi dữ liệu DB → Frontend types
+// ============================================================
+function mapCarFromDB(db: Record<string, unknown>): Car {
+  const status = db.status as string;
+  return {
+    id: (db.plate_number || db.id) as string,
+    name: `${db.brand} ${db.model}`,
+    brand: db.brand as string || '',
+    year: String(db.year || 2024),
+    seats: Number(db.seats) || 4,
+    status: status === 'Rented' ? 'rented' : status === 'Maintenance' ? 'maintenance' : status === 'Reserved' ? 'suspended' : 'ready',
+    color: db.color as string || 'Trắng',
+    image: db.image_url as string || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
+    km: Number(db.current_mileage) || 0,
+    ownerPhone: db.owner_phone as string || '',
+    expiryRegistration: db.registration_expiry ? (db.registration_expiry as string).split('T')[0] : '2026-12-31',
+    expiryInsurance: db.insurance_expiry ? (db.insurance_expiry as string).split('T')[0] : '2026-12-31',
+    expiryLicense: db.license_expiry ? (db.license_expiry as string).split('T')[0] : '2026-12-31',
+    pricePerDay: Number(db.daily_rate) || 0,
+    pricePerHour: Number(db.hourly_rate) || 0,
+    pricePerWeek: Number(db.weekly_rate) || 0,
+  };
+}
+
+function mapCustomerFromDB(db: Record<string, unknown>): Customer {
+  const cls = db.classification as string || (db.status === 'VIP' ? 'vip' : db.status === 'Blacklisted' ? 'warning' : 'normal');
+  return {
+    id: db.id as string,
+    name: db.full_name as string || '',
+    phone: db.phone as string || '',
+    license: db.driver_license as string || '',
+    cccd: db.id_card as string || '',
+    address: db.address as string || '',
+    classification: cls as 'normal' | 'vip' | 'warning',
+    notes: db.notes as string || '',
+    activeRentals: Number(db.active_rentals) || 0,
+    totalRentals: Number(db.total_rentals) || 0,
     status: 'verified',
     statusText: 'Đã xác minh',
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
+    image: db.image_url as string || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+  };
+}
+
+function mapOwnerFromDB(db: Record<string, unknown>): Owner {
+  return {
+    id: db.id as string,
+    name: db.name as string || '',
+    phone: db.phone as string || '',
+    address: db.address as string || '',
+    notes: db.notes as string || '',
+    image: db.image_url as string || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+    commissionRate: Number(db.commission_rate) || 0,
+  };
+}
+
+function mapRentalFromDB(db: Record<string, unknown>): Rental {
+  let conditionImages: string[] = [];
+  try { conditionImages = JSON.parse(db.condition_images as string || '[]'); } catch { conditionImages = []; }
+  return {
+    id: db.id as string,
+    carId: db.car_id as string,
+    customerName: db.customer_name as string || '',
+    customerPhone: db.customer_phone as string || '',
+    startDate: db.start_date as string,
+    endDate: db.end_date as string,
+    rentalFee: Number(db.rental_fee) || 0,
+    deliveryFee: Number(db.delivery_fee) || 0,
+    deposit: Number(db.deposit) || 0,
+    extraFee: Number(db.extra_fee) || 0,
+    totalAmount: Number(db.total_amount) || 0,
+    paymentStatus: db.payment_status as Rental['paymentStatus'],
+    status: db.status as Rental['status'],
+    startKm: Number(db.start_km) || 0,
+    endKm: db.end_km ? Number(db.end_km) : undefined,
+    startFuel: db.start_fuel as string || 'full',
+    endFuel: db.end_fuel as string || undefined,
+    source: db.source as Rental['source'] || 'system',
+    fileUrl: db.file_url as string || undefined,
+    fileName: db.file_name as string || undefined,
+    ownerCommissionAmount: Number(db.owner_commission_amount) || 0,
+    conditionImages,
+    deliveredAt: db.delivered_at as string || undefined,
+    returnedAt: db.returned_at as string || undefined,
+    createdAt: db.created_at as string || undefined,
+  };
+}
+
+function mapExpenseFromDB(db: Record<string, unknown>): Expense {
+  return {
+    id: db.id as string,
+    title: db.title as string || db.description as string || '',
+    amount: Number(db.amount) || 0,
+    category: db.category as string || '',
+    date: db.expense_date as string || '',
+    ref: db.ref as string || '',
+    location: db.location as string || '',
+  };
+}
+
+function mapServiceOrderFromDB(db: Record<string, unknown>): ServiceOrder {
+  return {
+    id: db.id as string,
+    carId: db.car_id as string,
+    driverId: db.driver_id as string || '',
+    driverName: db.driver_name as string || '',
+    driverPhone: db.driver_phone as string || '',
+    customerName: db.customer_name as string || '',
+    customerPhone: db.customer_phone as string || '',
+    serviceDate: db.service_date as string,
+    startKm: Number(db.start_km) || 0,
+    endKm: Number(db.end_km) || 0,
+    distanceKm: Number(db.distance_km) || 0,
+    pricePerKm: Number(db.price_per_km) || 0,
+    extraFee: Number(db.extra_fee) || 0,
+    totalAmount: Number(db.total_amount) || 0,
+    driverCommissionRate: Number(db.driver_commission_rate) || 0,
+    driverCommissionAmount: Number(db.driver_commission_amount) || 0,
+    paymentStatus: db.payment_status as 'paid' | 'unpaid',
+    status: db.status as 'completed' | 'ongoing' | 'cancelled',
+    notes: db.notes as string || undefined,
+    createdAt: db.created_at as string || new Date().toISOString(),
+  };
+}
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // PostgreSQL is the source of truth for all business data.
+  // Start with empty arrays – they'll be populated from the API on mount.
+  const [cars, setCars] = useState<Car[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [rentals, setRentals] = useState<Rental[]>([]);
+  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
+  const [dbLoaded, setDbLoaded] = useState(false);
+
+  // Drivers & images still use localStorage (no DB table for them)
+  const [drivers, setDrivers] = useState<Driver[]>(() => {
+    try { const v = localStorage.getItem('agreen_drivers'); return v ? JSON.parse(v) : INITIAL_DRIVERS; } catch { return INITIAL_DRIVERS; }
+  });
+  const [images, setImages] = useState<ImageItem[]>(() => {
+    try { const v = localStorage.getItem('agreen_images'); return v ? JSON.parse(v) : INITIAL_IMAGES; } catch { return INITIAL_IMAGES; }
+  });
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  // Settings: localStorage only (theme, logo preferences)
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    try {
+      const v = localStorage.getItem('agreen_settings');
+      return v ? JSON.parse(v) : { logo: 'Auto', logoHistory: ['Auto'], favicon: 'Auto', primaryColor: '#006837' };
+    } catch { return { logo: 'Auto', logoHistory: ['Auto'], favicon: 'Auto', primaryColor: '#006837' }; }
   });
 
-  const mapCarFromDB = (dbCar: any): Car => ({
-    id: dbCar.plate_number || dbCar.id,
-    name: `${dbCar.brand} ${dbCar.model}`,
-    brand: dbCar.brand || '',
-    year: String(dbCar.year || 2024),
-    seats: dbCar.seats || 4,
-    status: dbCar.status === 'Rented' ? 'rented' : dbCar.status === 'Maintenance' ? 'maintenance' : dbCar.status === 'Reserved' ? 'suspended' : 'ready',
-    color: dbCar.color || 'Trắng',
-    image: dbCar.image_url || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
-    km: dbCar.current_mileage || 0,
-    ownerPhone: '',
-    expiryRegistration: dbCar.registration_expiry ? dbCar.registration_expiry.split('T')[0] : '2026-12-31',
-    expiryInsurance: dbCar.insurance_expiry ? dbCar.insurance_expiry.split('T')[0] : '2026-12-31',
-    expiryLicense: '2026-12-31',
-    pricePerDay: Number(dbCar.daily_rate) || 800000,
-    pricePerHour: 100000,
-    pricePerWeek: Number(dbCar.monthly_rate) || 5000000
-  });
-
-  const mapOwnerFromDB = (dbOwner: any): Owner => ({
-    id: dbOwner.id,
-    name: dbOwner.name || '',
-    phone: dbOwner.phone || '',
-    address: dbOwner.address || '',
-    notes: dbOwner.notes || '',
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80'
-  });
-
-  // Fetch real data from PostgreSQL Backend API on mount
+  // ============================================================
+  // LOAD ALL DATA FROM POSTGRESQL ON MOUNT
+  // ============================================================
   useEffect(() => {
-    fetch('/api/customers')
-      .then(r => r.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setCustomers(res.data.map(mapCustomerFromDB));
-        }
-      })
-      .catch(() => {});
+    const loadAll = async () => {
+      try {
+        const [vRes, cRes, oRes, rRes, eRes, sRes] = await Promise.allSettled([
+          apiFetch('/vehicles'),
+          apiFetch('/customers'),
+          apiFetch('/owners'),
+          apiFetch('/rentals'),
+          apiFetch('/expenses'),
+          apiFetch('/service-orders'),
+        ]);
 
-    fetch('/api/vehicles')
-      .then(r => r.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setCars(res.data.map(mapCarFromDB));
-        }
-      })
-      .catch(() => {});
+        if (vRes.status === 'fulfilled' && vRes.value.success && vRes.value.data.length > 0)
+          setCars(vRes.value.data.map(mapCarFromDB));
+        else if (vRes.status === 'rejected' || !vRes.value?.success)
+          setCars(INITIAL_CARS); // fallback khi API lỗi
 
-    fetch('/api/owners')
-      .then(r => r.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setOwners(res.data.map(mapOwnerFromDB));
-        }
-      })
-      .catch(() => {});
+        if (cRes.status === 'fulfilled' && cRes.value.success && cRes.value.data.length > 0)
+          setCustomers(cRes.value.data.map(mapCustomerFromDB));
+        else if (cRes.status === 'rejected' || !cRes.value?.success)
+          setCustomers(INITIAL_CUSTOMERS);
+
+        if (oRes.status === 'fulfilled' && oRes.value.success && oRes.value.data.length > 0)
+          setOwners(oRes.value.data.map(mapOwnerFromDB));
+        else if (oRes.status === 'rejected' || !oRes.value?.success)
+          setOwners(INITIAL_OWNERS);
+
+        if (rRes.status === 'fulfilled' && rRes.value.success)
+          setRentals(rRes.value.data.map(mapRentalFromDB));
+        else if (rRes.status === 'rejected' || !rRes.value?.success)
+          setRentals(INITIAL_RENTALS);
+
+        if (eRes.status === 'fulfilled' && eRes.value.success)
+          setExpenses(eRes.value.data.map(mapExpenseFromDB));
+        else if (eRes.status === 'rejected' || !eRes.value?.success)
+          setExpenses(INITIAL_EXPENSES);
+
+        if (sRes.status === 'fulfilled' && sRes.value.success && sRes.value.data.length > 0)
+          setServiceOrders(sRes.value.data.map(mapServiceOrderFromDB));
+        else if (sRes.status === 'rejected' || !sRes.value?.success)
+          setServiceOrders(INITIAL_SERVICE_ORDERS);
+
+      } catch {
+        // Network failure: use demo data as fallback
+        setCars(INITIAL_CARS);
+        setCustomers(INITIAL_CUSTOMERS);
+        setOwners(INITIAL_OWNERS);
+        setRentals(INITIAL_RENTALS);
+        setExpenses(INITIAL_EXPENSES);
+        setServiceOrders(INITIAL_SERVICE_ORDERS);
+      } finally {
+        setDbLoaded(true);
+      }
+    };
+    loadAll();
   }, []);
 
-  // Sync to localStorage
-  useEffect(() => { localStorage.setItem('agreen_cars', JSON.stringify(cars)); }, [cars]);
-  useEffect(() => { localStorage.setItem('agreen_customers', JSON.stringify(customers)); }, [customers]);
-  useEffect(() => { localStorage.setItem('agreen_owners', JSON.stringify(owners)); }, [owners]);
-  useEffect(() => { localStorage.setItem('agreen_expenses', JSON.stringify(expenses)); }, [expenses]);
-  useEffect(() => { localStorage.setItem('agreen_rentals', JSON.stringify(rentals)); }, [rentals]);
+  // Suppress unused warning – dbLoaded available for loading indicators
+  void dbLoaded;
+
+  // LocalStorage only for non-DB data
   useEffect(() => { localStorage.setItem('agreen_drivers', JSON.stringify(drivers)); }, [drivers]);
-  useEffect(() => { localStorage.setItem('agreen_service_orders', JSON.stringify(serviceOrders)); }, [serviceOrders]);
   useEffect(() => { localStorage.setItem('agreen_images', JSON.stringify(images)); }, [images]);
   useEffect(() => { localStorage.setItem('agreen_settings', JSON.stringify(settings)); }, [settings]);
 
@@ -608,14 +711,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000);
   };
 
+  // ============================================================
+  // CAR ACTIONS – đồng bộ với PostgreSQL
+  // ============================================================
   const addCar = (car: Car) => {
-    setCars(prev => [...prev, car]);
+    setCars(prev => [car, ...prev]);
     if (car.image && !images.some(img => img.url === car.image)) {
       setImages(prev => [...prev, { id: Date.now().toString(), url: car.image, usedIn: `Xe ${car.id}` }]);
     }
-    fetch('/api/vehicles', {
+    apiFetch('/vehicles', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         plate_number: car.id,
         brand: car.brand,
@@ -624,123 +729,176 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         color: car.color,
         seats: car.seats,
         daily_rate: car.pricePerDay,
-        monthly_rate: car.pricePerWeek,
-        status: car.status === 'rented' ? 'Rented' : car.status === 'maintenance' ? 'Maintenance' : 'Available',
+        hourly_rate: car.pricePerHour,
+        weekly_rate: car.pricePerWeek,
+        status: car.status === 'rented' ? 'Rented' : car.status === 'maintenance' ? 'Maintenance' : car.status === 'suspended' ? 'Reserved' : 'Available',
         current_mileage: car.km,
-        image_url: car.image
-      })
+        registration_expiry: car.expiryRegistration || null,
+        insurance_expiry: car.expiryInsurance || null,
+        license_expiry: car.expiryLicense || null,
+        image_url: car.image,
+        notes: ''
+      }),
+    }).then(res => {
+      if (res.success && res.data) setCars(prev => prev.map(c => c.id === car.id ? mapCarFromDB(res.data) : c));
     }).catch(() => {});
   };
 
   const updateCar = (id: string, updatedFields: Partial<Car>) => {
     setCars(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields } : c));
+    const dbFields: Record<string, unknown> = {};
+    if (updatedFields.status) dbFields.status = updatedFields.status === 'rented' ? 'Rented' : updatedFields.status === 'maintenance' ? 'Maintenance' : updatedFields.status === 'suspended' ? 'Reserved' : 'Available';
+    if (updatedFields.km !== undefined) dbFields.current_mileage = updatedFields.km;
+    if (updatedFields.image) dbFields.image_url = updatedFields.image;
+    if (updatedFields.pricePerDay !== undefined) dbFields.daily_rate = updatedFields.pricePerDay;
+    if (updatedFields.pricePerHour !== undefined) dbFields.hourly_rate = updatedFields.pricePerHour;
+    if (updatedFields.pricePerWeek !== undefined) dbFields.weekly_rate = updatedFields.pricePerWeek;
+    if (updatedFields.color) dbFields.color = updatedFields.color;
+    if (updatedFields.seats !== undefined) dbFields.seats = updatedFields.seats;
+    if (Object.keys(dbFields).length > 0) {
+      apiFetch(`/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).catch(() => {});
+    }
   };
 
   const deleteCar = (id: string) => {
     setCars(prev => prev.filter(c => c.id !== id));
+    apiFetch(`/vehicles/${id}`, { method: 'DELETE' }).catch(() => {});
   };
 
   const updateCarStatus = (id: string, status: Car['status'], customer?: string, timeRemaining?: string) => {
     setCars(prev => prev.map(c => c.id === id ? { ...c, status, customer, timeRemaining } : c));
+    const dbStatus = status === 'rented' ? 'Rented' : status === 'maintenance' ? 'Maintenance' : status === 'suspended' ? 'Reserved' : 'Available';
+    apiFetch(`/vehicles/${id}`, { method: 'PUT', body: JSON.stringify({ status: dbStatus }) }).catch(() => {});
   };
 
+  // ============================================================
+  // CUSTOMER ACTIONS
+  // ============================================================
   const addCustomer = (customer: Customer) => {
     setCustomers(prev => [customer, ...prev]);
-    fetch('/api/customers', {
+    apiFetch('/customers', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        full_name: customer.name,
-        phone: customer.phone,
-        id_card: customer.cccd,
-        driver_license: customer.license,
-        address: customer.address,
+        full_name: customer.name, phone: customer.phone, email: '',
+        id_card: customer.cccd, driver_license: customer.license,
+        address: customer.address, classification: customer.classification,
         status: customer.classification === 'vip' ? 'VIP' : customer.classification === 'warning' ? 'Blacklisted' : 'Active',
-        notes: customer.notes
-      })
+        notes: customer.notes, image_url: customer.image
+      }),
+    }).then(res => {
+      if (res.success && res.data) setCustomers(prev => prev.map(c => c.id === customer.id ? mapCustomerFromDB(res.data) : c));
     }).catch(() => {});
   };
 
   const updateCustomer = (id: string, updatedFields: Partial<Customer>) => {
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields } : c));
+    const dbFields: Record<string, unknown> = {};
+    if (updatedFields.name) dbFields.full_name = updatedFields.name;
+    if (updatedFields.phone) dbFields.phone = updatedFields.phone;
+    if (updatedFields.cccd) dbFields.id_card = updatedFields.cccd;
+    if (updatedFields.license) dbFields.driver_license = updatedFields.license;
+    if (updatedFields.address) dbFields.address = updatedFields.address;
+    if (updatedFields.classification) { dbFields.classification = updatedFields.classification; dbFields.status = updatedFields.classification === 'vip' ? 'VIP' : updatedFields.classification === 'warning' ? 'Blacklisted' : 'Active'; }
+    if (updatedFields.notes !== undefined) dbFields.notes = updatedFields.notes;
+    if (updatedFields.activeRentals !== undefined) dbFields.active_rentals = updatedFields.activeRentals;
+    if (updatedFields.totalRentals !== undefined) dbFields.total_rentals = updatedFields.totalRentals;
+    if (Object.keys(dbFields).length > 0) {
+      apiFetch(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).catch(() => {});
+    }
   };
 
+  // ============================================================
+  // OWNER ACTIONS
+  // ============================================================
   const addOwner = (owner: Owner) => {
     setOwners(prev => [owner, ...prev]);
-    fetch('/api/owners', {
+    apiFetch('/owners', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: owner.name,
-        phone: owner.phone,
-        address: owner.address,
-        notes: owner.notes
-      })
+        name: owner.name, phone: owner.phone, address: owner.address,
+        notes: owner.notes, commission_rate: owner.commissionRate || 0,
+        image_url: owner.image
+      }),
+    }).then(res => {
+      if (res.success && res.data) setOwners(prev => prev.map(o => o.id === owner.id ? mapOwnerFromDB(res.data) : o));
     }).catch(() => {});
   };
 
   const updateOwner = (id: string, updatedFields: Partial<Owner>) => {
     setOwners(prev => prev.map(o => o.id === id ? { ...o, ...updatedFields } : o));
+    const dbFields: Record<string, unknown> = {};
+    if (updatedFields.name) dbFields.name = updatedFields.name;
+    if (updatedFields.phone) dbFields.phone = updatedFields.phone;
+    if (updatedFields.address) dbFields.address = updatedFields.address;
+    if (updatedFields.notes !== undefined) dbFields.notes = updatedFields.notes;
+    if (updatedFields.commissionRate !== undefined) dbFields.commission_rate = updatedFields.commissionRate;
+    if (Object.keys(dbFields).length > 0) {
+      apiFetch(`/owners/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).catch(() => {});
+    }
   };
 
   const deleteOwner = (id: string) => {
     setOwners(prev => prev.filter(o => o.id !== id));
+    apiFetch(`/owners/${id}`, { method: 'DELETE' }).catch(() => {});
   };
 
+  // ============================================================
+  // EXPENSE ACTIONS
+  // ============================================================
   const addExpense = (expense: Expense) => {
     setExpenses(prev => [expense, ...prev]);
+    apiFetch('/expenses', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: expense.id, title: expense.title, category: expense.category,
+        amount: expense.amount, expense_date: expense.date,
+        ref: expense.ref, location: expense.location || ''
+      }),
+    }).catch(() => {});
   };
 
+  // ============================================================
+  // RENTAL ACTIONS – dữ liệu quan trọng nhất, lưu ngay vào DB
+  // ============================================================
   const addRental = (rental: Rental) => {
     setRentals(prev => [rental, ...prev]);
-    
-    // Update car status if rental is active or pending
-    if (rental.status === 'active' || rental.status === 'pending') {
-      setCars(prev => prev.map(c => c.id === rental.carId ? { 
-        ...c, 
-        status: 'rented', 
-        customer: rental.customerName, 
-        timeRemaining: '48:00:00' 
-      } : c));
+    // Save to PostgreSQL immediately
+    apiFetch('/rentals', { method: 'POST', body: JSON.stringify(rental) }).catch(() => {});
 
-      // Update customer stats
-      setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? { 
-        ...cust, 
-        activeRentals: cust.activeRentals + 1,
-        totalRentals: cust.totalRentals + 1
+    // Update car status
+    if (rental.status === 'active' || rental.status === 'pending') {
+      setCars(prev => prev.map(c => c.id === rental.carId ? {
+        ...c, status: 'rented', customer: rental.customerName, timeRemaining: '48:00:00'
+      } : c));
+      updateCarStatus(rental.carId, 'rented');
+      setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? {
+        ...cust, activeRentals: cust.activeRentals + 1, totalRentals: cust.totalRentals + 1
       } : cust));
     } else {
-      setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? { 
-        ...cust, 
-        totalRentals: cust.totalRentals + 1
+      setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? {
+        ...cust, totalRentals: cust.totalRentals + 1
       } : cust));
     }
   };
 
   const updateRental = (id: string, updatedFields: Partial<Rental>) => {
     setRentals(prev => prev.map(r => r.id === id ? { ...r, ...updatedFields } : r));
+    apiFetch(`/rentals/${id}`, { method: 'PUT', body: JSON.stringify(updatedFields) }).catch(() => {});
   };
 
   const completeRental = (id: string, endKm: number, extraFee: number, endFuel: string, paymentStatus: Rental['paymentStatus']) => {
     const targetRental = rentals.find(r => r.id === id);
     const carIdToRelease = targetRental?.carId;
     const customerNameToRelease = targetRental?.customerName;
+    const returnedAt = new Date().toISOString();
 
     setRentals(prev => prev.map(r => {
       if (r.id === id) {
-        return {
-          ...r,
-          endKm,
-          extraFee,
-          endFuel,
-          paymentStatus,
-          status: 'completed',
-          totalAmount: r.totalAmount + extraFee,
-          returnedAt: new Date().toISOString()
-        };
+        return { ...r, endKm, extraFee, endFuel, paymentStatus, status: 'completed', totalAmount: r.totalAmount + extraFee, returnedAt };
       }
       return r;
     }));
+    apiFetch(`/rentals/${id}`, { method: 'PUT', body: JSON.stringify({ endKm, extraFee, endFuel, paymentStatus, status: 'completed', returnedAt }) }).catch(() => {});
 
     if (carIdToRelease) {
       setCars(prev => prev.map(c => c.id === carIdToRelease ? {
@@ -792,8 +950,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addServiceOrder = (order: ServiceOrder) => {
     setServiceOrders(prev => [order, ...prev]);
+    apiFetch('/service-orders', { method: 'POST', body: JSON.stringify(order) }).catch(() => {});
     if (order.carId && order.endKm) {
       setCars(prev => prev.map(c => c.id === order.carId ? { ...c, km: Math.max(c.km, order.endKm) } : c));
+      apiFetch(`/vehicles/${order.carId}`, { method: 'PUT', body: JSON.stringify({ current_mileage: order.endKm }) }).catch(() => {});
     }
     if (order.driverId) {
       setDrivers(prev => prev.map(d => d.id === order.driverId ? { ...d, totalTrips: d.totalTrips + 1 } : d));
@@ -865,23 +1025,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetDemoData = () => {
-    localStorage.removeItem('agreen_cars');
-    localStorage.removeItem('agreen_customers');
-    localStorage.removeItem('agreen_owners');
-    localStorage.removeItem('agreen_expenses');
-    localStorage.removeItem('agreen_rentals');
+    // Clear localStorage non-DB data
     localStorage.removeItem('agreen_drivers');
-    localStorage.removeItem('agreen_service_orders');
     localStorage.removeItem('agreen_images');
-    setCars(INITIAL_CARS);
-    setCustomers(INITIAL_CUSTOMERS);
-    setOwners(INITIAL_OWNERS);
-    setExpenses(INITIAL_EXPENSES);
-    setRentals(INITIAL_RENTALS);
+    // Reset local state to demo data (PostgreSQL data won't be touched)
     setDrivers(INITIAL_DRIVERS);
-    setServiceOrders(INITIAL_SERVICE_ORDERS);
     setImages(INITIAL_IMAGES);
-    showToast('Đã reset về dữ liệu ban đầu!', 'info');
+    // Reload PostgreSQL data fresh
+    apiFetch('/vehicles').then(r => r.success && r.data.length > 0 && setCars(r.data.map(mapCarFromDB))).catch(() => setCars(INITIAL_CARS));
+    apiFetch('/customers').then(r => r.success && r.data.length > 0 && setCustomers(r.data.map(mapCustomerFromDB))).catch(() => setCustomers(INITIAL_CUSTOMERS));
+    apiFetch('/owners').then(r => r.success && r.data.length > 0 && setOwners(r.data.map(mapOwnerFromDB))).catch(() => setOwners(INITIAL_OWNERS));
+    apiFetch('/rentals').then(r => r.success && setRentals(r.data.map(mapRentalFromDB))).catch(() => setRentals(INITIAL_RENTALS));
+    apiFetch('/expenses').then(r => r.success && setExpenses(r.data.map(mapExpenseFromDB))).catch(() => setExpenses(INITIAL_EXPENSES));
+    showToast('Đã đồng bộ lại dữ liệu từ PostgreSQL!', 'info');
   };
 
   return (
