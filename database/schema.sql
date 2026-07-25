@@ -19,6 +19,43 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================
+-- SAFE DATABASE MIGRATIONS (Updates existing tables with new columns)
+-- ============================================================
+DO $$
+BEGIN
+    -- Update vehicles table if exists
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'vehicles') THEN
+        ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC(12, 2) DEFAULT 0.00;
+        ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS weekly_rate NUMERIC(12, 2) DEFAULT 0.00;
+        ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS license_expiry DATE;
+    END IF;
+
+    -- Update owners table if exists
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'owners') THEN
+        ALTER TABLE owners ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,2) DEFAULT 0.00;
+        ALTER TABLE owners ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
+    END IF;
+
+    -- Update customers table if exists
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'customers') THEN
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS classification VARCHAR(20) DEFAULT 'normal';
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS active_rentals INT DEFAULT 0;
+        ALTER TABLE customers ADD COLUMN IF NOT EXISTS total_rentals INT DEFAULT 0;
+    END IF;
+
+    -- Update expenses table if exists
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'expenses') THEN
+        ALTER TABLE expenses ALTER COLUMN id TYPE VARCHAR(50);
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS title VARCHAR(200) DEFAULT '';
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS ref VARCHAR(100) DEFAULT '';
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS location VARCHAR(200) DEFAULT '';
+    END IF;
+EXCEPTION WHEN OTHERS THEN
+    NULL;
+END $$;
+
+-- ============================================================
 -- 1. USERS / ACCOUNTS TABLE
 -- ============================================================
 CREATE TABLE IF NOT EXISTS users (
