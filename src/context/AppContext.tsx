@@ -715,10 +715,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // CAR ACTIONS – đồng bộ với PostgreSQL
   // ============================================================
   const addCar = (car: Car) => {
+    // Optimistic UI update
     setCars(prev => [car, ...prev]);
     if (car.image && !images.some(img => img.url === car.image)) {
       setImages(prev => [...prev, { id: Date.now().toString(), url: car.image, usedIn: `Xe ${car.id}` }]);
     }
+
+    // Map ownerPhone to owner_id in database
+    const ownerObj = owners.find(o => o.phone === car.ownerPhone);
+    const ownerId = ownerObj ? ownerObj.id : null;
+
     apiFetch('/vehicles', {
       method: 'POST',
       body: JSON.stringify({
@@ -737,11 +743,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         insurance_expiry: car.expiryInsurance || null,
         license_expiry: car.expiryLicense || null,
         image_url: car.image,
+        owner_id: ownerId,
         notes: ''
       }),
     }).then(res => {
-      if (res.success && res.data) setCars(prev => prev.map(c => c.id === car.id ? mapCarFromDB(res.data) : c));
-    }).catch(() => {});
+      if (res.success && res.data) {
+        setCars(prev => prev.map(c => c.id === car.id ? mapCarFromDB(res.data) : c));
+        showToast(`Đã thêm xe ${car.id} và đồng bộ CSDL thành công!`, 'success');
+      } else {
+        showToast(`Không thể lưu xe vào CSDL: ${res.error || 'Lỗi không xác định'}`, 'error');
+        // Rollback optimistic update
+        setCars(prev => prev.filter(c => c.id !== car.id));
+      }
+    }).catch(err => {
+      showToast(`Lỗi kết nối máy chủ khi lưu xe: ${err.message || err}`, 'error');
+      setCars(prev => prev.filter(c => c.id !== car.id));
+    });
   };
 
   const updateCar = (id: string, updatedFields: Partial<Car>) => {
@@ -755,14 +772,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (updatedFields.pricePerWeek !== undefined) dbFields.weekly_rate = updatedFields.pricePerWeek;
     if (updatedFields.color) dbFields.color = updatedFields.color;
     if (updatedFields.seats !== undefined) dbFields.seats = updatedFields.seats;
+    
     if (Object.keys(dbFields).length > 0) {
-      apiFetch(`/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).catch(() => {});
+      apiFetch(`/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).then(res => {
+        if (res.success) {
+          showToast('Đã đồng bộ thông tin cập nhật xe lên CSDL!', 'success');
+        } else {
+          showToast(`Lỗi đồng bộ cập nhật xe: ${res.error}`, 'error');
+        }
+      }).catch(err => {
+        showToast(`Lỗi mạng khi đồng bộ cập nhật xe: ${err.message || err}`, 'error');
+      });
     }
   };
 
   const deleteCar = (id: string) => {
     setCars(prev => prev.filter(c => c.id !== id));
-    apiFetch(`/vehicles/${id}`, { method: 'DELETE' }).catch(() => {});
+    apiFetch(`/vehicles/${id}`, { method: 'DELETE' }).then(res => {
+      if (res.success) {
+        showToast('Đã xóa xe khỏi CSDL vĩnh viễn!', 'success');
+      } else {
+        showToast(`Lỗi xóa xe: ${res.error}`, 'error');
+      }
+    }).catch(err => {
+      showToast(`Lỗi kết nối khi xóa xe: ${err.message || err}`, 'error');
+    });
   };
 
   const updateCarStatus = (id: string, status: Car['status'], customer?: string, timeRemaining?: string) => {
@@ -786,8 +820,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notes: customer.notes, image_url: customer.image
       }),
     }).then(res => {
-      if (res.success && res.data) setCustomers(prev => prev.map(c => c.id === customer.id ? mapCustomerFromDB(res.data) : c));
-    }).catch(() => {});
+      if (res.success && res.data) {
+        setCustomers(prev => prev.map(c => c.id === customer.id ? mapCustomerFromDB(res.data) : c));
+        showToast('Đã lưu khách hàng vào CSDL!', 'success');
+      } else {
+        showToast(`Lỗi lưu khách hàng: ${res.error}`, 'error');
+        setCustomers(prev => prev.filter(c => c.id !== customer.id));
+      }
+    }).catch(err => {
+      showToast(`Lỗi mạng khi lưu khách hàng: ${err.message || err}`, 'error');
+      setCustomers(prev => prev.filter(c => c.id !== customer.id));
+    });
   };
 
   const updateCustomer = (id: string, updatedFields: Partial<Customer>) => {
@@ -802,8 +845,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (updatedFields.notes !== undefined) dbFields.notes = updatedFields.notes;
     if (updatedFields.activeRentals !== undefined) dbFields.active_rentals = updatedFields.activeRentals;
     if (updatedFields.totalRentals !== undefined) dbFields.total_rentals = updatedFields.totalRentals;
+    
     if (Object.keys(dbFields).length > 0) {
-      apiFetch(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).catch(() => {});
+      apiFetch(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).then(res => {
+        if (res.success) {
+          showToast('Đã đồng bộ cập nhật khách hàng lên CSDL!', 'success');
+        } else {
+          showToast(`Lỗi cập nhật khách hàng: ${res.error}`, 'error');
+        }
+      }).catch(err => {
+        showToast(`Lỗi mạng khi cập nhật khách hàng: ${err.message || err}`, 'error');
+      });
     }
   };
 
@@ -820,8 +872,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         image_url: owner.image
       }),
     }).then(res => {
-      if (res.success && res.data) setOwners(prev => prev.map(o => o.id === owner.id ? mapOwnerFromDB(res.data) : o));
-    }).catch(() => {});
+      if (res.success && res.data) {
+        setOwners(prev => prev.map(o => o.id === owner.id ? mapOwnerFromDB(res.data) : o));
+        showToast('Đã thêm chủ xe vào CSDL!', 'success');
+      } else {
+        showToast(`Lỗi thêm chủ xe: ${res.error}`, 'error');
+        setOwners(prev => prev.filter(o => o.id !== owner.id));
+      }
+    }).catch(err => {
+      showToast(`Lỗi mạng khi lưu chủ xe: ${err.message || err}`, 'error');
+      setOwners(prev => prev.filter(o => o.id !== owner.id));
+    });
   };
 
   const updateOwner = (id: string, updatedFields: Partial<Owner>) => {
@@ -832,8 +893,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (updatedFields.address) dbFields.address = updatedFields.address;
     if (updatedFields.notes !== undefined) dbFields.notes = updatedFields.notes;
     if (updatedFields.commissionRate !== undefined) dbFields.commission_rate = updatedFields.commissionRate;
+    
     if (Object.keys(dbFields).length > 0) {
-      apiFetch(`/owners/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).catch(() => {});
+      apiFetch(`/owners/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).then(res => {
+        if (res.success) {
+          showToast('Đã đồng bộ thông tin chủ xe!', 'success');
+        } else {
+          showToast(`Lỗi cập nhật chủ xe: ${res.error}`, 'error');
+        }
+      }).catch(err => {
+        showToast(`Lỗi mạng khi cập nhật chủ xe: ${err.message || err}`, 'error');
+      });
     }
   };
 
