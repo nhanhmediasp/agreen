@@ -48,6 +48,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/fleet':      'Quản lý Đội xe',
   '/contracts':  'Quản lý Đơn thuê',
   '/services':   'Quản lý Đơn Dịch vụ & Tài xế',
+  '/drivers':    'Quản lý Đơn Dịch vụ & Tài xế',
+  '/tai-xe':     'Quản lý Đơn Dịch vụ & Tài xế',
   '/customers':  'Khách hàng',
   '/owners':     'Chủ xe / Đối tác',
   '/expenses':   'Sổ Thu chi & Chi phí',
@@ -433,6 +435,8 @@ function App() {
           <Route path="/rental/new" element={<AdminLayout><CreateRental /></AdminLayout>} />
           <Route path="/contracts" element={<AdminLayout><Contracts /></AdminLayout>} />
           <Route path="/services" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+          <Route path="/drivers" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+          <Route path="/tai-xe" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
           <Route path="/customers" element={<AdminLayout><Customers /></AdminLayout>} />
           <Route path="/owners" element={<AdminLayout><Owners /></AdminLayout>} />
           <Route path="/expenses" element={<AdminLayout><Expenses /></AdminLayout>} />
