@@ -436,7 +436,9 @@ function App() {
           <Route path="/contracts" element={<AdminLayout><Contracts /></AdminLayout>} />
           <Route path="/services" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
           <Route path="/drivers" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+          <Route path="/drivers/:id" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
           <Route path="/tai-xe" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+          <Route path="/tai-xe/:id" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
           <Route path="/customers" element={<AdminLayout><Customers /></AdminLayout>} />
           <Route path="/owners" element={<AdminLayout><Owners /></AdminLayout>} />
           <Route path="/expenses" element={<AdminLayout><Expenses /></AdminLayout>} />

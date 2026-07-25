@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { 
   Plus, Search, Filter, CheckCircle2, Clock, 
   Car, UserCheck, DollarSign, Edit, Trash2, 
@@ -17,14 +18,32 @@ export default function ServiceOrders() {
     addDriver, updateDriver, deleteDriver, showToast 
   } = useApp();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const routeParams = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState<'orders' | 'drivers'>('orders');
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [carFilter, setCarFilter] = useState<string>('all');
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
-  // Page View state for Driver Detail (Trang chi tiết tài xế riêng biệt)
+  // Page View state for Driver Detail (URL path /drivers/:id or URL query ?driverId=... or local state)
   const [selectedDriverIdPage, setSelectedDriverIdPage] = useState<string | null>(null);
+  const activeDriverId = routeParams.id || searchParams.get('driverId') || selectedDriverIdPage;
+
+  const handleSelectDriverForDetail = (id: string | null) => {
+    setSelectedDriverIdPage(id);
+    if (id) {
+      setSearchParams({ driverId: id });
+    } else {
+      setSearchParams({});
+      if (routeParams.id) {
+        navigate('/services');
+      }
+    }
+  };
+
   const [driverPageDateFilter, setDriverPageDateFilter] = useState<string>('');
 
   // Modals state
@@ -839,12 +858,12 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
   // ============================================================
   // DRIVER DETAIL PAGE VIEW (TRANG CHI TIẾT TÀI XẾ RIÊNG BIỆT)
   // ============================================================
-  if (selectedDriverIdPage) {
-    const selectedDriver = drivers.find(d => d.id === selectedDriverIdPage);
+  if (activeDriverId) {
+    const selectedDriver = drivers.find(d => d.id === activeDriverId);
     if (!selectedDriver) {
       return (
         <div style={{ padding: '24px' }}>
-          <button onClick={() => setSelectedDriverIdPage(null)} className="btn btn-secondary">
+          <button onClick={() => handleSelectDriverForDetail(null)} className="btn btn-secondary">
             <ArrowLeft size={16} /> Quay lại danh sách
           </button>
           <div style={{ marginTop: '20px', color: '#EF4444', fontWeight: 600 }}>Không tìm thấy thông tin tài xế trong hệ thống!</div>
@@ -880,7 +899,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         {/* Navigation Top Bar */}
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
           <button
-            onClick={() => setSelectedDriverIdPage(null)}
+            onClick={() => handleSelectDriverForDetail(null)}
             style={{
               padding: '9px 16px',
               borderRadius: '10px',
@@ -1570,7 +1589,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                               </div>
                               <div>
                                 <div 
-                                  onClick={() => driverObj && setSelectedDriverIdPage(driverObj.id)}
+                                  onClick={() => driverObj && handleSelectDriverForDetail(driverObj.id)}
                                   style={{ fontWeight: 700, color: '#006837', cursor: 'pointer', textDecoration: 'underline', fontSize: '13px' }}
                                   title="Bấm để mở trang chi tiết tài xế"
                                 >
@@ -1914,7 +1933,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '12px' }}>
                     {/* Dedicated Driver Detail Page Button */}
                     <button
-                      onClick={() => setSelectedDriverIdPage(driver.id)}
+                      onClick={() => handleSelectDriverForDetail(driver.id)}
                       style={{ flex: 1, padding: '7px 10px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '6px', fontSize: '12px', fontWeight: 700, color: '#059669', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                     >
                       <BarChart2 size={14} /> Thống kê & Hóa đơn
