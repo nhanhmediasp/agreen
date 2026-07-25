@@ -90,6 +90,8 @@ npm run build
    - Nhấn **Save**.
 3. Vào mục **URL Rewrite / Config (Cấu hình Nginx)** dán đoạn mã sau vào:
    ```nginx
+   client_max_body_size 20M;
+
    location / {
        try_files $uri $uri/ /index.html;
    }
