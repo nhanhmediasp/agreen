@@ -593,6 +593,24 @@ function mapServiceOrderFromDB(db: Record<string, unknown>): ServiceOrder {
   };
 }
 
+function mapDriverFromDB(db: Record<string, unknown>): Driver {
+  const st = db.status as string;
+  return {
+    id: db.id as string,
+    name: db.name as string || '',
+    phone: db.phone as string || '',
+    licenseNumber: db.license_number as string || '',
+    licenseClass: db.license_class as string || 'B2',
+    status: st === 'on_trip' || st === 'busy' ? 'on_trip' : st === 'off' ? 'off' : 'available',
+    address: db.address as string || '',
+    notes: db.notes as string || '',
+    totalTrips: Number(db.total_trips) || 0,
+    assignedCarId: db.assigned_car_id as string || undefined,
+    avatar: db.avatar as string || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    commissionRate: Number(db.commission_rate) || 0,
+  };
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // PostgreSQL is the source of truth for all business data.
   // Start with empty arrays – they'll be populated from the API on mount.
@@ -636,13 +654,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const [vRes, cRes, oRes, rRes, eRes, sRes] = await Promise.allSettled([
+        const [vRes, cRes, oRes, rRes, eRes, sRes, dRes] = await Promise.allSettled([
           apiFetch('/vehicles'),
           apiFetch('/customers'),
           apiFetch('/owners'),
           apiFetch('/rentals'),
           apiFetch('/expenses'),
           apiFetch('/service-orders'),
+          apiFetch('/drivers'),
         ]);
 
         if (vRes.status === 'fulfilled' && vRes.value.success && vRes.value.data.length > 0)
@@ -672,8 +691,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (sRes.status === 'fulfilled' && sRes.value.success && sRes.value.data.length > 0)
           setServiceOrders(sRes.value.data.map(mapServiceOrderFromDB));
-        else if (sRes.status === 'rejected' || !sRes.value?.success)
-          setServiceOrders(INITIAL_SERVICE_ORDERS);
+        
+        if (dRes.status === 'fulfilled' && dRes.value.success && dRes.value.data.length > 0)
+          setDrivers(dRes.value.data.map(mapDriverFromDB));
 
       } catch {
         // Network failure: use demo data as fallback
@@ -1095,14 +1115,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addDriver = (driver: Driver) => {
     setDrivers(prev => [...prev, driver]);
+    apiFetch('/drivers', { method: 'POST', body: JSON.stringify(driver) }).then(res => {
+      if (res.success && res.data) {
+        setDrivers(prev => prev.map(d => d.id === driver.id ? mapDriverFromDB(res.data) : d));
+        showToast('Đã thêm tài xế mới vào hệ thống!', 'success');
+      }
+    }).catch(err => {
+      showToast(`Không thể đồng bộ tài xế lên CSDL: ${err.message || err}`, 'error');
+    });
   };
 
   const updateDriver = (id: string, updatedFields: Partial<Driver>) => {
     setDrivers(prev => prev.map(d => d.id === id ? { ...d, ...updatedFields } : d));
+    apiFetch(`/drivers/${id}`, { method: 'PUT', body: JSON.stringify(updatedFields) }).catch(() => {});
   };
 
   const deleteDriver = (id: string) => {
     setDrivers(prev => prev.filter(d => d.id !== id));
+    apiFetch(`/drivers/${id}`, { method: 'DELETE' }).then(res => {
+      if (res.success) {
+        showToast('Đã xóa tài xế thành công!', 'success');
+      }
+    }).catch(() => {});
   };
 
   const addServiceOrder = (order: ServiceOrder) => {
