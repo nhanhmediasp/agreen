@@ -605,20 +605,61 @@ const FleetManagement = () => {
               </div>
 
               {/* Lịch đặt xe (Calendar Timeline) */}
-              <div className="card" style={{ overflowX: 'auto' }}>
+              <div className="card">
                 <h3 style={{ fontSize: '16px', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <CalendarIcon size={18} color="var(--primary)" /> Lịch đặt xe tuần này
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minWidth: '500px', gap: '8px', textAlign: 'center' }}>
+
+                {/* Desktop View: 7 columns strip */}
+                <div className="desktop-only-table" style={{ width: '100%' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', textAlign: 'center' }}>
+                    {weekDays.map(day => {
+                      const status = getCarStatusForDay(day.fullDate);
+                      return (
+                        <div key={day.fullDate} style={{ padding: '12px 6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', background: status === 'rented' ? 'var(--status-rented-bg)' : status === 'maintenance' ? 'var(--status-maintenance-bg)' : status === 'suspended' ? 'var(--status-suspended-bg)' : 'white' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600 }}>{day.name}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{day.dateStr}</div>
+                          <div style={{ fontSize: '10px', marginTop: '6px', fontWeight: 700, color: status === 'rented' ? 'var(--status-rented-text)' : status === 'maintenance' ? 'var(--status-maintenance-text)' : 'var(--text-secondary)' }}>
+                            {status === 'rented' ? 'Bận' : status === 'maintenance' ? 'Bảo trì' : status === 'suspended' ? 'Ngưng' : 'Trống'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Mobile View: Vertical Day List */}
+                <div className="mobile-only-cards" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {weekDays.map(day => {
                     const status = getCarStatusForDay(day.fullDate);
                     return (
-                      <div key={day.fullDate} style={{ padding: '12px 6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', background: status === 'rented' ? 'var(--status-rented-bg)' : status === 'maintenance' ? 'var(--status-maintenance-bg)' : status === 'suspended' ? 'var(--status-suspended-bg)' : 'white' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600 }}>{day.name}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{day.dateStr}</div>
-                        <div style={{ fontSize: '10px', marginTop: '6px', fontWeight: 700, color: status === 'rented' ? 'var(--status-rented-text)' : status === 'maintenance' ? 'var(--status-maintenance-text)' : 'var(--text-secondary)' }}>
-                          {status === 'rented' ? 'Bận' : status === 'maintenance' ? 'Bảo trì' : status === 'suspended' ? 'Ngưng' : 'Trống'}
+                      <div 
+                        key={day.fullDate} 
+                        style={{ 
+                          padding: '10px 14px', 
+                          borderRadius: 'var(--radius-md)', 
+                          border: '1px solid var(--border-light)', 
+                          background: status === 'rented' ? 'var(--status-rented-bg)' : status === 'maintenance' ? 'var(--status-maintenance-bg)' : status === 'suspended' ? 'var(--status-suspended-bg)' : 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <strong style={{ fontSize: '13.5px' }}>{day.name}</strong>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Ngày {day.dateStr}/07</span>
                         </div>
+
+                        <span style={{
+                          padding: '3px 10px',
+                          borderRadius: '100px',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          background: status === 'rented' ? '#e0f2fe' : status === 'maintenance' ? '#fef3c7' : status === 'suspended' ? '#fee2e2' : '#d1fae5',
+                          color: status === 'rented' ? '#0369a1' : status === 'maintenance' ? '#b45309' : status === 'suspended' ? '#b91c1c' : '#047857'
+                        }}>
+                          {status === 'rented' ? '🔵 Đang bận (Có lịch thuê)' : status === 'maintenance' ? '🟠 Bảo trì xe' : status === 'suspended' ? '🔴 Tạm ngưng' : '🟢 Xe trống'}
+                        </span>
                       </div>
                     );
                   })}

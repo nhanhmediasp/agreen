@@ -601,10 +601,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [owners, setOwners] = useState<Owner[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
-  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
+  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(() => {
+    try { const v = localStorage.getItem('agreen_service_orders'); return v ? JSON.parse(v) : INITIAL_SERVICE_ORDERS; } catch { return INITIAL_SERVICE_ORDERS; }
+  });
   const [dbLoaded, setDbLoaded] = useState(false);
 
-  // Drivers & images still use localStorage (no DB table for them)
+  // Drivers & images use localStorage + PostgreSQL sync
   const [drivers, setDrivers] = useState<Driver[]>(() => {
     try { const v = localStorage.getItem('agreen_drivers'); return v ? JSON.parse(v) : INITIAL_DRIVERS; } catch { return INITIAL_DRIVERS; }
   });
@@ -691,8 +693,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Suppress unused warning – dbLoaded available for loading indicators
   void dbLoaded;
 
-  // LocalStorage only for non-DB data
+  // LocalStorage fallback for drivers & serviceOrders & settings
   useEffect(() => { localStorage.setItem('agreen_drivers', JSON.stringify(drivers)); }, [drivers]);
+  useEffect(() => { localStorage.setItem('agreen_service_orders', JSON.stringify(serviceOrders)); }, [serviceOrders]);
   useEffect(() => { localStorage.setItem('agreen_images', JSON.stringify(images)); }, [images]);
   useEffect(() => { localStorage.setItem('agreen_settings', JSON.stringify(settings)); }, [settings]);
 

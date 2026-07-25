@@ -478,6 +478,70 @@ app.delete('/api/service-orders/:id', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  // ============================================================
+// DRIVERS (Tài xế)
+// ============================================================
+app.get('/api/drivers', async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM drivers ORDER BY created_at DESC');
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/drivers', async (req, res) => {
+  try {
+    const d = req.body;
+    const result = await query(
+      `INSERT INTO drivers (id, name, phone, license_number, license_class, status, address, notes, total_trips, assigned_car_id, avatar, commission_rate)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ON CONFLICT (id) DO UPDATE SET
+         name=EXCLUDED.name, phone=EXCLUDED.phone, license_number=EXCLUDED.license_number,
+         license_class=EXCLUDED.license_class, status=EXCLUDED.status, address=EXCLUDED.address,
+         notes=EXCLUDED.notes, total_trips=EXCLUDED.total_trips, assigned_car_id=EXCLUDED.assigned_car_id,
+         avatar=EXCLUDED.avatar, commission_rate=EXCLUDED.commission_rate, updated_at=NOW()
+       RETURNING *`,
+      [
+        d.id || `DRV-${Date.now()}`, d.name || '', d.phone || '', d.licenseNumber || '',
+        d.licenseClass || 'B2', d.status || 'available', d.address || '', d.notes || '',
+        Number(d.totalTrips) || 0, d.assignedCarId || null, d.avatar || '', Number(d.commissionRate) || 0
+      ]
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put('/api/drivers/:id', async (req, res) => {
+  try {
+    const allowed = ['name','phone','license_number','license_class','status','address','notes','total_trips','assigned_car_id','avatar','commission_rate'];
+    const d = req.body;
+    const fields = Object.fromEntries(Object.entries({
+      name: d.name, phone: d.phone, license_number: d.licenseNumber,
+      license_class: d.licenseClass, status: d.status, address: d.address,
+      notes: d.notes, total_trips: d.totalTrips, assigned_car_id: d.assignedCarId,
+      avatar: d.avatar, commission_rate: d.commissionRate
+    }).filter(([,v]) => v !== undefined));
+
+    if (Object.keys(fields).length === 0) return res.json({ success: true });
+    const keys = Object.keys(fields);
+    const setClause = keys.map((k,i) => `"${k}"=$${i+1}`).join(', ');
+    const values = [...Object.values(fields), req.params.id];
+    const result = await query(`UPDATE drivers SET ${setClause}, updated_at=NOW() WHERE id::text=$${values.length} RETURNING *`, values);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/drivers/:id', async (req, res) => {
+  try {
+    await query('DELETE FROM drivers WHERE id::text=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
