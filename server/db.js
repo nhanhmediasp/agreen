@@ -2,27 +2,19 @@ import 'dotenv/config';
 import pkg from 'pg';
 const { Pool } = pkg;
 
-const dbUser = process.env.DB_USER || 'postgres';
+const dbUser = (process.env.DB_USER && process.env.DB_USER.trim()) || 'agrenn_sql';
 const dbPassword = process.env.DB_PASSWORD || '';
-const dbName = process.env.DB_NAME || 'vpanel_car_rental';
+const dbName = (process.env.DB_NAME && process.env.DB_NAME.trim()) || 'agrenn_sql';
 const dbHost = process.env.DB_HOST || '127.0.0.1';
 const dbPort = parseInt(process.env.DB_PORT || '5432', 10);
 
-const poolConfig = (process.env.DB_USER && process.env.DB_USER.trim())
-  ? {
-      host: dbHost,
-      port: dbPort,
-      user: dbUser,
-      password: dbPassword,
-      database: dbName,
-    }
-  : (process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {
-      host: dbHost,
-      port: dbPort,
-      user: dbUser,
-      password: dbPassword,
-      database: dbName,
-    });
+const poolConfig = {
+  host: dbHost,
+  port: dbPort,
+  user: dbUser,
+  password: dbPassword,
+  database: dbName,
+};
 
 console.log(`[DB Pool] Connecting to PostgreSQL at ${dbHost}:${dbPort} as user "${dbUser}" (db: "${dbName}")`);
 
