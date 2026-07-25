@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Search, Filter, Plus, Gauge, ShieldCheck, X, Image as ImageIcon, Trash2, CheckSquare, Calendar as CalendarIcon, ArrowLeft, Edit, LayoutGrid, List, Receipt } from 'lucide-react';
 import { useApp, type Car } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
-import { MoneyInputLeft } from '../components/MoneyInput';
 
 const LiveCountdown = ({ endDateStr }: { endDateStr: string }) => {
   const [timeLeft, setTimeLeft] = useState('');
@@ -1371,15 +1370,15 @@ const FleetManagement = () => {
             <div style={{ display: 'flex', gap: '12px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Giá thuê Giờ (₫) *</label>
-                <MoneyInputLeft value={newPriceHour} onChange={setNewPriceHour} placeholder="100000" required />
+                <input type="number" value={newPriceHour} onChange={e => setNewPriceHour(e.target.value)} placeholder="100000" style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Giá thuê Ngày (₫) *</label>
-                <MoneyInputLeft value={newPriceDay} onChange={setNewPriceDay} placeholder="800000" required />
+                <input type="number" value={newPriceDay} onChange={e => setNewPriceDay(e.target.value)} placeholder="800000" style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Giá thuê Tuần (₫) *</label>
-                <MoneyInputLeft value={newPriceWeek} onChange={setNewPriceWeek} placeholder="5000000" required />
+                <input type="number" value={newPriceWeek} onChange={e => setNewPriceWeek(e.target.value)} placeholder="5000000" style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
               </div>
             </div>
 
