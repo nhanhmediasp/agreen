@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Car, Lock, User, ShieldAlert, CheckCircle2, Clock } from 'lucide-react';
+import { Eye, EyeOff, Car, Lock, User, ShieldAlert, Clock } from 'lucide-react';
 
 const ADMIN_CREDENTIALS_KEY = 'agreen_admin_credentials';
 const FAILED_LOGINS_KEY = 'agreen_failed_logins';
@@ -364,16 +364,6 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
             ) : isLocked ? `Tạm khóa (${lockoutRemaining}s)` : 'Đăng nhập an toàn'}
           </button>
         </form>
-
-        <div style={{ marginTop: '24px', padding: '14px 16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-          <p style={{ fontSize: '12px', color: '#64748b', margin: 0, fontWeight: 600 }}>💡 Thông tin đăng nhập mặc định</p>
-          <p style={{ fontSize: '12px', color: '#94a3b8', margin: '4px 0 0' }}>
-            Tài khoản: <strong style={{ color: '#475569' }}>admin</strong>&nbsp;&nbsp;·&nbsp;&nbsp;Mật khẩu: <strong style={{ color: '#475569' }}>agreen2024</strong>
-          </p>
-          <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#16A34A', fontWeight: 600 }}>
-            <CheckCircle2 size={13} /> Đã kích hoạt bảo vệ chống Brute-Force & Bot Spam
-          </div>
-        </div>
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

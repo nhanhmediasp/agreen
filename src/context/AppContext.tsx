@@ -173,12 +173,14 @@ interface AppContextType {
   updateCarStatus: (id: string, status: Car['status'], customer?: string, timeRemaining?: string) => void;
   addCustomer: (customer: Customer) => void;
   updateCustomer: (id: string, updatedFields: Partial<Customer>) => void;
+  deleteCustomer: (id: string) => void;
   addOwner: (owner: Owner) => void;
   updateOwner: (id: string, updatedFields: Partial<Owner>) => void;
   deleteOwner: (id: string) => void;
   addExpense: (expense: Expense) => void;
   addRental: (rental: Rental) => void;
   updateRental: (id: string, updatedFields: Partial<Rental>) => void;
+  deleteRental: (id: string) => void;
   completeRental: (id: string, endKm: number, extraFee: number, endFuel: string, paymentStatus: Rental['paymentStatus']) => void;
   addDriver: (driver: Driver) => void;
   updateDriver: (id: string, updatedFields: Partial<Driver>) => void;
@@ -859,6 +861,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const deleteCustomer = (id: string) => {
+    setCustomers(prev => prev.filter(c => c.id !== id));
+    apiFetch(`/customers/${id}`, { method: 'DELETE' }).then(res => {
+      if (res.success) {
+        showToast('Đã xóa khách hàng khỏi CSDL thành công!', 'success');
+      } else {
+        showToast(`Lỗi khi xóa khách hàng: ${res.error}`, 'error');
+      }
+    }).catch(err => {
+      showToast(`Lỗi kết nối khi xóa khách hàng: ${err.message || err}`, 'error');
+    });
+  };
+
   // ============================================================
   // OWNER ACTIONS
   // ============================================================
@@ -950,10 +965,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } : cust));
     }
   };
-
   const updateRental = (id: string, updatedFields: Partial<Rental>) => {
     setRentals(prev => prev.map(r => r.id === id ? { ...r, ...updatedFields } : r));
     apiFetch(`/rentals/${id}`, { method: 'PUT', body: JSON.stringify(updatedFields) }).catch(() => {});
+  };
+
+  const deleteRental = (id: string) => {
+    setRentals(prev => prev.filter(r => r.id !== id));
+    apiFetch(`/rentals/${id}`, { method: 'DELETE' }).then(res => {
+      if (res.success) {
+        showToast('Đã xóa đơn thuê khỏi CSDL thành công!', 'success');
+      } else {
+        showToast(`Lỗi khi xóa đơn thuê: ${res.error}`, 'error');
+      }
+    }).catch(err => {
+      showToast(`Lỗi kết nối khi xóa đơn thuê: ${err.message || err}`, 'error');
+    });
   };
 
   const completeRental = (id: string, endKm: number, extraFee: number, endFuel: string, paymentStatus: Rental['paymentStatus']) => {
@@ -1036,6 +1063,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteServiceOrder = (id: string) => {
     setServiceOrders(prev => prev.filter(s => s.id !== id));
+    apiFetch(`/service-orders/${id}`, { method: 'DELETE' }).then(res => {
+      if (res.success) {
+        showToast('Đã xóa dịch vụ tài xế khỏi CSDL thành công!', 'success');
+      } else {
+        showToast(`Lỗi khi xóa dịch vụ tài xế: ${res.error}`, 'error');
+      }
+    }).catch(err => {
+      showToast(`Lỗi kết nối khi xóa dịch vụ tài xế: ${err.message || err}`, 'error');
+    });
   };
 
   const toggleServiceOrderPayment = (id: string) => {
@@ -1129,12 +1165,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateCarStatus,
       addCustomer,
       updateCustomer,
+      deleteCustomer,
       addOwner,
       updateOwner,
       deleteOwner,
       addExpense,
       addRental,
       updateRental,
+      deleteRental,
       completeRental,
       addDriver,
       updateDriver,

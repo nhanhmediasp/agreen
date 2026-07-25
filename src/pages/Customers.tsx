@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Plus, Phone, FileCheck, AlertCircle, X, MapPin, FileText, ArrowLeft, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Phone, FileCheck, AlertCircle, X, MapPin, FileText, ArrowLeft, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useApp, type Customer } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { Pagination } from '../components/Pagination';
 
 const Customers = () => {
-  const { customers, addCustomer, updateCustomer, rentals, showToast } = useApp();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, rentals, showToast } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const selectedCustomerId = searchParams.get('id');
   const setSelectedCustomerId = (id: string | null) => {
     if (id) {
@@ -371,6 +372,50 @@ const Customers = () => {
             </button>
           </div>
 
+          {selectedCustomerIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,104,55,0.08)', border: '1px solid var(--primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+              <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                Đã chọn {selectedCustomerIds.length} khách hàng
+              </span>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <select 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    if (window.confirm(`Thay đổi phân loại hàng loạt cho ${selectedCustomerIds.length} khách hàng đã chọn?`)) {
+                      selectedCustomerIds.forEach(id => updateCustomer(id, { classification: val as any }));
+                      setSelectedCustomerIds([]);
+                      showToast('Đã cập nhật phân loại hàng loạt!', 'success');
+                    }
+                    e.target.value = '';
+                  }}
+                  style={{ padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', outline: 'none' }}
+                >
+                  <option value="">-- Sửa phân loại hàng loạt --</option>
+                  <option value="normal">Bình thường</option>
+                  <option value="vip">Khách VIP ⭐</option>
+                  <option value="warning">Khách Cần Chú Ý ⚠️</option>
+                </select>
+                <button 
+                  onClick={() => {
+                    if (window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${selectedCustomerIds.length} khách hàng đã chọn?`)) {
+                      selectedCustomerIds.forEach(id => deleteCustomer(id));
+                      setSelectedCustomerIds([]);
+                      showToast('Đã xóa hàng loạt thành công!', 'success');
+                    }
+                  }}
+                  className="btn-secondary" 
+                  style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', gap: '6px', padding: '6px 14px' }}
+                >
+                  <Trash2 size={15} /> Xóa hàng loạt
+                </button>
+                <button onClick={() => setSelectedCustomerIds([])} className="btn-ghost" style={{ fontSize: '14px', padding: '6px 12px' }}>
+                  Hủy chọn
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card" style={{ padding: '16px 24px', display: 'flex', gap: '12px', marginBottom: '24px' }}>
             <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '8px 16px', borderRadius: 'var(--radius-md)', flex: 1 }}>
               <Search size={18} color="var(--text-secondary)" />
@@ -388,18 +433,32 @@ const Customers = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '14px' }}>
+                  <th style={{ padding: '16px 24px', width: '50px', textAlign: 'center' }}>
+                    <input 
+                      type="checkbox"
+                      checked={filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomerIds.includes(c.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedCustomerIds(filteredCustomers.map(c => c.id));
+                        } else {
+                          setSelectedCustomerIds([]);
+                        }
+                      }}
+                    />
+                  </th>
                   <th style={{ padding: '16px 24px', fontWeight: 500, width: '80px' }}>STT</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Khách hàng</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Số điện thoại</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Phân loại</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Trạng thái hồ sơ</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Đơn hoạt động</th>
+                  <th style={{ padding: '16px 24px', fontWeight: 500, width: '100px' }}>Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                       Không tìm thấy khách hàng nào.
                     </td>
                   </tr>
@@ -418,54 +477,80 @@ const Customers = () => {
                           transition: 'background 0.2s'
                         }}
                       >
+                        <td style={{ padding: '16px 24px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                          <input 
+                            type="checkbox"
+                            checked={selectedCustomerIds.includes(customer.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCustomerIds(prev => [...prev, customer.id]);
+                              } else {
+                                setSelectedCustomerIds(prev => prev.filter(id => id !== customer.id));
+                              }
+                            }}
+                          />
+                        </td>
                         <td style={{ padding: '16px 24px', fontWeight: 600, color: 'var(--text-secondary)' }}>{startIndex + idx + 1}</td>
-                      <td style={{ padding: '16px 24px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <img src={customer.image} alt={customer.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-strong)' }} />
-                          <div>
-                            <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{customer.name}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ID: #{customer.id}</div>
+                        <td style={{ padding: '16px 24px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <img src={customer.image} alt={customer.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-strong)' }} />
+                            <div>
+                              <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{customer.name}</div>
+                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ID: #{customer.id}</div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Phone size={14} />
-                          {customer.phone}
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px 24px' }}>
-                        {customer.classification === 'vip' ? (
-                          <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: '#fef3c7', color: '#d97706', fontSize: '12px', fontWeight: 700 }}>
-                            ⭐ VIP
-                          </span>
-                        ) : customer.classification === 'warning' ? (
-                          <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: 'var(--status-maintenance-bg)', color: 'var(--status-maintenance-text)', fontSize: '12px', fontWeight: 700 }}>
-                            ⚠️ Chú ý
-                          </span>
-                        ) : (
-                          <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: '#f1f5f9', color: '#64748b', fontSize: '12px', fontWeight: 600 }}>
-                            Thường
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 24px' }}>
-                        {customer.status === 'verified' ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '100px', background: '#d1fae5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '12.5px', fontWeight: 700 }}>
-                            <FileCheck size={14} /> {customer.statusText || 'Đã xác minh'}
-                          </span>
-                        ) : (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '100px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', fontSize: '12.5px', fontWeight: 700 }}>
-                            <AlertCircle size={14} /> {customer.statusText || 'GPLX hết hạn'}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 24px', fontWeight: 600, paddingLeft: '48px' }}>
-                        {customer.activeRentals}
-                      </td>
-                    </tr>
-                  ));
-                })()
+                        </td>
+                        <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Phone size={14} />
+                            {customer.phone}
+                          </div>
+                        </td>
+                        <td style={{ padding: '16px 24px' }}>
+                          {customer.classification === 'vip' ? (
+                            <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: '#fef3c7', color: '#d97706', fontSize: '12px', fontWeight: 700 }}>
+                              ⭐ VIP
+                            </span>
+                          ) : customer.classification === 'warning' ? (
+                            <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: 'var(--status-maintenance-bg)', color: 'var(--status-maintenance-text)', fontSize: '12px', fontWeight: 700 }}>
+                              ⚠️ Chú ý
+                            </span>
+                          ) : (
+                            <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: '#f1f5f9', color: '#64748b', fontSize: '12px', fontWeight: 600 }}>
+                              Thường
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '16px 24px' }}>
+                          {customer.status === 'verified' ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '100px', background: '#d1fae5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '12.5px', fontWeight: 700 }}>
+                              <FileCheck size={14} /> {customer.statusText || 'Đã xác minh'}
+                            </span>
+                          ) : (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '100px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', fontSize: '12.5px', fontWeight: 700 }}>
+                              <AlertCircle size={14} /> {customer.statusText || 'GPLX hết hạn'}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '16px 24px', fontWeight: 600, paddingLeft: '48px' }}>
+                          {customer.activeRentals}
+                        </td>
+                        <td style={{ padding: '16px 24px' }} onClick={e => e.stopPropagation()}>
+                          <button 
+                            onClick={() => {
+                              if (window.confirm(`Bạn có chắc chắn muốn xóa khách hàng "${customer.name}" khỏi hệ thống?`)) {
+                                deleteCustomer(customer.id);
+                              }
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            title="Xóa khách hàng"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ));
+                  })()
                 )}
               </tbody>
             </table>

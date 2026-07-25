@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Upload, Save, RefreshCw, Eye, ShieldCheck, ShieldAlert, Lock, Trash2, Key, CheckCircle2 } from 'lucide-react';
+import { Upload, Save, RefreshCw, ShieldCheck, ShieldAlert, Lock, Trash2, Key, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getSecurityLogs, clearSecurityLogs, type SecurityLog } from './Login';
 
 const SettingsPage = () => {
-  const { settings, updateSettings, rollbackLogo, load500DemoData, resetDemoData, showToast } = useApp();
+  const { settings, updateSettings, rollbackLogo, showToast } = useApp();
   const [activeTab, setActiveTab] = useState<'interface' | 'contract' | 'security'>('interface');
   
   // Local state for settings preview before saving
@@ -14,12 +14,6 @@ const SettingsPage = () => {
 
   // Security State
   const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>(() => getSecurityLogs());
-
-  // Contract state
-  const [contractTerms, setContractTerms] = useState(
-    `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nHỢP ĐỒNG CHO THUÊ XE TỰ LÁI\n\nBên A (Bên cho thuê): AutoManage Car Rental\nBên B (Bên thuê): {ten_khach_hang}\nSố điện thoại: {so_dien_thoai}\n\nĐIỀU 1: NỘI DUNG HỢP ĐỒNG\nBên A đồng ý cho Bên B thuê xe ô tô tự lái có thông tin như sau:\n- Dòng xe: {dong_xe}\n- Biển số xe: {bien_so_xe}\n- Thời gian thuê: Từ {ngay_thue} đến {ngay_tra}\n\nĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG & ĐẶT CỌC\n- Tổng tiền thuê: {tong_tien_thue} VNĐ\n- Số tiền đặt cọc giữ xe: {tien_dat_coc} VNĐ (Bên A sẽ hoàn trả đầy đủ cho Bên B sau khi nhận lại xe nguyên vẹn).\n\nĐIỀU 3: QUY ĐỊNH SỬ DỤNG\n1. Bên B cam kết sử dụng xe đúng mục đích, không chở hàng cấm, không lái xe khi say rượu bia.\n2. Trả xe đúng giờ đã hẹn. Nếu quá giờ phạt 100,000 VNĐ/giờ.`
-  );
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const colors = [
     { name: 'Xanh Lá Vận Tải', hex: '#006837' },
@@ -60,22 +54,6 @@ const SettingsPage = () => {
     }
   };
 
-  const handleInsertTag = (tag: string) => {
-    setContractTerms(prev => prev + ` ${tag}`);
-  };
-
-  const renderPreviewContract = () => {
-    return contractTerms
-      .replace(/{ten_khach_hang}/g, 'Nguyễn Văn A')
-      .replace(/{so_dien_thoai}/g, '0901234567')
-      .replace(/{dong_xe}/g, 'Mazda 3 2022')
-      .replace(/{bien_so_xe}/g, '51F-123.45')
-      .replace(/{ngay_thue}/g, '15/07/2026 08:00')
-      .replace(/{ngay_tra}/g, '17/07/2026 17:00')
-      .replace(/{tong_tien_thue}/g, '1,750,000')
-      .replace(/{tien_dat_coc}/g, '10,000,000');
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1300px', width: '100%', position: 'relative' }}>
       
@@ -87,7 +65,7 @@ const SettingsPage = () => {
 
       <div>
         <h1 style={{ fontSize: '28px', marginBottom: '8px' }}>Cài đặt hệ thống</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Tùy chỉnh giao diện, mẫu hợp đồng và trung tâm bảo mật website</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Tùy chỉnh giao diện và trung tâm bảo mật website</p>
       </div>
 
       {/* Tabs */}
@@ -97,12 +75,6 @@ const SettingsPage = () => {
           style={{ padding: '12px 16px', borderBottom: activeTab === 'interface' ? '2px solid var(--primary)' : 'none', color: activeTab === 'interface' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600 }}
         >
           Giao diện hệ thống
-        </button>
-        <button 
-          onClick={() => setActiveTab('contract')}
-          style={{ padding: '12px 16px', borderBottom: activeTab === 'contract' ? '2px solid var(--primary)' : 'none', color: activeTab === 'contract' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600 }}
-        >
-          Mẫu hợp đồng
         </button>
         <button 
           onClick={() => setActiveTab('security')}
@@ -189,25 +161,6 @@ const SettingsPage = () => {
 
             <div style={{ height: '1px', backgroundColor: 'var(--border-light)' }}></div>
 
-            {/* DEMO DATA LOADER */}
-            <div>
-              <h2 style={{ fontSize: '18px', marginBottom: '8px' }}>Dữ liệu mẫu 500 bản ghi (Stress-Test Performance)</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
-                Nạp 500 chiếc xe, hợp đồng và khách hàng vào hệ thống để thử nghiệm khả năng chịu tải và tốc độ xử lý của bảng.
-              </p>
-              
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button className="btn-secondary" style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={() => load500DemoData()}>
-                  ⚡ Nạp 500 bản ghi ngẫu nhiên
-                </button>
-                <button className="btn-ghost" style={{ color: 'var(--status-maintenance-text)' }} onClick={() => resetDemoData()}>
-                  🧹 Đặt lại dữ liệu ban đầu
-                </button>
-              </div>
-            </div>
-
-            <div style={{ height: '1px', backgroundColor: 'var(--border-light)' }}></div>
-
             {/* SAVE ACTION */}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button className="btn-primary" style={{ gap: '8px' }} onClick={handleSave}>
@@ -218,66 +171,6 @@ const SettingsPage = () => {
           </>
         )}
 
-        {/* TAB 2: MẪU HỢP ĐỒNG */}
-        {activeTab === 'contract' && (
-          <>
-            <div>
-              <h2 style={{ fontSize: '18px', marginBottom: '8px' }}>Mẫu hợp đồng thuê xe chuẩn</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
-                Nhập văn bản điều khoản và gán các biến thông minh. Các biến trong ngoặc nhọn <code>{'{...}'}</code> sẽ tự động điền thông tin thực tế khi xuất in PDF.
-              </p>
-
-              {/* Tag Generator Controls */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', alignSelf: 'center' }}>Chèn nhanh biến:</span>
-                {[
-                  { label: '+ Tên khách', tag: '{ten_khach_hang}' },
-                  { label: '+ SĐT', tag: '{so_dien_thoai}' },
-                  { label: '+ Biển số', tag: '{bien_so_xe}' },
-                  { label: '+ Dòng xe', tag: '{dong_xe}' },
-                  { label: '+ Ngày thuê', tag: '{ngay_thue}' },
-                  { label: '+ Ngày trả', tag: '{ngay_tra}' },
-                  { label: '+ Tổng tiền', tag: '{tong_tien_thue}' },
-                  { label: '+ Tiền cọc', tag: '{tien_dat_coc}' }
-                ].map(t => (
-                  <button key={t.tag} onClick={() => handleInsertTag(t.tag)} className="btn-ghost" style={{ fontSize: '12px', padding: '4px 8px', border: '1px solid var(--border-light)' }}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Textarea Editor */}
-              <textarea 
-                value={contractTerms}
-                onChange={e => setContractTerms(e.target.value)}
-                rows={16}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  fontFamily: 'monospace',
-                  fontSize: '13.5px',
-                  lineHeight: '1.6',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-strong)',
-                  backgroundColor: 'var(--bg-main)',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button className="btn-secondary" style={{ gap: '8px' }} onClick={() => setShowPreviewModal(true)}>
-                <Eye size={16} />
-                Xem trước bản in PDF
-              </button>
-              
-              <button className="btn-primary" style={{ gap: '8px' }} onClick={() => alert('Đã lưu mẫu hợp đồng mặc định!')}>
-                <Save size={16} />
-                Lưu mẫu hợp đồng
-              </button>
-            </div>
-          </>
-        )}
 
         {/* TAB 3: BẢO MẬT & ANTI-SPAM */}
         {activeTab === 'security' && (
@@ -410,60 +303,6 @@ const SettingsPage = () => {
 
       </div>
 
-      {/* Contract PDF Preview Modal */}
-      {showPreviewModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '700px', height: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: '18px' }}>Xem trước Bản in hợp đồng (PDF giả lập)</h2>
-              <button onClick={() => setShowPreviewModal(false)} style={{ fontSize: '20px', fontWeight: 'bold' }}>×</button>
-            </div>
-            
-            <div style={{ flex: 1, padding: '32px', overflowY: 'auto', backgroundColor: '#525659', display: 'flex', justifyContent: 'center' }}>
-              {/* PDF Sheet simulation */}
-              <div style={{ width: '100%', maxWidth: '595px', minHeight: '842px', padding: '48px', background: 'white', color: '#000', fontSize: '14px', fontFamily: 'serif', lineHeight: '1.6', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', position: 'relative' }}>
-                {/* Header branding */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #000', paddingBottom: '12px', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {localLogo.startsWith('http') ? (
-                      <img src={localLogo} alt="Logo" style={{ width: '40px', height: '40px', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ padding: '6px 12px', background: localColor, color: 'white', fontWeight: 'bold', fontSize: '16px' }}>{localLogo}</div>
-                    )}
-                    <span style={{ fontWeight: 'bold', fontSize: '14px', fontFamily: 'var(--font-heading)' }}>AutoManage Car Rental</span>
-                  </div>
-                  <div style={{ textAlign: 'right', fontSize: '11px', color: '#555' }}>
-                    Mẫu số: 01/HD-AUTO<br/>Liên hệ: 1900 1234
-                  </div>
-                </div>
-
-                {/* Main Text with variables populated */}
-                <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'serif', fontSize: '13px', margin: 0 }}>
-                  {renderPreviewContract()}
-                </pre>
-
-                {/* Footer signatures */}
-                <div style={{ marginTop: '48px', display: 'flex', justifyContent: 'space-between', padding: '0 24px' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <strong>Đại diện Bên A</strong><br/>
-                    <span style={{ fontSize: '11px', color: '#777' }}>(Ký, đóng dấu)</span>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <strong>Đại diện Bên B</strong><br/>
-                    <span style={{ fontSize: '11px', color: '#777' }}>(Ký, ghi rõ họ tên)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: 'var(--bg-main)' }}>
-              <button className="btn-primary" onClick={() => { alert('Yêu cầu in đã được gửi tới máy in của hãng xe!'); setShowPreviewModal(false); }}>
-                Tải xuống PDF & In ngay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

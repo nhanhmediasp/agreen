@@ -21,6 +21,7 @@ export default function ServiceOrders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [carFilter, setCarFilter] = useState<string>('all');
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   // Page View state for Driver Detail (Trang chi tiết tài xế riêng biệt)
   const [selectedDriverIdPage, setSelectedDriverIdPage] = useState<string | null>(null);
@@ -998,6 +999,70 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
       {/* TAB 1: SERVICE ORDERS LIST */}
       {activeTab === 'orders' && (
         <>
+          {selectedOrderIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,104,55,0.08)', border: '1px solid var(--primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+              <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                Đã chọn {selectedOrderIds.length} đơn dịch vụ tài xế
+              </span>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button 
+                  onClick={() => {
+                    if (window.confirm(`Đánh dấu ĐÃ THANH TOÁN hàng loạt cho ${selectedOrderIds.length} đơn đã chọn?`)) {
+                      selectedOrderIds.forEach(id => updateServiceOrder(id, { paymentStatus: 'paid' }));
+                      setSelectedOrderIds([]);
+                      showToast('Đã cập nhật trạng thái thanh toán hàng loạt!', 'success');
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)', padding: '6px 14px', borderRadius: '8px' }}
+                >
+                  Đánh dấu Đã thanh toán
+                </button>
+                <button 
+                  onClick={() => {
+                    const pct = window.prompt("Nhập tỷ lệ chiết khấu (%) mới cho các đơn đã chọn (từ 0 đến 100):");
+                    if (pct !== null && !isNaN(Number(pct))) {
+                      selectedOrderIds.forEach(id => {
+                        const order = serviceOrders.find(o => o.id === id);
+                        if (order) {
+                          const distance = Math.max(0, order.endKm - order.startKm);
+                          const calculatedFare = Math.round(distance * order.pricePerKm + (order.extraFee || 0));
+                          const newCommAmount = Math.round(calculatedFare * (Number(pct) / 100));
+                          updateServiceOrder(id, { 
+                            driverCommissionRate: Number(pct),
+                            driverCommissionAmount: newCommAmount
+                          });
+                        }
+                      });
+                      setSelectedOrderIds([]);
+                      showToast('Đã sửa chiết khấu hàng loạt!', 'success');
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)', padding: '6px 14px', borderRadius: '8px' }}
+                >
+                  Sửa chiết khấu hàng loạt
+                </button>
+                <button 
+                  onClick={() => {
+                    if (window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${selectedOrderIds.length} đơn dịch vụ đã chọn?`)) {
+                      selectedOrderIds.forEach(id => deleteServiceOrder(id));
+                      setSelectedOrderIds([]);
+                      showToast('Đã xóa hàng loạt đơn dịch vụ thành công!', 'success');
+                    }
+                  }}
+                  className="btn btn-secondary" 
+                  style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', gap: '6px', padding: '6px 14px', borderRadius: '8px' }}
+                >
+                  <Trash2 size={15} /> Xóa hàng loạt
+                </button>
+                <button onClick={() => setSelectedOrderIds([])} className="btn-ghost" style={{ fontSize: '14px', padding: '6px 12px' }}>
+                  Hủy chọn
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Controls & Filter Bar */}
           <div style={{ 
             background: '#FFFFFF', 
@@ -1096,6 +1161,19 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>
+                        <input 
+                          type="checkbox"
+                          checked={filteredOrders.length > 0 && filteredOrders.every(o => selectedOrderIds.includes(o.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedOrderIds(filteredOrders.map(o => o.id));
+                            } else {
+                              setSelectedOrderIds([]);
+                            }
+                          }}
+                        />
+                      </th>
                       <th style={{ padding: '10px 12px' }}>Mã Đơn / Ngày</th>
                       <th style={{ padding: '10px 12px' }}>Tài Xế Phụ Trách</th>
                       <th style={{ padding: '10px 12px' }}>Xe Sử Dụng</th>
@@ -1118,6 +1196,19 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
 
                       return (
                         <tr key={order.id} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.15s' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            <input 
+                              type="checkbox"
+                              checked={selectedOrderIds.includes(order.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedOrderIds(prev => [...prev, order.id]);
+                                } else {
+                                  setSelectedOrderIds(prev => prev.filter(id => id !== order.id));
+                                }
+                              }}
+                            />
+                          </td>
                           
                           {/* Order ID & Date */}
                           <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>

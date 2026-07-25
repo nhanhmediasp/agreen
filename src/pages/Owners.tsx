@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Plus, Phone, MapPin, X, ArrowLeft, Edit, Image as ImageIcon, Receipt } from 'lucide-react';
+import { Search, Plus, Phone, MapPin, X, ArrowLeft, Edit, Image as ImageIcon, Receipt, Trash2 } from 'lucide-react';
 import { useApp, type Owner } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { Pagination } from '../components/Pagination';
@@ -9,6 +9,7 @@ const Owners = () => {
   const { owners, addOwner, updateOwner, deleteOwner, cars, rentals, addExpense, showToast } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
   const selectedOwnerId = searchParams.get('id');
   const setSelectedOwnerId = (id: string | null) => {
     if (id) {
@@ -419,6 +420,46 @@ const Owners = () => {
             </button>
           </div>
 
+          {selectedOwnerIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,104,55,0.08)', border: '1px solid var(--primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+              <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                Đã chọn {selectedOwnerIds.length} đối tác chủ xe
+              </span>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button 
+                  onClick={() => {
+                    const rate = window.prompt("Nhập tỷ lệ chia hoa hồng (%) mới cho các chủ xe đã chọn (từ 0 đến 100):");
+                    if (rate !== null && !isNaN(Number(rate))) {
+                      selectedOwnerIds.forEach(id => updateOwner(id, { commissionRate: Number(rate) }));
+                      setSelectedOwnerIds([]);
+                      showToast('Đã cập nhật tỷ lệ chia hoa hồng hàng loạt!', 'success');
+                    }
+                  }}
+                  className="btn-secondary"
+                  style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)', padding: '6px 14px' }}
+                >
+                  Sửa hoa hồng hàng loạt
+                </button>
+                <button 
+                  onClick={() => {
+                    if (window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${selectedOwnerIds.length} chủ xe đã chọn?`)) {
+                      selectedOwnerIds.forEach(id => deleteOwner(id));
+                      setSelectedOwnerIds([]);
+                      showToast('Đã xóa hàng loạt chủ xe thành công!', 'success');
+                    }
+                  }}
+                  className="btn-secondary" 
+                  style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', gap: '6px', padding: '6px 14px' }}
+                >
+                  <Trash2 size={15} /> Xóa hàng loạt
+                </button>
+                <button onClick={() => setSelectedOwnerIds([])} className="btn-ghost" style={{ fontSize: '14px', padding: '6px 12px' }}>
+                  Hủy chọn
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card" style={{ padding: '16px 24px', display: 'flex', gap: '12px', marginBottom: '24px' }}>
             <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '8px 16px', borderRadius: 'var(--radius-md)', flex: 1 }}>
               <Search size={18} color="var(--text-secondary)" />
@@ -436,19 +477,33 @@ const Owners = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '14px' }}>
+                  <th style={{ padding: '16px 24px', width: '50px', textAlign: 'center' }}>
+                    <input 
+                      type="checkbox"
+                      checked={filteredOwners.length > 0 && filteredOwners.every(o => selectedOwnerIds.includes(o.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedOwnerIds(filteredOwners.map(o => o.id));
+                        } else {
+                          setSelectedOwnerIds([]);
+                        }
+                      }}
+                    />
+                  </th>
                   <th style={{ padding: '16px 24px', fontWeight: 500, width: '80px' }}>STT</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Chủ xe</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Số điện thoại</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Địa chỉ</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Số xe sở hữu</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 500 }}>Tổng chi trả trực tiếp (₫)</th>
+                  <th style={{ padding: '16px 24px', fontWeight: 500 }}>Tổng chi trả (₫)</th>
                   <th style={{ padding: '16px 24px', fontWeight: 500 }}>Ghi chú</th>
+                  <th style={{ padding: '16px 24px', fontWeight: 500, width: '100px' }}>Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredOwners.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                       Không tìm thấy chủ xe nào.
                     </td>
                   </tr>
@@ -473,29 +528,55 @@ const Owners = () => {
                             transition: 'background 0.2s'
                           }}
                         >
+                          <td style={{ padding: '16px 24px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                            <input 
+                              type="checkbox"
+                              checked={selectedOwnerIds.includes(o.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedOwnerIds(prev => [...prev, o.id]);
+                                } else {
+                                  setSelectedOwnerIds(prev => prev.filter(id => id !== o.id));
+                                }
+                              }}
+                            />
+                          </td>
                           <td style={{ padding: '16px 24px', fontWeight: 600, color: 'var(--text-secondary)' }}>{startIndex + idx + 1}</td>
-                        <td style={{ padding: '16px 24px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <img src={o.image} alt={o.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-strong)' }} />
-                            <div>
-                              <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{o.name}</div>
-                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ID: #{o.id}</div>
+                          <td style={{ padding: '16px 24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <img src={o.image} alt={o.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-strong)' }} />
+                              <div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{o.name}</div>
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ID: #{o.id}</div>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Phone size={14} />
-                            {o.phone}
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px 24px' }}>{o.address}</td>
-                        <td style={{ padding: '16px 24px', fontWeight: 700, paddingLeft: '36px' }}>{oCars.length} xe</td>
-                        <td style={{ padding: '16px 24px', fontWeight: 800, color: 'var(--primary)' }} className="font-mono">
-                          {oPayoutTotal.toLocaleString()} ₫
-                        </td>
-                        <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontSize: '13px' }}>{o.notes}</td>
-                      </tr>
+                          </td>
+                          <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Phone size={14} />
+                              {o.phone}
+                            </div>
+                          </td>
+                          <td style={{ padding: '16px 24px' }}>{o.address}</td>
+                          <td style={{ padding: '16px 24px', fontWeight: 700 }}>{oCars.length} xe</td>
+                          <td style={{ padding: '16px 24px', fontWeight: 800, color: 'var(--primary)' }} className="font-mono">
+                            {oPayoutTotal.toLocaleString()} ₫
+                          </td>
+                          <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontSize: '13px' }}>{o.notes}</td>
+                          <td style={{ padding: '16px 24px' }} onClick={e => e.stopPropagation()}>
+                            <button 
+                              onClick={() => {
+                                if (window.confirm(`Bạn có chắc chắn muốn xóa đối tác chủ xe "${o.name}" khỏi hệ thống?`)) {
+                                  deleteOwner(o.id);
+                                }
+                              }}
+                              style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Xóa chủ xe"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
                       );
                     });
                   })()

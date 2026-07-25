@@ -472,6 +472,15 @@ app.post('/api/service-orders', async (req, res) => {
   }
 });
 
+app.delete('/api/service-orders/:id', async (req, res) => {
+  try {
+    await query('DELETE FROM service_orders WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ============================================================
 // CONTRACTS (Hợp đồng chính thức)
 // ============================================================

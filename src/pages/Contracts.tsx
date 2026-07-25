@@ -49,7 +49,8 @@ const LiveCountdown = ({ endDateStr }: { endDateStr: string }) => {
 };
 
 const Contracts = () => {
-  const { rentals, updateRental, showToast, cars, owners } = useApp();
+  const { rentals, updateRental, deleteRental, showToast, cars, owners } = useApp();
+  const [selectedRentalIds, setSelectedRentalIds] = useState<string[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
@@ -955,7 +956,6 @@ const Contracts = () => {
 
         </div>
       ) : (
-        
         /* 2. DANH SÁCH ĐƠN THUÊ CHÍNH */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -970,6 +970,69 @@ const Contracts = () => {
               </button>
             </Link>
           </div>
+
+          {selectedRentalIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,104,55,0.08)', border: '1px solid var(--primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+              <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                Đã chọn {selectedRentalIds.length} đơn thuê/hợp đồng
+              </span>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <select 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    if (window.confirm(`Thay đổi trạng thái hàng loạt cho ${selectedRentalIds.length} đơn đã chọn?`)) {
+                      selectedRentalIds.forEach(id => updateRental(id, { status: val as any }));
+                      setSelectedRentalIds([]);
+                      showToast('Đã cập nhật trạng thái hàng loạt!', 'success');
+                    }
+                    e.target.value = '';
+                  }}
+                  style={{ padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', outline: 'none' }}
+                >
+                  <option value="">-- Sửa trạng thái hàng loạt --</option>
+                  <option value="pending">Chờ bàn giao xe</option>
+                  <option value="active">Đang thuê</option>
+                  <option value="completed">Đã trả xe</option>
+                  <option value="cancelled">Đã hủy đơn</option>
+                </select>
+                <select 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    if (window.confirm(`Thay đổi trạng thái thanh toán hàng loạt cho ${selectedRentalIds.length} đơn đã chọn?`)) {
+                      selectedRentalIds.forEach(id => updateRental(id, { paymentStatus: val as any }));
+                      setSelectedRentalIds([]);
+                      showToast('Đã cập nhật trạng thái thanh toán hàng loạt!', 'success');
+                    }
+                    e.target.value = '';
+                  }}
+                  style={{ padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', outline: 'none' }}
+                >
+                  <option value="">-- Sửa thanh toán hàng loạt --</option>
+                  <option value="deposit">Đã đặt cọc</option>
+                  <option value="paid">Đã thanh toán</option>
+                  <option value="unpaid">Chưa thanh toán</option>
+                </select>
+                <button 
+                  onClick={() => {
+                    if (window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${selectedRentalIds.length} đơn thuê đã chọn?`)) {
+                      selectedRentalIds.forEach(id => deleteRental(id));
+                      setSelectedRentalIds([]);
+                      showToast('Đã xóa hàng loạt đơn thuê thành công!', 'success');
+                    }
+                  }}
+                  className="btn-secondary" 
+                  style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', gap: '6px', padding: '6px 14px' }}
+                >
+                  <Trash size={15} /> Xóa hàng loạt
+                </button>
+                <button onClick={() => setSelectedRentalIds([])} className="btn-ghost" style={{ fontSize: '14px', padding: '6px 12px' }}>
+                  Hủy chọn
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Tìm kiếm & Bộ lọc nâng cao */}
           <div className="card" style={{ padding: '16px 24px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
@@ -1066,6 +1129,19 @@ const Contracts = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '16px 20px', width: '50px', textAlign: 'center' }}>
+                    <input 
+                      type="checkbox"
+                      checked={filteredRentals.length > 0 && filteredRentals.every(r => selectedRentalIds.includes(r.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedRentalIds(filteredRentals.map(r => r.id));
+                        } else {
+                          setSelectedRentalIds([]);
+                        }
+                      }}
+                    />
+                  </th>
                   <th style={{ padding: '16px 20px', fontWeight: 600, width: '60px' }}>STT</th>
                   <th style={{ padding: '16px 20px', fontWeight: 600 }}>Mã đơn thuê</th>
                   <th style={{ padding: '16px 20px', fontWeight: 600 }}>Biển số xe</th>
@@ -1080,7 +1156,7 @@ const Contracts = () => {
               <tbody>
                 {paginatedRentals.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <td colSpan={10} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                       Không tìm thấy đơn thuê nào phù hợp với bộ lọc.
                     </td>
                   </tr>
@@ -1089,6 +1165,19 @@ const Contracts = () => {
                     const sttNumber = (currentPage - 1) * itemsPerPage + idx + 1;
                     return (
                       <tr key={rental.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                          <input 
+                            type="checkbox"
+                            checked={selectedRentalIds.includes(rental.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRentalIds(prev => [...prev, rental.id]);
+                              } else {
+                                setSelectedRentalIds(prev => prev.filter(id => id !== rental.id));
+                              }
+                            }}
+                          />
+                        </td>
                         <td style={{ padding: '16px 20px', fontWeight: 600, color: 'var(--text-secondary)' }}>{sttNumber}</td>
                         <td style={{ padding: '16px 20px', fontWeight: 700 }} className="font-mono">{rental.id}</td>
                         <td style={{ padding: '16px 20px' }}>
@@ -1156,7 +1245,7 @@ const Contracts = () => {
                           </select>
                         </td>
                         <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
                             <button 
                               onClick={() => setSelectedDetailRentalId(rental.id)}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--primary)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
@@ -1175,6 +1264,17 @@ const Contracts = () => {
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
                             >
                               <Edit size={14} />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                if (window.confirm(`Bạn có chắc chắn muốn XÓA vĩnh viễn đơn thuê #${rental.id} khỏi hệ thống?`)) {
+                                  deleteRental(rental.id);
+                                }
+                              }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+                              title="Xóa đơn thuê"
+                            >
+                              <Trash size={14} />
                             </button>
                           </div>
                         </td>
