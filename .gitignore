@@ -1,0 +1,23 @@
+# Node dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# IDE & OS files
+.DS_Store
+.idea/
+.vscode/
+.agents/
+.claude-plugin/
+awesome-design-systems/

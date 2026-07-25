@@ -18,7 +18,7 @@ const pool = new Pool({
   maxUses: 7500,             // Close a connection after 7500 queries to prevent memory leaks
 });
 
-pool.on('error', (err, client) => {
+pool.on('error', (err, _client) => {
   console.error('Unexpected error on idle PostgreSQL client', err);
 });
 

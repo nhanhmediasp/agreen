@@ -237,7 +237,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                 new ClipboardItem({ 'image/png': blob })
               ]);
               showToast('📸 ĐÃ CHỤP & SAO CHÉP ÁNH BÁO GIÁ! Chỉ cần sang Zalo ấn Ctrl + V để dán gửi cho khách.', 'success');
-            } catch (clipboardErr) {
+            } catch (_clipboardErr) {
               // Fallback to auto download if clipboard image permission denied
               const imageUri = canvas.toDataURL('image/png');
               const link = document.createElement('a');
@@ -249,7 +249,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
           }
         });
       }
-    } catch (err) {
+    } catch (_err) {
       showToast('Không thể tạo ảnh báo giá. Vui lòng thử lại!', 'error');
     } finally {
       setIsCapturingImage(false);

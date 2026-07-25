@@ -35,7 +35,7 @@ export function logSecurityEvent(type: SecurityLog['type'], message: string, use
 export function getSecurityLogs(): SecurityLog[] {
   try {
     return JSON.parse(localStorage.getItem(SECURITY_LOGS_KEY) || '[]');
-  } catch (err) {
+  } catch (_err) {
     return [];
   }
 }

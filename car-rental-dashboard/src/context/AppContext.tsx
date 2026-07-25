@@ -520,7 +520,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const hoverColor = darkenColor(settings.primaryColor, 15);
       document.documentElement.style.setProperty('--primary-hover', hoverColor);
-    } catch (e) {
+    } catch (_e) {
       document.documentElement.style.setProperty('--primary-hover', settings.primaryColor);
     }
   }, [settings.primaryColor]);
