@@ -1142,8 +1142,8 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
             </div>
           </div>
 
-          {/* Orders Table */}
-          <div style={{ background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          {/* Orders Table - Desktop */}
+          <div className="card desktop-only-table" style={{ padding: 0, overflowX: 'auto', width: '100%', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             {filteredOrders.length === 0 ? (
               <div style={{ padding: '48px', textAlign: 'center', color: '#64748B' }}>
                 <Compass size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
@@ -1157,8 +1157,8 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                 </button>
               </div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
+              <div style={{ overflowX: 'auto', width: '100%' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px', minWidth: '850px' }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>
@@ -1334,7 +1334,6 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                           {/* Actions */}
                           <td style={{ padding: '10px 12px', verticalAlign: 'top', textAlign: 'right' }}>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                              {/* Xem đơn & Gửi báo giá Button */}
                               <button
                                 onClick={() => handleOpenQuoteModal(order)}
                                 style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '6px', padding: '6px', cursor: 'pointer', color: '#059669', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -1366,6 +1365,108 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+
+          {/* Orders Cards - Mobile View */}
+          <div className="mobile-only-cards">
+            {filteredOrders.length === 0 ? (
+              <div className="card" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                Chưa có đơn dịch vụ nào khớp với bộ lọc.
+              </div>
+            ) : (
+              filteredOrders.map(order => {
+                const distance = Math.max(0, order.endKm - order.startKm);
+                const isPaid = order.paymentStatus === 'paid';
+                const commRate = order.driverCommissionRate !== undefined ? order.driverCommissionRate : 80;
+                const commAmount = order.driverCommissionAmount || Math.round(order.totalAmount * (commRate / 100));
+
+                return (
+                  <div key={order.id} className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', border: '1px solid var(--border-strong)', background: 'white' }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input 
+                          type="checkbox"
+                          checked={selectedOrderIds.includes(order.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedOrderIds(prev => [...prev, order.id]);
+                            } else {
+                              setSelectedOrderIds(prev => prev.filter(id => id !== order.id));
+                            }
+                          }}
+                        />
+                        <strong className="font-mono" style={{ fontSize: '15px', color: 'var(--primary)' }}>{order.id}</strong>
+                        <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px' }}>{order.carId}</span>
+                      </div>
+
+                      <button
+                        onClick={() => toggleServiceOrderPayment(order.id)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 10px',
+                          borderRadius: '16px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: isPaid ? '#DCFCE7' : '#FEE2E2',
+                          color: isPaid ? '#15803D' : '#991B1B'
+                        }}
+                      >
+                        {isPaid ? '🟢 ĐÃ THANH TOÁN' : '🔴 CHƯA THANH TOÁN'}
+                      </button>
+                    </div>
+
+                    {/* Details */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13.5px', borderTop: '1px solid var(--border-light)', paddingTop: '10px' }}>
+                      <div>👤 Tài xế: <strong>{order.driverName}</strong> ({order.driverPhone})</div>
+                      {order.customerName && order.customerName !== 'Tài xế tự bắt khách' && (
+                        <div>🙋 Khách hàng: <strong>{order.customerName}</strong> ({order.customerPhone})</div>
+                      )}
+                      {(order.pickupLocation || order.dropoffLocation) && (
+                        <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                          📍 Lộ trình: {order.pickupLocation || '---'} ➔ {order.dropoffLocation || '---'}
+                        </div>
+                      )}
+                      <div>📏 Quãng đường: <strong>{distance} KM</strong> ({order.startKm} ➔ {order.endKm} km)</div>
+                      <div>💰 Cước chuyến đi: <strong className="font-mono" style={{ color: '#006837', fontSize: '15px' }}>{order.totalAmount.toLocaleString('vi-VN')} ₫</strong></div>
+                      <div style={{ fontSize: '12px', color: '#D97706' }}>🏷️ Chiết khấu tài xế ({commRate}%): <strong>{commAmount.toLocaleString('vi-VN')} ₫</strong></div>
+                    </div>
+
+                    {/* Actions */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border-light)', paddingTop: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenQuoteModal(order)}
+                        style={{ width: '100%', padding: '10px', background: '#006837', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }}
+                      >
+                        <Eye size={16} /> Xem đơn & Gửi báo giá cho khách
+                      </button>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenOrderModal(order)}
+                          style={{ flex: 1, padding: '8px', background: 'var(--bg-page)', color: 'var(--text-main)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
+                        >
+                          <Edit size={14} /> Chỉnh sửa đơn
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOrder(order.id)}
+                          style={{ padding: '8px 12px', background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={14} /> Xóa
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </>

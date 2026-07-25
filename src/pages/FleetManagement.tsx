@@ -224,6 +224,12 @@ const FleetManagement = () => {
       return;
     }
 
+    const cleanPlate = newPlate.trim();
+    if (cars.some(c => normalizePlate(c.id) === normalizePlate(cleanPlate))) {
+      showToast(`Biển số xe "${cleanPlate}" đã tồn tại trong hệ thống! Vui lòng kiểm tra lại.`, 'error');
+      return;
+    }
+
     const carToAdd: Car = {
       id: newPlate,
       name: newName,
@@ -417,7 +423,7 @@ const FleetManagement = () => {
             <h1 style={{ fontSize: '24px', margin: 0 }}>Chi tiết xe: {activeCar.name}</h1>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '24px', alignItems: 'flex-start' }}>
+          <div className="grid-2" style={{ gap: '24px', alignItems: 'flex-start' }}>
             
             {/* Cột trái: Thông tin xe & Trạng thái thuê */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -438,7 +444,7 @@ const FleetManagement = () => {
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '14px' }}>
+                <div className="grid-2" style={{ gap: '12px', fontSize: '14px' }}>
                   <div>Hãng xe: <strong>{activeCar.brand}</strong></div>
                   <div>Năm sản xuất: <strong>{activeCar.year}</strong></div>
                   <div>Màu sắc: <strong>{activeCar.color}</strong></div>
@@ -518,7 +524,7 @@ const FleetManagement = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
               {/* Biểu giá & Hạn giấy tờ thành 2 cột */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div className="grid-2" style={{ gap: '20px' }}>
                 {/* Bảng giá thuê xe */}
                 <div style={{ background: 'white', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
                   <h3 style={{ fontSize: '15px', margin: '0 0 14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
@@ -599,11 +605,11 @@ const FleetManagement = () => {
               </div>
 
               {/* Lịch đặt xe (Calendar Timeline) */}
-              <div className="card">
+              <div className="card" style={{ overflowX: 'auto' }}>
                 <h3 style={{ fontSize: '16px', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <CalendarIcon size={18} color="var(--primary)" /> Lịch đặt xe tuần này
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', textAlign: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minWidth: '500px', gap: '8px', textAlign: 'center' }}>
                   {weekDays.map(day => {
                     const status = getCarStatusForDay(day.fullDate);
                     return (
@@ -1372,11 +1378,37 @@ const FleetManagement = () => {
               <input type="text" placeholder="VD: Trắng (Hoặc tự nhập màu khác)..." value={newColor} onChange={e => setNewColor(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số chỗ ngồi</label>
-                <input type="number" value={newSeats} onChange={e => setNewSeats(parseInt(e.target.value) || 5)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600 }}>Số chỗ ngồi *</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[4, 5, 7, 9, 16].map(num => (
+                  <button 
+                    key={num}
+                    type="button"
+                    onClick={() => setNewSeats(num)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: newSeats === num ? '2px solid var(--primary)' : '1px solid var(--border-strong)',
+                      background: newSeats === num ? '#e0f2fe' : 'white',
+                      fontWeight: newSeats === num ? 700 : 500,
+                      color: newSeats === num ? 'var(--primary)' : 'var(--text-main)',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {num} chỗ
+                  </button>
+                ))}
               </div>
+              <input 
+                type="number" 
+                value={newSeats || ''} 
+                onChange={e => setNewSeats(e.target.value === '' ? 0 : (parseInt(e.target.value) || 0))} 
+                placeholder="Nhập số chỗ ngồi..."
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} 
+                required 
+              />
             </div>
 
             {/* Custom pricing in add car */}
