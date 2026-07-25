@@ -1,17 +1,21 @@
+import 'dotenv/config';
 import pkg from 'pg';
 const { Pool } = pkg;
 
+// Connection config: prefer DATABASE_URL if set, else explicit DB params
+const poolConfig = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
+      host: process.env.DB_HOST || '127.0.0.1',
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      user: process.env.DB_USER || 'vpanel_car_user',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'vpanel_car_rental',
+    };
+
 // Optimized PostgreSQL Connection Pool configuration
-// Adjust environment variables in .env file when deploying to VPanel
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  user: process.env.DB_USER || 'vpanel_user',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'car_rental_db',
-  
-  // Connection Pool Tuning for VPS
+  ...poolConfig,
   max: 20,                   // Maximum number of clients in the pool
   idleTimeoutMillis: 30000,  // Close idle clients after 30 seconds
   connectionTimeoutMillis: 2000, // Return an error if connection takes > 2s
