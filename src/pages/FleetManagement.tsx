@@ -646,13 +646,13 @@ const FleetManagement = () => {
             {/* ===== CỘT PHẢI: Giấy tờ + Lịch + Bảng ===== */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-              {/* Thời hạn giấy tờ pháp lý - Compact rows */}
+              {/* Thời hạn giấy tờ pháp lý - 3 Columns Compact */}
               <Card
                 title={<div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}><ShieldCheck size={16} color="#047857" /> Thời hạn giấy tờ pháp lý</div>}
                 style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
-                bodyStyle={{ padding: '8px 16px' }}
+                bodyStyle={{ padding: '12px' }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                   {[
                     { label: 'Đăng kiểm', date: activeCar.expiryRegistration },
                     { label: 'Bảo hiểm TNDS', date: activeCar.expiryInsurance },
@@ -664,20 +664,42 @@ const FleetManagement = () => {
                     const isExpired = diffDays <= 0;
                     const isCritical = diffDays > 0 && diffDays < 30;
                     const isWarning = diffDays >= 30 && diffDays <= 60;
+                    
                     const badgeColor = isExpired ? '#B91C1C' : isCritical ? '#C2410C' : isWarning ? '#A16207' : '#15803D';
                     const badgeBg = isExpired ? '#FEE2E2' : isCritical ? '#FFEDD5' : isWarning ? '#FEF9C3' : '#DCFCE7';
-                    const dotColor = isExpired ? '#EF4444' : isCritical ? '#F97316' : isWarning ? '#EAB308' : '#22C55E';
+                    const borderCol = isExpired ? '#FCA5A5' : isCritical ? '#FED7AA' : isWarning ? '#FDE68A' : '#BBF7D0';
+                    const bgCol = isExpired ? '#FEF2F2' : isCritical ? '#FFF7ED' : isWarning ? '#FEFCE8' : '#F0FDF4';
+
                     return (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: idx < 2 ? '1px solid #F1F5F9' : 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, display: 'inline-block', flexShrink: 0 }} />
-                          <div>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>{doc.label}</div>
-                            <div style={{ fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>{new Date(doc.date).toLocaleDateString('vi-VN')}</div>
-                          </div>
-                        </div>
-                        <span style={{ background: badgeBg, color: badgeColor, borderRadius: 100, padding: '2px 10px', fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                          {isExpired ? `Hết ${Math.abs(diffDays)}ng` : `Còn ${diffDays} ngày`}
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          padding: '10px 4px', 
+                          background: bgCol, 
+                          border: `1.5px solid ${borderCol}`,
+                          borderRadius: '8px', 
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#1E293B', whiteSpace: 'nowrap' }}>{doc.label}</div>
+                        <div style={{ fontSize: '9.5px', color: '#64748B', fontFamily: 'monospace' }}>{new Date(doc.date).toLocaleDateString('vi-VN')}</div>
+                        <span style={{ 
+                          background: badgeBg, 
+                          color: badgeColor, 
+                          borderRadius: '100px', 
+                          padding: '1px 6px', 
+                          fontSize: '9.5px', 
+                          fontWeight: 700,
+                          marginTop: '2px',
+                          display: 'inline-block',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {isExpired ? `Hết ${Math.abs(diffDays)}n` : `Còn ${diffDays}n`}
                         </span>
                       </div>
                     );
