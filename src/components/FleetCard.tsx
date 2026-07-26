@@ -1,4 +1,5 @@
 import React from 'react';
+import { Tag } from 'antd';
 import { Clock, AlertTriangle, User, Wrench } from 'lucide-react';
 import { type Car } from '../context/AppContext';
 
@@ -14,28 +15,22 @@ interface FleetCardProps {
 }
 
 export const FleetCard: React.FC<FleetCardProps> = ({ car, onSelectCar }) => {
-  // Determine badge style & label based on status and overdue flag
-  const getStatusBadge = () => {
+  const renderStatusTag = () => {
     if (car.isOverdue) {
-      return {
-        className: 'badge-overdue',
-        label: '🔴 Quá hạn trả'
-      };
+      return <Tag color="error" style={{ borderRadius: 12, fontWeight: 600, margin: 0 }}>🔴 Quá hạn trả</Tag>;
     }
     switch (car.status) {
       case 'ready':
-        return { className: 'badge-available', label: '🟢 Sẵn sàng' };
+        return <Tag color="success" style={{ borderRadius: 12, fontWeight: 600, margin: 0 }}>🟢 Sẵn sàng</Tag>;
       case 'rented':
-        return { className: 'badge-rented', label: '🔵 Đang thuê' };
+        return <Tag color="processing" style={{ borderRadius: 12, fontWeight: 600, margin: 0 }}>🔵 Đang thuê</Tag>;
       case 'maintenance':
-        return { className: 'badge-maintenance', label: '🟠 Bảo trì' };
+        return <Tag color="warning" style={{ borderRadius: 12, fontWeight: 600, margin: 0 }}>🟠 Bảo trì</Tag>;
       case 'suspended':
       default:
-        return { className: 'badge-inactive', label: '⚪ Tạm ngưng' };
+        return <Tag color="default" style={{ borderRadius: 12, fontWeight: 600, margin: 0 }}>⚪ Tạm ngưng</Tag>;
     }
   };
-
-  const badge = getStatusBadge();
 
   return (
     <div 
@@ -60,20 +55,7 @@ export const FleetCard: React.FC<FleetCardProps> = ({ car, onSelectCar }) => {
       {/* Top Header: Plate & Status Badge */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span className="license-plate">{car.id}</span>
-        <span 
-          style={{ 
-            padding: '3px 10px', 
-            borderRadius: '100px', 
-            fontSize: '12px', 
-            fontWeight: 600,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px'
-          }} 
-          className={badge.className}
-        >
-          {badge.label}
-        </span>
+        {renderStatusTag()}
       </div>
 
       {/* Car Info */}
