@@ -238,22 +238,22 @@ const Expenses = () => {
               pagination={{
                 pageSize: 10,
                 showSizeChanger: true,
-                showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi`
+                showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi`
               }}
               columns={[
                 {
                   title: 'Khoản chi',
                   dataIndex: 'title',
                   key: 'title',
-                  sorter: (a, b) => a.title.localeCompare(b.title),
-                  render: (title) => <span style={{ fontWeight: 600, color: '#262626' }}>{title}</span>
+                  sorter: (a: Expense, b: Expense) => a.title.localeCompare(b.title),
+                  render: (title: string) => <span style={{ fontWeight: 600, color: '#262626' }}>{title}</span>
                 },
                 {
                   title: 'Số tiền (₫)',
                   dataIndex: 'amount',
                   key: 'amount',
-                  sorter: (a, b) => a.amount - b.amount,
-                  render: (amount) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
+                  sorter: (a: Expense, b: Expense) => a.amount - b.amount,
+                  render: (amount: number) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
                 },
                 {
                   title: 'Danh mục',
@@ -265,21 +265,21 @@ const Expenses = () => {
                     { text: 'Rửa xe', value: 'Rửa xe' },
                     { text: 'Nhiên liệu', value: 'Nhiên liệu' },
                   ],
-                  onFilter: (value, record) => record.category === value,
-                  render: (category) => <Tag color="blue">{category}</Tag>
+                  onFilter: (value: boolean | React.Key, record: Expense) => record.category === value,
+                  render: (category: string) => <Tag color="blue">{category}</Tag>
                 },
                 {
                   title: 'Liên kết xe',
                   dataIndex: 'ref',
                   key: 'ref',
-                  render: (ref) => ref ? <span className="license-plate" style={{ fontSize: '11px', padding: '2px 8px' }}>{ref}</span> : <span style={{ color: '#8c8c8c' }}>Chi phí chung</span>
+                  render: (ref: string) => ref ? <span className="license-plate" style={{ fontSize: '11px', padding: '2px 8px' }}>{ref}</span> : <span style={{ color: '#8c8c8c' }}>Chi phí chung</span>
                 },
                 {
                   title: 'Ngày chi',
                   dataIndex: 'date',
                   key: 'date',
-                  sorter: (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-                  render: (date) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{new Date(date).toLocaleDateString('vi-VN')}</span>
+                  sorter: (a: Expense, b: Expense) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+                  render: (date: string) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{new Date(date).toLocaleDateString('vi-VN')}</span>
                 }
               ]}
             />

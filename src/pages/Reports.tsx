@@ -274,25 +274,25 @@ const Reports = () => {
                 title: 'Biển số',
                 dataIndex: 'id',
                 key: 'id',
-                render: (id) => <span className="license-plate" style={{ fontSize: '11px', padding: '2px 6px' }}>{id}</span>
+                render: (id: string) => <span className="license-plate" style={{ fontSize: '11px', padding: '2px 6px' }}>{id}</span>
               },
               {
                 title: 'Bảo dưỡng',
                 dataIndex: 'maint',
                 key: 'maint',
-                render: (val) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                render: (val: number) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
               },
               {
                 title: 'Vệ sinh',
                 dataIndex: 'clean',
                 key: 'clean',
-                render: (val) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                render: (val: number) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
               },
               {
                 title: 'Chiết khấu / Khác',
                 dataIndex: 'repair',
                 key: 'repair',
-                render: (val) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                render: (val: number) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
               }
             ]}
           />

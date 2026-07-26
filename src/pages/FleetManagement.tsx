@@ -834,7 +834,7 @@ const FleetManagement = () => {
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <Segmented
                     value={activeDetailTab}
-                    onChange={(val) => setActiveDetailTab(val as 'rentals' | 'expenses')}
+                    onChange={(val: string | number) => setActiveDetailTab(val as 'rentals' | 'expenses')}
                     options={[
                       { label: `📜 Lịch sử người đặt xe (${carRentals.length})`, value: 'rentals' },
                       { label: `💰 Lịch sử chi phí (${expenses.filter(e => e.ref === activeCar.id).length})`, value: 'expenses' }
@@ -864,7 +864,7 @@ const FleetManagement = () => {
                     pagination={{
                       pageSize: 5,
                       showSizeChanger: true,
-                      showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} lượt thuê`
+                      showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} lượt thuê`
                     }}
                     locale={{
                       emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có lịch sử thuê cho xe này" />
@@ -874,7 +874,7 @@ const FleetManagement = () => {
                         title: 'Khách hàng',
                         dataIndex: 'customerName',
                         key: 'customerName',
-                        render: (name, record) => (
+                        render: (name: string, record: Rental) => (
                           <div>
                             <strong style={{ color: '#0F172A' }}>{name}</strong>
                             <div style={{ fontSize: '11px', color: '#64748B' }} className="font-mono">{record.customerPhone}</div>
@@ -884,7 +884,7 @@ const FleetManagement = () => {
                       {
                         title: 'Thời gian thuê',
                         key: 'time',
-                        render: (_, record) => (
+                        render: (_: unknown, record: Rental) => (
                           <span style={{ fontSize: '13px', color: '#475569' }} className="font-mono">
                             {new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}
                           </span>
@@ -894,8 +894,8 @@ const FleetManagement = () => {
                         title: 'Tổng tiền',
                         dataIndex: 'totalAmount',
                         key: 'totalAmount',
-                        sorter: (a, b) => a.totalAmount - b.totalAmount,
-                        render: (val) => (
+                        sorter: (a: Rental, b: Rental) => a.totalAmount - b.totalAmount,
+                        render: (val: number) => (
                           <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#006837' }}>
                             {(val || 0).toLocaleString()} ₫
                           </span>
@@ -905,7 +905,7 @@ const FleetManagement = () => {
                         title: 'Trạng thái',
                         dataIndex: 'status',
                         key: 'status',
-                        render: (st) => st === 'active' ? <Tag color="processing">Đang thuê</Tag> : <Tag color="success">Hoàn tất</Tag>
+                        render: (st: string) => st === 'active' ? <Tag color="processing">Đang thuê</Tag> : <Tag color="success">Hoàn tất</Tag>
                       }
                     ]}
                   />
@@ -916,7 +916,7 @@ const FleetManagement = () => {
                     pagination={{
                       pageSize: 5,
                       showSizeChanger: true,
-                      showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi`
+                      showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi`
                     }}
                     locale={{
                       emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa ghi nhận chi phí nào cho xe này" />
@@ -926,27 +926,27 @@ const FleetManagement = () => {
                         title: 'Ngày chi',
                         dataIndex: 'date',
                         key: 'date',
-                        render: (d) => <span style={{ fontFamily: 'monospace', color: '#64748B' }}>{new Date(d).toLocaleDateString('vi-VN')}</span>
+                        render: (d: string) => <span style={{ fontFamily: 'monospace', color: '#64748B' }}>{new Date(d).toLocaleDateString('vi-VN')}</span>
                       },
                       {
                         title: 'Nội dung',
                         dataIndex: 'title',
                         key: 'title',
-                        render: (t) => <span style={{ fontWeight: 600, color: '#0F172A' }}>{t}</span>
+                        render: (t: string) => <span style={{ fontWeight: 600, color: '#0F172A' }}>{t}</span>
                       },
                       {
                         title: 'Danh mục',
                         dataIndex: 'category',
                         key: 'category',
-                        render: (cat) => <Tag color="blue">{cat}</Tag>
+                        render: (cat: string) => <Tag color="blue">{cat}</Tag>
                       },
                       {
                         title: 'Số tiền',
                         dataIndex: 'amount',
                         key: 'amount',
                         align: 'right',
-                        sorter: (a, b) => a.amount - b.amount,
-                        render: (val) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#EF4444' }}>{(val || 0).toLocaleString()} ₫</span>
+                        sorter: (a: Expense, b: Expense) => a.amount - b.amount,
+                        render: (val: number) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#EF4444' }}>{(val || 0).toLocaleString()} ₫</span>
                       }
                     ]}
                   />
@@ -1175,21 +1175,21 @@ const FleetManagement = () => {
                 <Table<Car>
                   dataSource={filteredCars}
                   rowKey="id"
-                  onRow={(record) => ({
+                  onRow={(record: Car) => ({
                     onClick: () => setSelectedCarId(record.id),
                     style: { cursor: 'pointer' }
                   })}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
-                    showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} xe`
+                    showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} xe`
                   }}
                   columns={[
                     {
                       title: 'Phương tiện',
                       dataIndex: 'name',
                       key: 'name',
-                      render: (_, record) => (
+                      render: (_: unknown, record: Car) => (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <img src={record.image} alt={record.name} style={{ width: '60px', height: '40px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #f0f0f0' }} />
                           <div>
@@ -1203,28 +1203,28 @@ const FleetManagement = () => {
                       title: 'Biển số xe',
                       dataIndex: 'id',
                       key: 'id',
-                      sorter: (a, b) => a.id.localeCompare(b.id),
-                      render: (id) => <span className="license-plate" style={{ fontSize: '12px', padding: '2px 8px' }}>{id}</span>
+                      sorter: (a: Car, b: Car) => a.id.localeCompare(b.id),
+                      render: (id: string) => <span className="license-plate" style={{ fontSize: '12px', padding: '2px 8px' }}>{id}</span>
                     },
                     {
                       title: 'Chủ sở hữu',
                       dataIndex: 'ownerPhone',
                       key: 'ownerPhone',
-                      render: (phone) => <span style={{ color: '#595959', fontSize: '13px' }}>{getOwnerNameByPhone(phone)}</span>
+                      render: (phone: string) => <span style={{ color: '#595959', fontSize: '13px' }}>{getOwnerNameByPhone(phone)}</span>
                     },
                     {
                       title: 'Số KM',
                       dataIndex: 'km',
                       key: 'km',
-                      sorter: (a, b) => a.km - b.km,
-                      render: (km) => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#262626' }}>{(km || 0).toLocaleString()} km</span>
+                      sorter: (a: Car, b: Car) => a.km - b.km,
+                      render: (km: number) => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#262626' }}>{(km || 0).toLocaleString()} km</span>
                     },
                     {
                       title: 'Giá ngày',
                       dataIndex: 'pricePerDay',
                       key: 'pricePerDay',
-                      sorter: (a, b) => (a.pricePerDay || 0) - (b.pricePerDay || 0),
-                      render: (price) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1677ff' }}>{(price || 800000).toLocaleString('vi-VN')} ₫</span>
+                      sorter: (a: Car, b: Car) => (a.pricePerDay || 0) - (b.pricePerDay || 0),
+                      render: (price: number) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1677ff' }}>{(price || 800000).toLocaleString('vi-VN')} ₫</span>
                     },
                     {
                       title: 'Trạng thái',
@@ -1236,8 +1236,8 @@ const FleetManagement = () => {
                         { text: 'Bảo trì', value: 'maintenance' },
                         { text: 'Tạm ngưng', value: 'suspended' },
                       ],
-                      onFilter: (value, record) => record.status === value,
-                      render: (_, record) => {
+                      onFilter: (value: boolean | React.Key, record: Car) => record.status === value,
+                      render: (_: unknown, record: Car) => {
                         if (record.status === 'rented') {
                           return <Tag color="processing" style={{ borderRadius: 12, fontWeight: 600 }}>🔵 Đang thuê</Tag>;
                         } else if (record.status === 'ready') {
@@ -1251,7 +1251,7 @@ const FleetManagement = () => {
                     {
                       title: 'Thao tác',
                       key: 'actions',
-                      render: (_, record) => (
+                      render: (_: unknown, record: Car) => (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

@@ -426,26 +426,26 @@ const Customers = () => {
             <Table<Customer>
               dataSource={filteredCustomers}
               rowKey="id"
-              onRow={(customer) => ({
+              onRow={(customer: Customer) => ({
                 onClick: () => setSelectedCustomerId(customer.id),
                 style: { cursor: 'pointer' }
               })}
               rowSelection={{
                 selectedRowKeys: selectedCustomerIds,
-                onChange: (keys) => setSelectedCustomerIds(keys as string[])
+                onChange: (keys: React.Key[]) => setSelectedCustomerIds(keys as string[])
               }}
               pagination={{
                 pageSize: 10,
                 showSizeChanger: true,
-                showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} khách hàng`
+                showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} khách hàng`
               }}
               columns={[
                 {
                   title: 'Khách hàng',
                   dataIndex: 'name',
                   key: 'name',
-                  sorter: (a, b) => a.name.localeCompare(b.name),
-                  render: (_, record) => (
+                  sorter: (a: Customer, b: Customer) => a.name.localeCompare(b.name),
+                  render: (_: unknown, record: Customer) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <img src={record.image} alt={record.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #f0f0f0' }} />
                       <div>
@@ -459,7 +459,7 @@ const Customers = () => {
                   title: 'Số điện thoại',
                   dataIndex: 'phone',
                   key: 'phone',
-                  render: (phone) => (
+                  render: (phone: string) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#595959' }}>
                       <Phone size={14} />
                       {phone}
@@ -475,8 +475,8 @@ const Customers = () => {
                     { text: 'Thường', value: 'normal' },
                     { text: '⚠️ Chú ý', value: 'warning' },
                   ],
-                  onFilter: (value, record) => record.classification === value,
-                  render: (classification) => {
+                  onFilter: (value: boolean | React.Key, record: Customer) => record.classification === value,
+                  render: (classification: string) => {
                     if (classification === 'vip') return <Tag color="gold" style={{ borderRadius: 12, fontWeight: 700 }}>⭐ VIP</Tag>;
                     if (classification === 'warning') return <Tag color="error" style={{ borderRadius: 12, fontWeight: 700 }}>⚠️ Chú ý</Tag>;
                     return <Tag color="default" style={{ borderRadius: 12, fontWeight: 600 }}>Thường</Tag>;
@@ -486,7 +486,7 @@ const Customers = () => {
                   title: 'Trạng thái hồ sơ',
                   dataIndex: 'status',
                   key: 'status',
-                  render: (status, record) => {
+                  render: (status: string, record: Customer) => {
                     if (status === 'verified') return <Tag color="success" style={{ borderRadius: 12, fontWeight: 700 }}>✓ {record.statusText || 'Đã xác minh'}</Tag>;
                     return <Tag color="error" style={{ borderRadius: 12, fontWeight: 700 }}>⚠️ {record.statusText || 'GPLX hết hạn'}</Tag>;
                   }
@@ -495,13 +495,13 @@ const Customers = () => {
                   title: 'Đơn hoạt động',
                   dataIndex: 'activeRentals',
                   key: 'activeRentals',
-                  sorter: (a, b) => a.activeRentals - b.activeRentals,
-                  render: (count) => <span style={{ fontWeight: 600, color: '#262626' }}>{count}</span>
+                  sorter: (a: Customer, b: Customer) => a.activeRentals - b.activeRentals,
+                  render: (count: number) => <span style={{ fontWeight: 600, color: '#262626' }}>{count}</span>
                 },
                 {
                   title: 'Hành động',
                   key: 'actions',
-                  render: (_, record) => (
+                  render: (_: unknown, record: Customer) => (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

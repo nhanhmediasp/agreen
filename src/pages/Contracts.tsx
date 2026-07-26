@@ -1155,32 +1155,32 @@ const Contracts = () => {
             <Table<Rental>
               dataSource={filteredRentals}
               rowKey="id"
-              onRow={(rental) => ({
+              onRow={(rental: Rental) => ({
                 onClick: () => setSelectedDetailRentalId(rental.id),
                 style: { cursor: 'pointer' }
               })}
               rowSelection={{
                 selectedRowKeys: selectedRentalIds,
-                onChange: (keys) => setSelectedRentalIds(keys as string[])
+                onChange: (keys: React.Key[]) => setSelectedRentalIds(keys as string[])
               }}
               pagination={{
                 pageSize: 10,
                 showSizeChanger: true,
-                showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} đơn thuê`
+                showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} đơn thuê`
               }}
               columns={[
                 {
                   title: 'Mã đơn',
                   dataIndex: 'id',
                   key: 'id',
-                  sorter: (a, b) => a.id.localeCompare(b.id),
-                  render: (id) => <span className="font-mono" style={{ fontWeight: 700, color: 'var(--primary)' }}>{id}</span>
+                  sorter: (a: Rental, b: Rental) => a.id.localeCompare(b.id),
+                  render: (id: string) => <span className="font-mono" style={{ fontWeight: 700, color: 'var(--primary)' }}>{id}</span>
                 },
                 {
                   title: 'Biển số xe',
                   dataIndex: 'carId',
                   key: 'carId',
-                  render: (carId) => (
+                  render: (carId: string) => (
                     <Link to={`/fleet?id=${carId}`} onClick={(e) => e.stopPropagation()}>
                       <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px' }}>{carId}</span>
                     </Link>
@@ -1190,8 +1190,8 @@ const Contracts = () => {
                   title: 'Khách hàng',
                   dataIndex: 'customerName',
                   key: 'customerName',
-                  sorter: (a, b) => a.customerName.localeCompare(b.customerName),
-                  render: (_, record) => (
+                  sorter: (a: Rental, b: Rental) => a.customerName.localeCompare(b.customerName),
+                  render: (_: unknown, record: Rental) => (
                     <div>
                       <div style={{ fontWeight: 600, color: '#262626' }}>{record.customerName}</div>
                       <div style={{ fontSize: '12px', color: '#8c8c8c' }} className="font-mono">{record.customerPhone}</div>
@@ -1202,19 +1202,19 @@ const Contracts = () => {
                   title: 'Loại đơn',
                   dataIndex: 'source',
                   key: 'source',
-                  render: (source) => source === 'system' ? <Tag color="green">Hệ thống tạo</Tag> : <Tag color="default">Tải lên tệp</Tag>
+                  render: (source: string) => source === 'system' ? <Tag color="green">Hệ thống tạo</Tag> : <Tag color="default">Tải lên tệp</Tag>
                 },
                 {
                   title: 'Tổng tiền',
                   dataIndex: 'totalAmount',
                   key: 'totalAmount',
-                  sorter: (a, b) => a.totalAmount - b.totalAmount,
-                  render: (amount) => <span className="font-mono" style={{ fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
+                  sorter: (a: Rental, b: Rental) => a.totalAmount - b.totalAmount,
+                  render: (amount: number) => <span className="font-mono" style={{ fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
                 },
                 {
                   title: 'Thời gian thuê',
                   key: 'duration',
-                  render: (_, record) => (
+                  render: (_: unknown, record: Rental) => (
                     <div style={{ fontSize: '12px', color: '#595959' }} className="font-mono">
                       {new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}
                     </div>
@@ -1230,8 +1230,8 @@ const Contracts = () => {
                     { text: 'Đã trả xe', value: 'completed' },
                     { text: 'Đã hủy', value: 'cancelled' },
                   ],
-                  onFilter: (value, record) => record.status === value,
-                  render: (status) => {
+                  onFilter: (value: boolean | React.Key, record: Rental) => record.status === value,
+                  render: (status: string) => {
                     if (status === 'pending') return <Tag color="warning">🟡 Chờ giao</Tag>;
                     if (status === 'active') return <Tag color="processing">🔵 Đang thuê</Tag>;
                     if (status === 'completed') return <Tag color="success">🟢 Đã trả</Tag>;
@@ -1241,7 +1241,7 @@ const Contracts = () => {
                 {
                   title: 'Hành động',
                   key: 'actions',
-                  render: (_, record) => (
+                  render: (_: unknown, record: Rental) => (
                     <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setSelectedDetailRentalId(record.id)}
