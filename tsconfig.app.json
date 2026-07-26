@@ -1,25 +1,23 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "es2023",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "allowImportingTsExtensions": true,
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
     "skipLibCheck": true,
-    "allowJs": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "paths": {
-      "antd": ["./node_modules/antd/es/index.d.ts"],
-      "antd/*": ["./node_modules/antd/es/*"],
-      "@ant-design/icons": ["./node_modules/@ant-design/icons/lib/index.d.ts"],
-      "@ant-design/icons/*": ["./node_modules/@ant-design/icons/lib/*"],
-      "@ant-design/v5-patch-for-react-19": ["./node_modules/@ant-design/v5-patch-for-react-19/es/index.d.ts"]
-    }
+    "strict": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src"]
 }
