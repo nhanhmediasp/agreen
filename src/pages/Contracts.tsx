@@ -460,10 +460,21 @@ const Contracts = () => {
                         <div style={{ marginTop: '4px' }}>
                           <span className="license-plate" style={{ fontSize: '11px', padding: '2px 8px' }}>{carObj.id}</span>
                         </div>
-                        <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <div>📏 KM bàn giao: <strong style={{ color: '#0F172A' }}>{selectedDetailRental.startKm.toLocaleString()} km</strong></div>
-                          {selectedDetailRental.status === 'completed' && selectedDetailRental.endKm !== undefined && selectedDetailRental.endKm !== null && (
-                            <div>🏁 KM kết thúc: <strong style={{ color: '#16a34a' }}>{Number(selectedDetailRental.endKm).toLocaleString()} km</strong> (Đã chạy {(Number(selectedDetailRental.endKm) - selectedDetailRental.startKm).toLocaleString()} km)</div>
+                        <div style={{ fontSize: '13px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px', background: '#f8fafc', padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', minWidth: '180px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>📏 KM bàn giao:</span>
+                            <strong className="font-mono" style={{ color: '#0F172A' }}>{selectedDetailRental.startKm ? selectedDetailRental.startKm.toLocaleString() : 0} km</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>🏁 KM kết thúc:</span>
+                            <strong className="font-mono" style={{ color: (selectedDetailRental.endKm !== undefined && selectedDetailRental.endKm !== null) ? '#16a34a' : '#d97706' }}>
+                              {(selectedDetailRental.endKm !== undefined && selectedDetailRental.endKm !== null) ? `${Number(selectedDetailRental.endKm).toLocaleString()} km` : 'Chưa cập nhật'}
+                            </strong>
+                          </div>
+                          {(selectedDetailRental.endKm !== undefined && selectedDetailRental.endKm !== null && Number(selectedDetailRental.endKm) >= selectedDetailRental.startKm) && (
+                            <div style={{ fontSize: '11.5px', color: '#059669', textAlign: 'right', fontWeight: 600 }}>
+                              (Đã chạy: {(Number(selectedDetailRental.endKm) - selectedDetailRental.startKm).toLocaleString()} km)
+                            </div>
                           )}
                         </div>
                       </div>

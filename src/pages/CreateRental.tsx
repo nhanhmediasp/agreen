@@ -938,8 +938,8 @@ const CreateRental = () => {
 
       {/* QUICK ADD CAR MODAL */}
       {showQuickAddCarModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleQuickAddCarSubmit} style={{ width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <form className="card" onSubmit={handleQuickAddCarSubmit} style={{ width: '780px', maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', borderRadius: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h2 style={{ fontSize: '20px', margin: 0 }}>Thêm xe mới nhanh</h2>
               <button type="button" onClick={() => setShowQuickAddCarModal(false)} style={{ color: 'var(--text-secondary)' }}>
