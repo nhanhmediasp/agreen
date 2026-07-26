@@ -413,11 +413,11 @@ const FleetManagement = () => {
   return (
     <div style={{ height: '100%' }}>
       {selectedCarId && activeCar ? (
-        /* Trang Chi tiết xe chuẩn Ant Design Enterprise UI */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+        /* Trang Chi tiết xe - Redesigned Layout */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
           
-          {/* 1. Page Header & Breadcrumb Bar */}
-          <Card style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }} bodyStyle={{ padding: '16px 24px' }}>
+          {/* 1. Page Header & Breadcrumb Bar - Redesigned */}
+          <Card style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', border: '1px solid #E8EDF2' }} bodyStyle={{ padding: '16px 24px' }}>
             <Breadcrumb
               items={[
                 { title: <a onClick={() => setSelectedCarId(null)} style={{ color: '#64748B' }}>Quản lý xe</a> },
@@ -425,167 +425,103 @@ const FleetManagement = () => {
                 { title: <span style={{ fontWeight: 600, color: '#0F172A' }}>{activeCar.name}</span> },
                 { title: <span className="license-plate" style={{ fontSize: '11px', padding: '1px 6px' }}>{activeCar.id}</span> }
               ]}
-              style={{ marginBottom: '14px' }}
+              style={{ marginBottom: '12px' }}
             />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <Button 
-                  icon={<ArrowLeftOutlined />} 
+                <Button
+                  icon={<ArrowLeftOutlined />}
                   onClick={() => setSelectedCarId(null)}
-                  style={{ borderRadius: '6px' }}
+                  style={{ borderRadius: '8px', borderColor: '#E2E8F0', color: '#475569' }}
                 >
-                  Quay lại danh sách
+                  Quay lại
                 </Button>
-                <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 700, color: '#0F172A' }}>{activeCar.name}</h1>
-                
-                {/* AntD Status Tag */}
-                {activeCar.status === 'rented' ? (
-                  <Tag color="processing" style={{ fontSize: '13px', padding: '3px 10px', borderRadius: '100px' }}>
-                    <Badge status="processing" text="Đang cho thuê" />
-                  </Tag>
-                ) : activeCar.status === 'ready' ? (
-                  <Tag color="success" style={{ fontSize: '13px', padding: '3px 10px', borderRadius: '100px' }}>
-                    <Badge status="success" text="Sẵn sàng đón khách" />
-                  </Tag>
-                ) : activeCar.status === 'maintenance' ? (
-                  <Tag color="warning" style={{ fontSize: '13px', padding: '3px 10px', borderRadius: '100px' }}>
-                    <Badge status="warning" text="Bảo trì xe" />
-                  </Tag>
-                ) : (
-                  <Tag color="error" style={{ fontSize: '13px', padding: '3px 10px', borderRadius: '100px' }}>
-                    <Badge status="error" text="Tạm ngưng" />
-                  </Tag>
-                )}
+                <div>
+                  <h1 style={{ fontSize: '22px', margin: 0, fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>{activeCar.name}</h1>
+                  <div style={{ marginTop: '6px' }}>
+                    {activeCar.status === 'rented' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 100, padding: '3px 12px', fontSize: '12.5px', fontWeight: 600 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3B82F6', display: 'inline-block' }} />
+                        Đang cho thuê
+                      </span>
+                    ) : activeCar.status === 'ready' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#F0FDF4', color: '#16A34A', border: '1px solid #86EFAC', borderRadius: 100, padding: '3px 12px', fontSize: '12.5px', fontWeight: 600 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+                        Sẵn sàng đón khách
+                      </span>
+                    ) : activeCar.status === 'maintenance' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FFF7ED', color: '#EA580C', border: '1px solid #FED7AA', borderRadius: 100, padding: '3px 12px', fontSize: '12.5px', fontWeight: 600 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#F97316', display: 'inline-block' }} />
+                        Đang bảo trì
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: 100, padding: '3px 12px', fontSize: '12.5px', fontWeight: 600 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#EF4444', display: 'inline-block' }} />
+                        Tạm ngưng
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Action Toolbar */}
-              <Space size="middle" wrap>
-                <Button icon={<EditOutlined />} onClick={handleOpenEdit} style={{ borderRadius: '6px' }}>
-                  Chỉnh sửa xe
-                </Button>
-                <Button 
-                  danger 
-                  ghost 
-                  icon={<DeleteOutlined />} 
-                  style={{ borderRadius: '6px' }}
+              <Space size={10} wrap>
+                <Button icon={<EditOutlined />} onClick={handleOpenEdit} style={{ borderRadius: '8px' }}>Chỉnh sửa</Button>
+                <Button danger ghost icon={<DeleteOutlined />} style={{ borderRadius: '8px' }}
                   onClick={() => {
-                    if (activeCar.status === 'rented') {
-                      showToast('Không thể xóa xe đang cho thuê!', 'error');
-                      return;
-                    }
-                    if (confirm(`Bạn có chắc chắn muốn xóa xe ${activeCar.name} (${activeCar.id})?`)) {
-                      deleteCar(activeCar.id);
-                      setSelectedCarId(null);
-                    }
+                    if (activeCar.status === 'rented') { showToast('Không thể xóa xe đang cho thuê!', 'error'); return; }
+                    if (confirm(`Bạn có chắc chắn muốn xóa xe ${activeCar.name} (${activeCar.id})?`)) { deleteCar(activeCar.id); setSelectedCarId(null); }
                   }}
-                >
-                  Xóa xe
-                </Button>
+                >Xóa xe</Button>
                 {activeCar.status === 'ready' && (
                   <Link to={`/rental/new?car=${activeCar.id}`} style={{ textDecoration: 'none' }}>
-                    <Button type="primary" icon={<PlusOutlined />} style={{ borderRadius: '6px', background: '#006837' }}>
-                      Tạo đơn thuê mới
-                    </Button>
+                    <Button type="primary" icon={<PlusOutlined />} style={{ borderRadius: '8px', background: '#006837', boxShadow: '0 2px 6px rgba(0,104,55,0.25)' }}>Tạo đơn thuê mới</Button>
                   </Link>
                 )}
                 {activeCar.status === 'rented' && (
-                  <Button type="primary" icon={<CheckSquareOutlined />} onClick={handleOpenReturn} style={{ borderRadius: '6px', background: '#047857' }}>
-                    Nhận trả xe
-                  </Button>
+                  <Button type="primary" icon={<CheckSquareOutlined />} onClick={handleOpenReturn} style={{ borderRadius: '8px', background: '#1D4ED8' }}>Nhận trả xe</Button>
                 )}
               </Space>
             </div>
           </Card>
 
-          {/* 2. Top Statistic Cards Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-            <Card hoverable style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }} bodyStyle={{ padding: '16px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>Số KM hiện tại</span>
-                <DashboardOutlined style={{ fontSize: '18px', color: '#94A3B8' }} />
-              </div>
-              <Statistic 
-                value={activeCar.km} 
-                suffix="km" 
-                valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', fontFamily: 'monospace' }} 
-              />
-            </Card>
+          {/* Stat cards removed - info now shown inline in left column */}
 
-            <Card hoverable style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }} bodyStyle={{ padding: '16px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>Giá thuê ngày</span>
-                <DollarOutlined style={{ fontSize: '18px', color: '#006837' }} />
-              </div>
-              <Statistic 
-                value={activeCar.pricePerDay || 800000} 
-                suffix="₫/ngày" 
-                valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#006837', fontFamily: 'monospace' }} 
-              />
-            </Card>
+          {/* 3. Main 2-Column Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '20px', alignItems: 'flex-start' }}>
 
-            <Card hoverable style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }} bodyStyle={{ padding: '16px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>Chủ xe quản lý</span>
-                <UserOutlined style={{ fontSize: '18px', color: '#1D4ED8' }} />
-              </div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', marginTop: '4px' }}>
-                {getOwnerNameByPhone(activeCar.ownerPhone)}
-              </div>
-            </Card>
+            {/* ===== CỘT TRÁI: Ảnh + Thông số + Bảng giá ===== */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-            <Card hoverable style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }} bodyStyle={{ padding: '16px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>Tổng lượt thuê xe</span>
-                <HistoryOutlined style={{ fontSize: '18px', color: '#047857' }} />
-              </div>
-              <Statistic 
-                value={carRentals.length} 
-                suffix="lượt" 
-                valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#047857', fontFamily: 'monospace' }} 
-              />
-            </Card>
-          </div>
-
-          {/* 3. Main Workspace Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px', alignItems: 'flex-start' }}>
-            
-            {/* Cột trái: Ảnh & Hợp đồng hiện tại */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <Card style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }} bodyStyle={{ padding: '20px' }}>
-                <div style={{ position: 'relative', width: '100%', height: '280px', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', marginBottom: '16px' }}>
+              {/* Ảnh xe */}
+              <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #E8EDF2', overflow: 'hidden' }} bodyStyle={{ padding: '16px' }}>
+                <div style={{ position: 'relative', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px' }}>
                   <img src={activeCar.image} alt={activeCar.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
-                    <span className="license-plate" style={{ fontSize: '18px', padding: '4px 12px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-                      {activeCar.id}
-                    </span>
+                  <div style={{ position: 'absolute', top: '10px', left: '10px' }}>
+                    <span className="license-plate" style={{ fontSize: '16px', padding: '3px 10px', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>{activeCar.id}</span>
                   </div>
+                  {activeCar.status === 'rented' && (
+                    <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(29,78,216,0.9)', color: 'white', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}>Đang thuê</div>
+                  )}
+                  {activeCar.status === 'maintenance' && (
+                    <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(234,88,12,0.9)', color: 'white', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}>Bảo trì</div>
+                  )}
                 </div>
 
                 {activeCar.status === 'rented' && (
-                  <div style={{ background: '#EFF6FF', padding: '16px', borderRadius: '8px', border: '1px solid #3B82F6', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#1D4ED8', fontWeight: 700, fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        🔑 Hợp đồng đang chạy
-                      </span>
-                      {activeRental && (
-                        <Link to={`/contracts?id=${activeRental.id}`} style={{ fontSize: '12px', color: '#1D4ED8', fontWeight: 700, textDecoration: 'none' }}>
-                          Đơn #{activeRental.id} →
-                        </Link>
-                      )}
+                  <div style={{ background: '#EFF6FF', padding: '12px', borderRadius: '8px', border: '1px solid #BFDBFE', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ color: '#1D4ED8', fontWeight: 700, fontSize: '13px' }}>🔑 Hợp đồng đang chạy</span>
+                      {activeRental && (<Link to={`/contracts?id=${activeRental.id}`} style={{ fontSize: '12px', color: '#1D4ED8', fontWeight: 700, textDecoration: 'none' }}>Đơn #{activeRental.id} →</Link>)}
                     </div>
-
-                    <div style={{ background: 'white', padding: '12px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
-                      <div style={{ fontSize: '12px', color: '#64748B' }}>Khách hàng thuê:</div>
-                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#0F172A', marginTop: '2px' }}>{activeCar.customer || activeRental?.customerName}</div>
-                      {activeRental?.customerPhone && (
-                        <div style={{ fontSize: '12px', color: '#64748B', fontFamily: 'monospace' }}>{activeRental.customerPhone}</div>
-                      )}
+                    <div style={{ background: 'white', padding: '10px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>Khách thuê:</div>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#0F172A' }}>{activeCar.customer || activeRental?.customerName}</div>
+                      {activeRental?.customerPhone && (<div style={{ fontSize: '12px', color: '#64748B', fontFamily: 'monospace' }}>{activeRental.customerPhone}</div>)}
                     </div>
-
                     {activeRental && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 12px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
-                        <span style={{ color: '#1D4ED8', fontWeight: 600, fontSize: '13px' }}>⏳ Thời gian còn lại:</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', background: 'white', padding: '8px 10px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
+                        <span style={{ color: '#1D4ED8', fontWeight: 600, fontSize: '12px' }}>⏳ Còn lại:</span>
                         <SpeedometerCountdown endDateStr={activeRental.endDate} />
                       </div>
                     )}
@@ -594,367 +530,196 @@ const FleetManagement = () => {
 
                 {activeCar.status === 'ready' && (
                   <Link to={`/rental/new?car=${activeCar.id}`} style={{ textDecoration: 'none', display: 'block' }}>
-                    <Button 
-                      type="primary" 
-                      size="large" 
-                      block 
-                      icon={<CarOutlined />} 
-                      style={{ height: '44px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, background: '#006837' }}
-                    >
-                      Tạo đơn cho thuê ngay
-                    </Button>
+                    <Button type="primary" size="large" block icon={<CarOutlined />} style={{ height: '42px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, background: '#006837', boxShadow: '0 2px 8px rgba(0,104,55,0.25)' }}>Tạo đơn cho thuê ngay</Button>
                   </Link>
                 )}
                 {activeCar.status === 'rented' && (
-                  <Button 
-                    type="primary" 
-                    size="large" 
-                    block 
-                    icon={<CheckSquareOutlined />} 
-                    onClick={handleOpenReturn}
-                    style={{ height: '44px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, background: '#047857' }}
-                  >
-                    Nhận trả xe & Thanh lý đơn
-                  </Button>
+                  <Button type="primary" size="large" block icon={<CheckSquareOutlined />} onClick={handleOpenReturn} style={{ height: '42px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, background: '#1D4ED8' }}>Nhận trả xe & Thanh lý</Button>
                 )}
+              </Card>
+
+              {/* Thông số kỹ thuật - Compact Grid */}
+              <Card
+                title={<div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}><Layers size={16} color="#006837" /> Thông số kỹ thuật</div>}
+                style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
+                bodyStyle={{ padding: '0' }}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                  {[
+                    { label: 'Hãng xe', value: activeCar.brand },
+                    { label: 'Năm SX', value: String(activeCar.year) },
+                    { label: 'Màu sắc', value: activeCar.color },
+                    { label: 'Số chỗ', value: `${activeCar.seats} chỗ` },
+                    { label: 'Số KM', value: `${activeCar.km.toLocaleString()} km` },
+                    { label: 'Chủ xe', value: getOwnerNameByPhone(activeCar.ownerPhone) || '—' },
+                  ].map((item, i) => (
+                    <div key={i} style={{ padding: '10px 16px', borderBottom: i < 4 ? '1px solid #F1F5F9' : 'none', borderRight: i % 2 === 0 ? '1px solid #F1F5F9' : 'none' }}>
+                      <div style={{ fontSize: '10.5px', color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>{item.label}</div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
+                        {item.label === 'Màu sắc' ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 12, height: 12, borderRadius: '50%', background: activeCar.color === 'Đen' ? '#0f172a' : activeCar.color === 'Trắng' ? '#e2e8f0' : activeCar.color === 'Đỏ' ? '#dc2626' : activeCar.color === 'Vàng cát' ? '#d4a84b' : '#94a3b8', border: '1.5px solid #cbd5e1', display: 'inline-block' }} />
+                            {item.value}
+                          </div>
+                        ) : item.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Bảng giá thuê - Compact */}
+              <Card
+                title={<div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}><Receipt size={16} color="#006837" /> Bảng giá cho thuê</div>}
+                style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
+                bodyStyle={{ padding: '12px 16px' }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { type: 'Theo Giờ', note: 'Ngắn hạn', price: activeCar.pricePerHour || 100000, color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE' },
+                    { type: 'Theo Ngày', note: 'Phổ biến ★', price: activeCar.pricePerDay || 800000, color: '#006837', bg: '#F0FDF4', border: '#86EFAC' },
+                    { type: 'Theo Tuần', note: 'Dài hạn', price: activeCar.pricePerWeek || 5000000, color: '#7C3AED', bg: '#F5F3FF', border: '#C4B5FD' },
+                  ].map((item) => (
+                    <div key={item.type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: item.bg, borderRadius: '8px', border: `1.5px solid ${item.border}` }}>
+                      <div>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: item.color }}>{item.type}</span>
+                        <span style={{ fontSize: '11px', color: item.color, opacity: 0.7, marginLeft: 6 }}>{item.note}</span>
+                      </div>
+                      <span style={{ fontSize: '15px', fontWeight: 800, color: item.color, fontFamily: 'monospace' }}>{item.price.toLocaleString('vi-VN')}₫</span>
+                    </div>
+                  ))}
+                </div>
               </Card>
             </div>
 
-            {/* Cột phải: Specs AntD Descriptions, Pricing & Legal Docs, Schedule & History Tabs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
-              {/* 1. AntD Descriptions - Thông số kỹ thuật */}
-              <Card 
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>
-                    <Layers size={18} color="#006837" /> Thông số kỹ thuật xe
-                  </div>
-                }
-                style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
-                bodyStyle={{ padding: '20px' }}
+            {/* ===== CỘT PHẢI: Giấy tờ + Lịch + Bảng ===== */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+              {/* Thời hạn giấy tờ pháp lý - Card grid 3 cột */}
+              <Card
+                title={<div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}><ShieldCheck size={16} color="#047857" /> Thời hạn giấy tờ pháp lý</div>}
+                style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
+                bodyStyle={{ padding: '16px' }}
               >
-                <Descriptions bordered column={{ xs: 1, sm: 2, md: 3 }} size="middle">
-                  <Descriptions.Item label={<span style={{ color: '#64748B', fontSize: '13px' }}>Hãng sản xuất</span>}>
-                    <span style={{ fontWeight: 600, color: '#0F172A' }}>{activeCar.brand}</span>
-                  </Descriptions.Item>
-                  <Descriptions.Item label={<span style={{ color: '#64748B', fontSize: '13px' }}>Tên mẫu xe</span>}>
-                    <span style={{ fontWeight: 600, color: '#0F172A' }}>{activeCar.name}</span>
-                  </Descriptions.Item>
-                  <Descriptions.Item label={<span style={{ color: '#64748B', fontSize: '13px' }}>Năm sản xuất</span>}>
-                    <span style={{ fontWeight: 600, color: '#0F172A' }}>{activeCar.year}</span>
-                  </Descriptions.Item>
-                  <Descriptions.Item label={<span style={{ color: '#64748B', fontSize: '13px' }}>Màu sắc xe</span>}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#0F172A' }}>
-                      <span style={{ 
-                        width: '14px', 
-                        height: '14px', 
-                        borderRadius: '50%', 
-                        background: activeCar.color === 'Đen' ? '#0f172a' : activeCar.color === 'Trắng' ? '#ffffff' : activeCar.color === 'Đỏ' ? '#dc2626' : '#94a3b8', 
-                        border: '1.5px solid #cbd5e1',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                      }} />
-                      {activeCar.color}
-                    </div>
-                  </Descriptions.Item>
-                  <Descriptions.Item label={<span style={{ color: '#64748B', fontSize: '13px' }}>Số chỗ ngồi</span>}>
-                    <span style={{ fontWeight: 600, color: '#0F172A' }}>{activeCar.seats} chỗ</span>
-                  </Descriptions.Item>
-                  <Descriptions.Item label={<span style={{ color: '#64748B', fontSize: '13px' }}>Số KM hiện tại</span>}>
-                    <span style={{ fontWeight: 700, color: '#006837', fontFamily: 'monospace' }}>{activeCar.km.toLocaleString()} km</span>
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
-
-              {/* 2. Biểu giá & Hạn giấy tờ thành 2 Cột */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                {/* Bảng giá thuê xe */}
-                <Card 
-                  title={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
-                      <Receipt size={17} color="#006837" /> Bảng giá cho thuê
-                    </div>
-                  }
-                  style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
-                  bodyStyle={{ padding: '20px' }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Tag color="blue" style={{ borderRadius: '4px', margin: 0 }}>Theo Giờ</Tag>
-                        <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>Thuê ngắn hạn theo giờ</span>
-                      </div>
-                      <strong className="font-mono" style={{ fontSize: '15px', color: '#006837', fontWeight: 700 }}>
-                        {(activeCar.pricePerHour || 100000).toLocaleString('vi-VN')} ₫
-                      </strong>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#ECFDF5', borderRadius: '8px', border: '1px solid #10B981' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Tag color="success" style={{ borderRadius: '4px', margin: 0 }}>Theo Ngày</Tag>
-                        <Tag color="gold" style={{ borderRadius: '4px', margin: 0, fontSize: '11px' }}>Phổ biến</Tag>
-                      </div>
-                      <strong className="font-mono" style={{ fontSize: '16px', color: '#006837', fontWeight: 800 }}>
-                        {(activeCar.pricePerDay || 800000).toLocaleString('vi-VN')} ₫
-                      </strong>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Tag color="purple" style={{ borderRadius: '4px', margin: 0 }}>Theo Tuần</Tag>
-                        <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>Thuê dài hạn theo tuần</span>
-                      </div>
-                      <strong className="font-mono" style={{ fontSize: '15px', color: '#006837', fontWeight: 700 }}>
-                        {(activeCar.pricePerWeek || 5000000).toLocaleString('vi-VN')} ₫
-                      </strong>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Hạn giấy tờ xe */}
-                <Card 
-                  title={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
-                      <ShieldCheck size={17} color="#047857" /> Thời hạn giấy tờ pháp lý
-                    </div>
-                  }
-                  style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
-                  bodyStyle={{ padding: '20px' }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {[
-                      { label: 'Hạn đăng kiểm', date: activeCar.expiryRegistration },
-                      { label: 'Bảo hiểm TNDS', date: activeCar.expiryInsurance },
-                      { label: 'Phù hiệu xe', date: activeCar.expiryLicense }
-                    ].map((doc, idx) => {
-                      const expiryDate = new Date(doc.date);
-                      const today = new Date('2026-07-15');
-                      const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                      const tagColor = diffDays <= 0 ? 'error' : diffDays < 30 ? 'error' : diffDays <= 60 ? 'warning' : 'success';
-                      const tagText = diffDays <= 0 ? `Đã hết hạn (${Math.abs(diffDays)} ngày)` : `Còn ${diffDays} ngày`;
-
-                      return (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <CalendarOutlined style={{ color: '#64748B', fontSize: '15px' }} />
-                            <div>
-                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>{doc.label}</span>
-                              <div style={{ fontSize: '11px', color: '#64748B' }} className="font-mono">{new Date(doc.date).toLocaleDateString('vi-VN')}</div>
-                            </div>
-                          </div>
-                          <Tag color={tagColor} style={{ borderRadius: '4px', margin: 0, fontWeight: 600 }}>
-                            {tagText}
-                          </Tag>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              </div>
-
-              {/* 3. Lịch đặt xe tuần này */}
-              <Card 
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
-                    <CalendarIcon size={17} color="#1D4ED8" /> Lịch đặt xe tuần này
-                  </div>
-                }
-                style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
-                bodyStyle={{ padding: '20px' }}
-              >
-                {/* Desktop View: 7 columns strip */}
-                <div className="desktop-only-table" style={{ width: '100%' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', textAlign: 'center' }}>
-                    {weekDays.map(day => {
-                      const status = getCarStatusForDay(day.fullDate);
-                      const isToday = day.fullDate === '2026-07-15';
-
-                      return (
-                        <div 
-                          key={day.fullDate} 
-                          style={{ 
-                            padding: '12px 6px', 
-                            borderRadius: '8px', 
-                            border: isToday ? '2px solid #006837' : '1px solid #E2E8F0', 
-                            background: isToday ? '#ECFDF5' : status === 'rented' ? '#EFF6FF' : status === 'maintenance' ? '#FFF7ED' : status === 'suspended' ? '#FEF2F2' : '#FFFFFF',
-                            boxShadow: isToday ? '0 2px 6px rgba(0,104,55,0.15)' : 'none',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <div style={{ fontSize: '12px', fontWeight: isToday ? 700 : 600, color: isToday ? '#006837' : '#0F172A' }}>
-                            {day.name} {isToday && '📍'}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#64748B', margin: '2px 0 6px' }}>{day.dateStr}</div>
-                          <div>
-                            {status === 'rented' ? <Tag color="processing" style={{ margin: 0, fontSize: '11px' }}>Đang bận</Tag> :
-                             status === 'maintenance' ? <Tag color="warning" style={{ margin: 0, fontSize: '11px' }}>Bảo trì</Tag> :
-                             status === 'suspended' ? <Tag color="error" style={{ margin: 0, fontSize: '11px' }}>Ngưng</Tag> :
-                             <Tag color="success" style={{ margin: 0, fontSize: '11px' }}>Trống</Tag>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Mobile View: Vertical Day List */}
-                <div className="mobile-only-cards" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {weekDays.map(day => {
-                    const status = getCarStatusForDay(day.fullDate);
-                    const isToday = day.fullDate === '2026-07-15';
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                  {[
+                    { label: 'Đăng kiểm', date: activeCar.expiryRegistration, icon: '🔍' },
+                    { label: 'Bảo hiểm TNDS', date: activeCar.expiryInsurance, icon: '🛡️' },
+                    { label: 'Phù hiệu xe', date: activeCar.expiryLicense, icon: '📋' }
+                  ].map((doc, idx) => {
+                    const expiryDate = new Date(doc.date);
+                    const today = new Date('2026-07-15');
+                    const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    const isExpired = diffDays <= 0;
+                    const isCritical = diffDays > 0 && diffDays < 30;
+                    const isWarning = diffDays >= 30 && diffDays <= 60;
+                    const s = isExpired
+                      ? { bg: '#FEF2F2', border: '#FECACA', badgeBg: '#FEE2E2', badgeColor: '#B91C1C' }
+                      : isCritical
+                        ? { bg: '#FFF7ED', border: '#FED7AA', badgeBg: '#FFEDD5', badgeColor: '#C2410C' }
+                        : isWarning
+                          ? { bg: '#FEFCE8', border: '#FDE68A', badgeBg: '#FEF9C3', badgeColor: '#A16207' }
+                          : { bg: '#F0FDF4', border: '#BBF7D0', badgeBg: '#DCFCE7', badgeColor: '#15803D' };
                     return (
-                      <div 
-                        key={day.fullDate} 
-                        style={{ 
-                          padding: '10px 14px', 
-                          borderRadius: '8px', 
-                          border: isToday ? '2px solid #006837' : '1px solid #E2E8F0', 
-                          background: isToday ? '#ECFDF5' : '#FFFFFF',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <strong style={{ fontSize: '13px', color: isToday ? '#006837' : '#0F172A' }}>{day.name} {isToday && '(Hôm nay)'}</strong>
-                          <span style={{ fontSize: '12px', color: '#64748B' }}>{day.dateStr}</span>
+                      <div key={idx} style={{ padding: '14px', background: s.bg, borderRadius: '10px', border: `1px solid ${s.border}`, textAlign: 'center' }}>
+                        <div style={{ fontSize: '22px', marginBottom: '6px' }}>{doc.icon}</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', marginBottom: '4px' }}>{doc.label}</div>
+                        <div style={{ fontSize: '11px', color: '#64748B', fontFamily: 'monospace', marginBottom: '8px' }}>{new Date(doc.date).toLocaleDateString('vi-VN')}</div>
+                        <div style={{ display: 'inline-block', background: s.badgeBg, color: s.badgeColor, borderRadius: 100, padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>
+                          {isExpired ? `Hết hạn ${Math.abs(diffDays)}n` : `Còn ${diffDays} ngày`}
                         </div>
-
-                        {status === 'rented' ? <Tag color="processing">Đang bận</Tag> :
-                         status === 'maintenance' ? <Tag color="warning">Bảo trì</Tag> :
-                         status === 'suspended' ? <Tag color="error">Tạm ngưng</Tag> :
-                         <Tag color="success">Trống</Tag>}
                       </div>
                     );
                   })}
                 </div>
               </Card>
 
-              {/* 4. Tabbed Table Component (AntD Segmented Tabs & Tables) */}
-              <Card style={{ borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }} bodyStyle={{ padding: 0 }}>
-                <div style={{ padding: '14px 20px', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              {/* Lịch đặt xe tuần này - Redesigned */}
+              <Card
+                title={<div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}><CalendarIcon size={16} color="#1D4ED8" /> Lịch đặt xe tuần này</div>}
+                style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
+                bodyStyle={{ padding: '16px' }}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                  {weekDays.map(day => {
+                    const status = getCarStatusForDay(day.fullDate);
+                    const isToday = day.fullDate === '2026-07-15';
+                    const dayStyle = isToday
+                      ? { bg: '#006837', border: '#006837', dayColor: 'white', dateColor: 'rgba(255,255,255,0.8)', shadow: '0 2px 8px rgba(0,104,55,0.3)' }
+                      : status === 'rented'
+                        ? { bg: '#EFF6FF', border: '#93C5FD', dayColor: '#1D4ED8', dateColor: '#3B82F6', shadow: 'none' }
+                        : status === 'maintenance'
+                          ? { bg: '#FFF7ED', border: '#FED7AA', dayColor: '#EA580C', dateColor: '#F97316', shadow: 'none' }
+                          : { bg: '#FAFAFA', border: '#E2E8F0', dayColor: '#374151', dateColor: '#9CA3AF', shadow: 'none' };
+                    const statusLabel = status === 'rented' ? 'Bận' : status === 'maintenance' ? 'BT' : 'Trống';
+                    const statusColor = isToday ? 'rgba(255,255,255,0.9)' : status === 'rented' ? '#1D4ED8' : status === 'maintenance' ? '#EA580C' : '#16A34A';
+                    const statusBg = isToday ? 'rgba(255,255,255,0.2)' : status === 'rented' ? '#DBEAFE' : status === 'maintenance' ? '#FFEDD5' : '#DCFCE7';
+                    return (
+                      <div key={day.fullDate} style={{ padding: '10px 4px', borderRadius: '10px', border: `1.5px solid ${dayStyle.border}`, background: dayStyle.bg, boxShadow: dayStyle.shadow, textAlign: 'center', transition: 'all 0.2s' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: dayStyle.dayColor, marginBottom: '2px', textTransform: 'uppercase' }}>{day.name}</div>
+                        <div style={{ fontSize: '18px', fontWeight: 800, color: dayStyle.dayColor, lineHeight: 1.2 }}>{day.dateStr}</div>
+                        <div style={{ marginTop: '6px' }}>
+                          <span style={{ display: 'inline-block', background: statusBg, color: statusColor, borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: 700 }}>{statusLabel}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+
+              {/* Lịch sử & Chi phí - Tabs */}
+              <Card style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2', overflow: 'hidden' }} bodyStyle={{ padding: 0 }}>
+                <div style={{ padding: '12px 20px', borderBottom: '1px solid #E8EDF2', background: '#FAFBFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                   <Segmented
                     value={activeDetailTab}
                     onChange={(val: string | number) => setActiveDetailTab(val as 'rentals' | 'expenses')}
                     options={[
-                      { label: `📜 Lịch sử người đặt xe (${carRentals.length})`, value: 'rentals' },
-                      { label: `💰 Lịch sử chi phí (${expenses.filter(e => e.ref === activeCar.id).length})`, value: 'expenses' }
+                      { label: `📜 Lịch sử đặt xe (${carRentals.length})`, value: 'rentals' },
+                      { label: `💰 Chi phí xe (${expenses.filter(e => e.ref === activeCar.id).length})`, value: 'expenses' }
                     ]}
                   />
-
                   {activeDetailTab === 'expenses' && (
-                    <Button 
-                      type="primary" 
-                      size="small" 
-                      icon={<PlusOutlined />}
-                      onClick={() => {
-                        setExpenseDate(new Date().toISOString().split('T')[0]);
-                        setShowAddExpenseModal(true);
-                      }}
+                    <Button type="primary" size="small" icon={<PlusOutlined />}
+                      onClick={() => { setExpenseDate(new Date().toISOString().split('T')[0]); setShowAddExpenseModal(true); }}
                       style={{ background: '#006837', borderRadius: '6px' }}
-                    >
-                      Thêm chi phí
-                    </Button>
+                    >Thêm chi phí</Button>
                   )}
                 </div>
-
                 {activeDetailTab === 'rentals' ? (
-                  <Table<Rental>
-                    dataSource={carRentals}
-                    rowKey="id"
-                    pagination={{
-                      pageSize: 5,
-                      showSizeChanger: true,
-                      showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} lượt thuê`
-                    }}
-                    locale={{
-                      emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có lịch sử thuê cho xe này" />
-                    }}
+                  <Table<Rental> dataSource={carRentals} rowKey="id"
+                    pagination={{ pageSize: 5, showSizeChanger: true, showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} lượt thuê` }}
+                    locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có lịch sử thuê cho xe này" /> }}
                     columns={[
-                      {
-                        title: 'Khách hàng',
-                        dataIndex: 'customerName',
-                        key: 'customerName',
-                        render: (name: string, record: Rental) => (
-                          <div>
-                            <strong style={{ color: '#0F172A' }}>{name}</strong>
-                            <div style={{ fontSize: '11px', color: '#64748B' }} className="font-mono">{record.customerPhone}</div>
-                          </div>
-                        )
-                      },
-                      {
-                        title: 'Thời gian thuê',
-                        key: 'time',
-                        render: (_: unknown, record: Rental) => (
-                          <span style={{ fontSize: '13px', color: '#475569' }} className="font-mono">
-                            {new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}
-                          </span>
-                        )
-                      },
-                      {
-                        title: 'Tổng tiền',
-                        dataIndex: 'totalAmount',
-                        key: 'totalAmount',
+                      { title: 'Khách hàng', dataIndex: 'customerName', key: 'customerName',
+                        render: (name: string, record: Rental) => (<div><strong style={{ color: '#0F172A' }}>{name}</strong><div style={{ fontSize: '11px', color: '#64748B' }} className="font-mono">{record.customerPhone}</div></div>) },
+                      { title: 'Thời gian thuê', key: 'time',
+                        render: (_: unknown, record: Rental) => (<span style={{ fontSize: '12px', color: '#475569' }} className="font-mono">{new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}</span>) },
+                      { title: 'Tổng tiền', dataIndex: 'totalAmount', key: 'totalAmount',
                         sorter: (a: Rental, b: Rental) => a.totalAmount - b.totalAmount,
-                        render: (val: number) => (
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#006837' }}>
-                            {(val || 0).toLocaleString()} ₫
-                          </span>
-                        )
-                      },
-                      {
-                        title: 'Trạng thái',
-                        dataIndex: 'status',
-                        key: 'status',
-                        render: (st: string) => st === 'active' ? <Tag color="processing">Đang thuê</Tag> : <Tag color="success">Hoàn tất</Tag>
-                      }
+                        render: (val: number) => (<span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#006837' }}>{(val || 0).toLocaleString()} ₫</span>) },
+                      { title: 'Trạng thái', dataIndex: 'status', key: 'status',
+                        render: (st: string) => st === 'active'
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Đang thuê</span>
+                          : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#F0FDF4', color: '#16A34A', border: '1px solid #86EFAC', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Hoàn tất</span> }
                     ]}
                   />
                 ) : (
-                  <Table<Expense>
-                    dataSource={expenses.filter(e => e.ref === activeCar.id)}
-                    rowKey="id"
-                    pagination={{
-                      pageSize: 5,
-                      showSizeChanger: true,
-                      showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi`
-                    }}
-                    locale={{
-                      emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa ghi nhận chi phí nào cho xe này" />
-                    }}
+                  <Table<Expense> dataSource={expenses.filter(e => e.ref === activeCar.id)} rowKey="id"
+                    pagination={{ pageSize: 5, showSizeChanger: true, showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi` }}
+                    locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa ghi nhận chi phí nào cho xe này" /> }}
                     columns={[
-                      {
-                        title: 'Ngày chi',
-                        dataIndex: 'date',
-                        key: 'date',
-                        render: (d: string) => <span style={{ fontFamily: 'monospace', color: '#64748B' }}>{new Date(d).toLocaleDateString('vi-VN')}</span>
-                      },
-                      {
-                        title: 'Nội dung',
-                        dataIndex: 'title',
-                        key: 'title',
-                        render: (t: string) => <span style={{ fontWeight: 600, color: '#0F172A' }}>{t}</span>
-                      },
-                      {
-                        title: 'Danh mục',
-                        dataIndex: 'category',
-                        key: 'category',
-                        render: (cat: string) => <Tag color="blue">{cat}</Tag>
-                      },
-                      {
-                        title: 'Số tiền',
-                        dataIndex: 'amount',
-                        key: 'amount',
-                        align: 'right',
+                      { title: 'Ngày chi', dataIndex: 'date', key: 'date', render: (d: string) => <span style={{ fontFamily: 'monospace', color: '#64748B' }}>{new Date(d).toLocaleDateString('vi-VN')}</span> },
+                      { title: 'Nội dung', dataIndex: 'title', key: 'title', render: (t: string) => <span style={{ fontWeight: 600, color: '#0F172A' }}>{t}</span> },
+                      { title: 'Danh mục', dataIndex: 'category', key: 'category', render: (cat: string) => <Tag color="blue">{cat}</Tag> },
+                      { title: 'Số tiền', dataIndex: 'amount', key: 'amount', align: 'right',
                         sorter: (a: Expense, b: Expense) => a.amount - b.amount,
-                        render: (val: number) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#EF4444' }}>{(val || 0).toLocaleString()} ₫</span>
-                      }
+                        render: (val: number) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#DC2626' }}>{(val || 0).toLocaleString()} ₫</span> }
                     ]}
                   />
                 )}
               </Card>
 
             </div>
-
           </div>
         </div>
       ) : (
