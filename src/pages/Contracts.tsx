@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Table, Tag, Modal, Form } from 'antd';
 import { Plus, X, Search, ArrowLeft, ShieldAlert, FileText, Edit, Trash, FileCheck, Eye, Filter, Calendar, Clock, Camera, Upload, Image as ImageIcon } from 'lucide-react';
 import { useApp, type Rental, type Violation } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
@@ -1150,179 +1151,121 @@ const Contracts = () => {
           )}
 
           {/* Desktop Table View */}
-          <div className="card desktop-only-table" style={{ padding: 0, overflowX: 'auto', width: '100%' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ padding: '16px 20px', width: '50px', textAlign: 'center' }}>
-                    <input 
-                      type="checkbox"
-                      checked={filteredRentals.length > 0 && filteredRentals.every(r => selectedRentalIds.includes(r.id))}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedRentalIds(filteredRentals.map(r => r.id));
-                        } else {
-                          setSelectedRentalIds([]);
-                        }
-                      }}
-                    />
-                  </th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600, width: '60px' }}>STT</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Mã đơn thuê</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Biển số xe</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Khách hàng</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Loại đơn</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Tổng tiền</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Thời gian thuê</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Trạng thái</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600, textAlign: 'right' }}>Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRentals.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      Không tìm thấy đơn thuê nào phù hợp với bộ lọc.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedRentals.map((rental, idx) => {
-                    const sttNumber = (currentPage - 1) * itemsPerPage + idx + 1;
-                    return (
-                      <tr 
-                        key={rental.id} 
-                        onClick={() => setSelectedDetailRentalId(rental.id)}
-                        style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+          <div className="card desktop-only-table" style={{ padding: 0, overflowX: 'auto', width: '100%', background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+            <Table<Rental>
+              dataSource={filteredRentals}
+              rowKey="id"
+              onRow={(rental) => ({
+                onClick: () => setSelectedDetailRentalId(rental.id),
+                style: { cursor: 'pointer' }
+              })}
+              rowSelection={{
+                selectedRowKeys: selectedRentalIds,
+                onChange: (keys) => setSelectedRentalIds(keys as string[])
+              }}
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} đơn thuê`
+              }}
+              columns={[
+                {
+                  title: 'Mã đơn',
+                  dataIndex: 'id',
+                  key: 'id',
+                  sorter: (a, b) => a.id.localeCompare(b.id),
+                  render: (id) => <span className="font-mono" style={{ fontWeight: 700, color: 'var(--primary)' }}>{id}</span>
+                },
+                {
+                  title: 'Biển số xe',
+                  dataIndex: 'carId',
+                  key: 'carId',
+                  render: (carId) => (
+                    <Link to={`/fleet?id=${carId}`} onClick={(e) => e.stopPropagation()}>
+                      <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px' }}>{carId}</span>
+                    </Link>
+                  )
+                },
+                {
+                  title: 'Khách hàng',
+                  dataIndex: 'customerName',
+                  key: 'customerName',
+                  sorter: (a, b) => a.customerName.localeCompare(b.customerName),
+                  render: (_, record) => (
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#262626' }}>{record.customerName}</div>
+                      <div style={{ fontSize: '12px', color: '#8c8c8c' }} className="font-mono">{record.customerPhone}</div>
+                    </div>
+                  )
+                },
+                {
+                  title: 'Loại đơn',
+                  dataIndex: 'source',
+                  key: 'source',
+                  render: (source) => source === 'system' ? <Tag color="green">Hệ thống tạo</Tag> : <Tag color="default">Tải lên tệp</Tag>
+                },
+                {
+                  title: 'Tổng tiền',
+                  dataIndex: 'totalAmount',
+                  key: 'totalAmount',
+                  sorter: (a, b) => a.totalAmount - b.totalAmount,
+                  render: (amount) => <span className="font-mono" style={{ fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
+                },
+                {
+                  title: 'Thời gian thuê',
+                  key: 'duration',
+                  render: (_, record) => (
+                    <div style={{ fontSize: '12px', color: '#595959' }} className="font-mono">
+                      {new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}
+                    </div>
+                  )
+                },
+                {
+                  title: 'Trạng thái',
+                  dataIndex: 'status',
+                  key: 'status',
+                  filters: [
+                    { text: 'Chờ giao xe', value: 'pending' },
+                    { text: 'Đang thuê', value: 'active' },
+                    { text: 'Đã trả xe', value: 'completed' },
+                    { text: 'Đã hủy', value: 'cancelled' },
+                  ],
+                  onFilter: (value, record) => record.status === value,
+                  render: (status) => {
+                    if (status === 'pending') return <Tag color="warning">🟡 Chờ giao</Tag>;
+                    if (status === 'active') return <Tag color="processing">🔵 Đang thuê</Tag>;
+                    if (status === 'completed') return <Tag color="success">🟢 Đã trả</Tag>;
+                    return <Tag color="error">🔴 Đã hủy</Tag>;
+                  }
+                },
+                {
+                  title: 'Hành động',
+                  key: 'actions',
+                  render: (_, record) => (
+                    <div style={{ display: 'flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setSelectedDetailRentalId(record.id)}
+                        style={{ padding: '4px 8px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, color: '#595959' }}
                       >
-                        <td style={{ padding: '16px 20px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                          <input 
-                            type="checkbox"
-                            checked={selectedRentalIds.includes(rental.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedRentalIds(prev => [...prev, rental.id]);
-                              } else {
-                                setSelectedRentalIds(prev => prev.filter(id => id !== rental.id));
-                              }
-                            }}
-                          />
-                        </td>
-                        <td style={{ padding: '16px 20px', fontWeight: 600, color: 'var(--text-secondary)' }}>{sttNumber}</td>
-                        <td style={{ padding: '16px 20px', fontWeight: 700 }} className="font-mono">{rental.id}</td>
-                        <td style={{ padding: '16px 20px' }} onClick={e => e.stopPropagation()}>
-                          <Link to={`/fleet?id=${rental.carId}`} style={{ textDecoration: 'none' }}>
-                            <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px', cursor: 'pointer', textDecoration: 'underline' }}>{rental.carId}</span>
-                          </Link>
-                        </td>
-                        <td style={{ padding: '16px 20px' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{rental.customerName}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }} className="font-mono">{rental.customerPhone}</div>
-                        </td>
-                        <td style={{ padding: '16px 20px' }}>
-                          {rental.source === 'system' ? (
-                            <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '100px', background: 'var(--status-available-bg)', color: 'var(--status-available-text)', fontSize: '11px', fontWeight: 600 }}>
-                              Hệ thống tạo
-                            </span>
-                          ) : (
-                            <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '100px', background: 'var(--bg-hover)', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600 }}>
-                              Tải lên tệp
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: '16px 20px', fontWeight: 700, color: 'var(--primary)' }} className="font-mono">
-                          {rental.totalAmount.toLocaleString()} ₫
-                        </td>
-                        <td style={{ padding: '16px 20px', fontSize: '12px', color: 'var(--text-secondary)' }} className="font-mono">
-                          {new Date(rental.startDate).toLocaleDateString('vi-VN')} → {new Date(rental.endDate).toLocaleDateString('vi-VN')}
-                        </td>
-                        <td style={{ padding: '16px 20px' }} onClick={e => e.stopPropagation()}>
-                          <select
-                            value={rental.status}
-                            onChange={e => {
-                              e.stopPropagation();
-                              const newStatus = e.target.value as any;
-                              const updates: Partial<Rental> = { status: newStatus };
-                              if (newStatus === 'active' && !rental.deliveredAt) {
-                                updates.deliveredAt = new Date().toISOString();
-                              }
-                              if (newStatus === 'completed' && !rental.returnedAt) {
-                                updates.returnedAt = new Date().toISOString();
-                              }
-                              updateRental(rental.id, updates);
-                              showToast(`Đã cập nhật đơn #${rental.id} thành "${
-                                newStatus === 'pending' ? 'Chờ bàn giao xe' :
-                                newStatus === 'active' ? 'Đang thuê' :
-                                newStatus === 'completed' ? 'Đã trả xe' : 'Đã hủy'
-                              }"`, 'success');
-                            }}
-                            onClick={e => e.stopPropagation()}
-                            style={{
-                              padding: '4px 10px',
-                              borderRadius: '100px',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontFamily: 'inherit',
-                              outline: 'none',
-                              background: rental.status === 'pending' ? '#fef3c7' : rental.status === 'active' ? '#e0f2fe' : rental.status === 'completed' ? '#d1fae5' : '#fee2e2',
-                              color: rental.status === 'pending' ? '#b45309' : rental.status === 'active' ? '#0369a1' : rental.status === 'completed' ? '#047857' : '#b91c1c'
-                            }}
-                          >
-                            <option value="pending">🟡 Chờ bàn giao xe</option>
-                            <option value="active">🔵 Đang thuê</option>
-                            <option value="completed">🟢 Đã trả xe</option>
-                            <option value="cancelled">🔴 Đã hủy đơn</option>
-                          </select>
-                        </td>
-                        <td style={{ padding: '16px 20px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <button 
-                              onClick={() => setSelectedDetailRentalId(rental.id)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--primary)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                            >
-                              <Eye size={14} /> Chi tiết
-                            </button>
-                            <button 
-                              onClick={() => handleViewContract(rental)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                              title="Xem hợp đồng"
-                            >
-                              <FileText size={14} /> Xem HĐ
-                            </button>
-                            <button 
-                              onClick={() => handleOpenEdit(rental)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button 
-                              onClick={() => {
-                                if (window.confirm(`Bạn có chắc chắn muốn XÓA vĩnh viễn đơn thuê #${rental.id} khỏi hệ thống?`)) {
-                                  deleteRental(rental.id);
-                                }
-                              }}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                              title="Xóa đơn thuê"
-                            >
-                              <Trash size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredRentals.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-              unitName="đơn thuê"
+                        Chi tiết
+                      </button>
+                      <button
+                        onClick={() => handleViewContract(record)}
+                        style={{ padding: '4px 8px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
+                        title="Xem HĐ"
+                      >
+                        <FileText size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleOpenEdit(record)}
+                        style={{ padding: '4px 8px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        <Edit size={14} />
+                      </button>
+                    </div>
+                  )
+                }
+              ]}
             />
           </div>
 
@@ -1430,181 +1373,158 @@ const Contracts = () => {
         </div>
       )}
 
-      {/* Modal Chỉnh Sửa Đơn Thuê */}
-      {showEditModal && selectedRental && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleUpdateContractSubmit} style={{ width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '20px', margin: 0 }}>Chỉnh sửa đơn thuê #{editId}</h2>
-              <button type="button" onClick={() => setShowEditModal(false)} style={{ color: 'var(--text-secondary)' }}>
-                <X size={20} />
+      {/* Modal Chỉnh Sửa Đơn Thuê - Ant Design Modal & Form */}
+      <Modal
+        title={`Chỉnh sửa đơn thuê #${editId}`}
+        open={showEditModal && !!selectedRental}
+        onCancel={() => setShowEditModal(false)}
+        footer={null}
+        width={520}
+      >
+        <Form layout="vertical" onFinish={handleUpdateContractSubmit} style={{ marginTop: '16px' }}>
+          <Form.Item label="Liên kết Xe">
+            <input type="text" value={editCarId} disabled style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f5f5' }} />
+          </Form.Item>
+
+          <Form.Item label="Họ tên Khách hàng" required>
+            <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+          </Form.Item>
+
+          <Form.Item label="SĐT Khách hàng" required>
+            <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+          </Form.Item>
+
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Ngày bắt đầu" style={{ flex: 1 }}>
+              <input type="datetime-local" value={editStart} onChange={e => setEditStart(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
+            </Form.Item>
+            <Form.Item label="Ngày dự kiến trả" style={{ flex: 1 }}>
+              <input type="datetime-local" value={editEnd} onChange={e => setEditEnd(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
+            </Form.Item>
+          </div>
+
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Thanh toán" style={{ flex: 1 }}>
+              <select value={editPaymentStatus} onChange={e => setEditPaymentStatus(e.target.value as any)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+                <option value="deposit">Đã cọc</option>
+                <option value="paid">Đã thanh toán</option>
+                <option value="debt">Còn nợ</option>
+              </select>
+            </Form.Item>
+            <Form.Item label="Vận hành" style={{ flex: 1 }}>
+              <select value={editStatus} onChange={e => setEditStatus(e.target.value as any)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+                <option value="active">Đang chạy</option>
+                <option value="completed">Hoàn tất</option>
+              </select>
+            </Form.Item>
+          </div>
+
+          <Form.Item label="Tệp đính kèm (URL hợp đồng scan)">
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input type="text" value={editFile} onChange={e => setEditFile(e.target.value)} style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
+              <button type="button" style={{ padding: '8px 12px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }} onClick={() => { setGalleryMode('contract'); setShowGallery(true); }}>
+                Thư viện
               </button>
             </div>
+          </Form.Item>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Liên kết Xe</label>
-              <input type="text" value={editCarId} disabled style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', background: '#f3f4f6' }} />
-            </div>
+          <div style={{ background: '#f6ffed', padding: '12px', borderRadius: '6px', border: '1px solid #b7eb8f', marginBottom: '16px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#389e0d' }}>🔒 Tiền chi trả cho chủ xe (Admin)</div>
+            <input 
+              type="number" 
+              value={editOwnerCommission} 
+              onChange={e => setEditOwnerCommission(e.target.value)}
+              placeholder="Nhập số tiền..."
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', marginTop: '6px', fontWeight: 700, color: '#389e0d' }} 
+            />
+          </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Họ tên Khách hàng *</label>
-              <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>SĐT Khách hàng *</label>
-              <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-            </div>
-
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ngày bắt đầu</label>
-                <input type="datetime-local" value={editStart} onChange={e => setEditStart(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ngày dự kiến trả</label>
-                <input type="datetime-local" value={editEnd} onChange={e => setEditEnd(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Trạng thái thanh toán</label>
-                <select value={editPaymentStatus} onChange={e => setEditPaymentStatus(e.target.value as any)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}>
-                  <option value="deposit">Đã cọc</option>
-                  <option value="paid">Đã thanh toán</option>
-                  <option value="debt">Còn nợ</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Trạng thái vận hành</label>
-                <select value={editStatus} onChange={e => setEditStatus(e.target.value as any)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}>
-                  <option value="active">Đang chạy</option>
-                  <option value="completed">Hoàn tất</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Tệp đính kèm (URL hợp đồng scan)</label>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <input type="text" value={editFile} onChange={e => setEditFile(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
-                <button type="button" className="btn-primary" style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)', whiteSpace: 'nowrap' }} onClick={() => { setGalleryMode('contract'); setShowGallery(true); }}>
-                  Thư viện
-                </button>
-              </div>
-            </div>
-
-            {/* Admin Only Owner Payout Field */}
-            <div style={{ background: 'var(--bg-page)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
-                🔒 Tiền chi trả cho chủ xe (Dành riêng Admin - KHÔNG in lên HĐ khách)
-              </label>
-              <input 
-                type="number" 
-                value={editOwnerCommission} 
-                onChange={e => setEditOwnerCommission(e.target.value)}
-                placeholder="Nhập số tiền..."
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: '15px', fontFamily: 'inherit', fontWeight: 700, color: 'var(--primary)', background: 'white' }} 
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-              <button type="button" onClick={() => setShowEditModal(false)} style={{ padding: '8px 16px', color: 'var(--text-secondary)' }}>Hủy</button>
-              <button type="submit" className="btn-primary">Lưu thay đổi</button>
-            </div>
-          </form>
-        </div>
-      )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <button type="button" onClick={() => setShowEditModal(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
+            <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Lưu thay đổi</button>
+          </div>
+        </Form>
+      </Modal>
 
       {/* Modal Thêm/Sửa Chi Phí Phát Sinh (Vi phạm GT, Hỏng hóc, Sửa xe) */}
-      {showViolationModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleViolationSubmit} style={{ width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '18px', margin: 0, color: 'var(--primary)' }}>
-                {violationEditId ? 'Sửa chi phí phát sinh' : 'Ghi nhận chi phí phát sinh mới'}
-              </h2>
-              <button type="button" onClick={() => setShowViolationModal(false)} style={{ color: 'var(--text-secondary)' }}>
-                <X size={20} />
-              </button>
-            </div>
+      <Modal
+        title={violationEditId ? 'Sửa chi phí phát sinh' : 'Ghi nhận chi phí phát sinh mới'}
+        open={showViolationModal}
+        onCancel={() => setShowViolationModal(false)}
+        footer={null}
+        width={500}
+      >
+        <Form layout="vertical" onFinish={handleViolationSubmit} style={{ marginTop: '16px' }}>
+          <Form.Item label="Nội dung chi phí phát sinh" required>
+            <input 
+              type="text" 
+              placeholder="VD: Phạt quá tốc độ, Vỡ đèn hậu, Rửa xe dơ, Hỏng lốp..." 
+              value={violationDesc} 
+              onChange={e => setViolationDesc(e.target.value)} 
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} 
+              required 
+            />
+          </Form.Item>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Nội dung chi phí phát sinh *</label>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Ngày phát sinh" required style={{ flex: 1 }}>
               <input 
-                type="text" 
-                placeholder="VD: Phạt quá tốc độ, Vỡ đèn hậu, Rửa xe dơ, Hỏng lốp..." 
-                value={violationDesc} 
-                onChange={e => setViolationDesc(e.target.value)} 
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }} 
+                type="date" 
+                value={violationDate} 
+                onChange={e => setViolationDate(e.target.value)} 
+                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} 
                 required 
               />
-            </div>
+            </Form.Item>
+            <Form.Item label="Số tiền phát sinh (₫)" required style={{ flex: 1 }}>
+              <input 
+                type="number" 
+                value={violationAmount} 
+                onChange={e => setViolationAmount(e.target.value)} 
+                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} 
+                required 
+              />
+            </Form.Item>
+          </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Ngày phát sinh *</label>
-                <input 
-                  type="date" 
-                  value={violationDate} 
-                  onChange={e => setViolationDate(e.target.value)} 
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }} 
-                  required 
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Số tiền phát sinh (₫) *</label>
-                <input 
-                  type="number" 
-                  value={violationAmount} 
-                  onChange={e => setViolationAmount(e.target.value)} 
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }} 
-                  required 
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Tài liệu chứng minh (Ảnh biên bản, hình sửa xe...)</label>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <input 
-                  type="text" 
-                  placeholder="URL hình ảnh chứng minh..." 
-                  value={violationEvidence} 
-                  onChange={e => setViolationEvidence(e.target.value)} 
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }} 
-                />
-                <button 
-                  type="button" 
-                  className="btn-primary" 
-                  style={{ background: 'white', color: 'var(--text-primary)', border: '1px solid var(--border)', whiteSpace: 'nowrap' }} 
-                  onClick={() => { setGalleryMode('evidence'); setShowGallery(true); }}
-                >
-                  Chọn ảnh
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Trạng thái thu tiền phát sinh</label>
-              <select 
-                value={violationStatus} 
-                onChange={e => setViolationStatus(e.target.value as any)} 
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }}
+          <Form.Item label="Tài liệu chứng minh (Ảnh biên bản, hình sửa xe...)">
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input 
+                type="text" 
+                placeholder="URL hình ảnh chứng minh..." 
+                value={violationEvidence} 
+                onChange={e => setViolationEvidence(e.target.value)} 
+                style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} 
+              />
+              <button 
+                type="button" 
+                style={{ padding: '8px 12px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}
+                onClick={() => { setGalleryMode('evidence'); setShowGallery(true); }}
               >
-                <option value="unpaid">Chưa thu tiền từ khách</option>
-                <option value="paid">Khách đã thanh toán tiền phát sinh</option>
-              </select>
+                Chọn ảnh
+              </button>
             </div>
+          </Form.Item>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-              <button type="button" onClick={() => setShowViolationModal(false)} style={{ padding: '8px 16px', color: 'var(--text-secondary)' }}>Hủy</button>
-              <button type="submit" className="btn-primary">{violationEditId ? 'Lưu thay đổi' : 'Ghi nhận vi phạm'}</button>
-            </div>
-          </form>
-        </div>
-      )}
+          <Form.Item label="Trạng thái thu tiền">
+            <select 
+              value={violationStatus} 
+              onChange={e => setViolationStatus(e.target.value as any)} 
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}
+            >
+              <option value="unpaid">Chưa thu tiền từ khách</option>
+              <option value="paid">Khách đã thanh toán tiền phát sinh</option>
+            </select>
+          </Form.Item>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+            <button type="button" onClick={() => setShowViolationModal(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
+            <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
+              {violationEditId ? 'Lưu thay đổi' : 'Ghi nhận vi phạm'}
+            </button>
+          </div>
+        </Form>
+      </Modal>
 
       {/* Modal Hóa Đơn Bàn Giao Xe & Hợp Đồng */}
       {showPreviewModal && selectedRental && (

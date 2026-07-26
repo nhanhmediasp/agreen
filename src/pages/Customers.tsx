@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Plus, Phone, FileCheck, AlertCircle, X, MapPin, FileText, ArrowLeft, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Table, Tag, Modal, Form } from 'antd';
+import { Search, Plus, Phone, FileCheck, AlertCircle, MapPin, FileText, ArrowLeft, Trash2 } from 'lucide-react';
 import { useApp, type Customer } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
-import { Pagination } from '../components/Pagination';
 
 const Customers = () => {
   const { customers, addCustomer, updateCustomer, deleteCustomer, rentals, showToast } = useApp();
@@ -42,15 +42,8 @@ const Customers = () => {
   const [editClass, setEditClass] = useState<'normal' | 'vip' | 'warning'>('normal');
   const [editNotes, setEditNotes] = useState('');
   const [editImage, setEditImage] = useState('');
-  const [galleryMode, setGalleryMode] = useState<'add' | 'edit'>('add');
-
-  // Customer Transaction filter
   const [historySearch, setHistorySearch] = useState('');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'active' | 'completed'>('all');
-
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
 
   // Selected customer details
   const activeCustomer = customers.find(c => c.id === selectedCustomerId);
@@ -423,314 +416,218 @@ const Customers = () => {
                 type="text" 
                 placeholder="Tìm theo tên hoặc số điện thoại..." 
                 value={searchTerm}
-                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                onChange={e => setSearchTerm(e.target.value)}
                 style={{ border: 'none', background: 'transparent', marginLeft: '8px', outline: 'none', width: '100%', fontFamily: 'inherit' }}
               />
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, overflowX: 'auto', width: '100%' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '14px' }}>
-                  <th style={{ padding: '16px 24px', width: '50px', textAlign: 'center' }}>
-                    <input 
-                      type="checkbox"
-                      checked={filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomerIds.includes(c.id))}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedCustomerIds(filteredCustomers.map(c => c.id));
-                        } else {
-                          setSelectedCustomerIds([]);
+          <div className="card" style={{ padding: 0, overflowX: 'auto', width: '100%', background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+            <Table<Customer>
+              dataSource={filteredCustomers}
+              rowKey="id"
+              onRow={(customer) => ({
+                onClick: () => setSelectedCustomerId(customer.id),
+                style: { cursor: 'pointer' }
+              })}
+              rowSelection={{
+                selectedRowKeys: selectedCustomerIds,
+                onChange: (keys) => setSelectedCustomerIds(keys as string[])
+              }}
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} khách hàng`
+              }}
+              columns={[
+                {
+                  title: 'Khách hàng',
+                  dataIndex: 'name',
+                  key: 'name',
+                  sorter: (a, b) => a.name.localeCompare(b.name),
+                  render: (_, record) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <img src={record.image} alt={record.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #f0f0f0' }} />
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#262626' }}>{record.name}</div>
+                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>ID: #{record.id}</div>
+                      </div>
+                    </div>
+                  )
+                },
+                {
+                  title: 'Số điện thoại',
+                  dataIndex: 'phone',
+                  key: 'phone',
+                  render: (phone) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#595959' }}>
+                      <Phone size={14} />
+                      {phone}
+                    </div>
+                  )
+                },
+                {
+                  title: 'Phân loại',
+                  dataIndex: 'classification',
+                  key: 'classification',
+                  filters: [
+                    { text: '⭐ VIP', value: 'vip' },
+                    { text: 'Thường', value: 'normal' },
+                    { text: '⚠️ Chú ý', value: 'warning' },
+                  ],
+                  onFilter: (value, record) => record.classification === value,
+                  render: (classification) => {
+                    if (classification === 'vip') return <Tag color="gold" style={{ borderRadius: 12, fontWeight: 700 }}>⭐ VIP</Tag>;
+                    if (classification === 'warning') return <Tag color="error" style={{ borderRadius: 12, fontWeight: 700 }}>⚠️ Chú ý</Tag>;
+                    return <Tag color="default" style={{ borderRadius: 12, fontWeight: 600 }}>Thường</Tag>;
+                  }
+                },
+                {
+                  title: 'Trạng thái hồ sơ',
+                  dataIndex: 'status',
+                  key: 'status',
+                  render: (status, record) => {
+                    if (status === 'verified') return <Tag color="success" style={{ borderRadius: 12, fontWeight: 700 }}>✓ {record.statusText || 'Đã xác minh'}</Tag>;
+                    return <Tag color="error" style={{ borderRadius: 12, fontWeight: 700 }}>⚠️ {record.statusText || 'GPLX hết hạn'}</Tag>;
+                  }
+                },
+                {
+                  title: 'Đơn hoạt động',
+                  dataIndex: 'activeRentals',
+                  key: 'activeRentals',
+                  sorter: (a, b) => a.activeRentals - b.activeRentals,
+                  render: (count) => <span style={{ fontWeight: 600, color: '#262626' }}>{count}</span>
+                },
+                {
+                  title: 'Hành động',
+                  key: 'actions',
+                  render: (_, record) => (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Xóa khách hàng "${record.name}"?`)) {
+                          deleteCustomer(record.id);
                         }
                       }}
-                    />
-                  </th>
-                  <th style={{ padding: '16px 24px', fontWeight: 500, width: '80px' }}>STT</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 500 }}>Khách hàng</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 500 }}>Số điện thoại</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 500 }}>Phân loại</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 500 }}>Trạng thái hồ sơ</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 500 }}>Đơn hoạt động</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 500, width: '100px' }}>Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCustomers.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      Không tìm thấy khách hàng nào.
-                    </td>
-                  </tr>
-                ) : (
-                  (() => {
-                    const startIndex = (currentPage - 1) * itemsPerPage;
-                    const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + itemsPerPage);
-
-                    return paginatedCustomers.map((customer, idx) => (
-                      <tr 
-                        key={customer.id} 
-                        onClick={() => setSelectedCustomerId(customer.id)}
-                        style={{ 
-                          borderBottom: '1px solid var(--border-light)', 
-                          cursor: 'pointer',
-                          transition: 'background 0.2s'
-                        }}
-                      >
-                        <td style={{ padding: '16px 24px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                          <input 
-                            type="checkbox"
-                            checked={selectedCustomerIds.includes(customer.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedCustomerIds(prev => [...prev, customer.id]);
-                              } else {
-                                setSelectedCustomerIds(prev => prev.filter(id => id !== customer.id));
-                              }
-                            }}
-                          />
-                        </td>
-                        <td style={{ padding: '16px 24px', fontWeight: 600, color: 'var(--text-secondary)' }}>{startIndex + idx + 1}</td>
-                        <td style={{ padding: '16px 24px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <img src={customer.image} alt={customer.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-strong)' }} />
-                            <div>
-                              <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{customer.name}</div>
-                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ID: #{customer.id}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Phone size={14} />
-                            {customer.phone}
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px 24px' }}>
-                          {customer.classification === 'vip' ? (
-                            <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: '#fef3c7', color: '#d97706', fontSize: '12px', fontWeight: 700 }}>
-                              ⭐ VIP
-                            </span>
-                          ) : customer.classification === 'warning' ? (
-                            <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: 'var(--status-maintenance-bg)', color: 'var(--status-maintenance-text)', fontSize: '12px', fontWeight: 700 }}>
-                              ⚠️ Chú ý
-                            </span>
-                          ) : (
-                            <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '100px', background: '#f1f5f9', color: '#64748b', fontSize: '12px', fontWeight: 600 }}>
-                              Thường
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: '16px 24px' }}>
-                          {customer.status === 'verified' ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '100px', background: '#d1fae5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '12.5px', fontWeight: 700 }}>
-                              <FileCheck size={14} /> {customer.statusText || 'Đã xác minh'}
-                            </span>
-                          ) : (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '100px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', fontSize: '12.5px', fontWeight: 700 }}>
-                              <AlertCircle size={14} /> {customer.statusText || 'GPLX hết hạn'}
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: '16px 24px', fontWeight: 600, paddingLeft: '48px' }}>
-                          {customer.activeRentals}
-                        </td>
-                        <td style={{ padding: '16px 24px' }} onClick={e => e.stopPropagation()}>
-                          <button 
-                            onClick={() => {
-                              if (window.confirm(`Bạn có chắc chắn muốn xóa khách hàng "${customer.name}" khỏi hệ thống?`)) {
-                                deleteCustomer(customer.id);
-                              }
-                            }}
-                            style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            title="Xóa khách hàng"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ));
-                  })()
-                )}
-              </tbody>
-            </table>
-
-            <Pagination
-              currentPage={currentPage}
-              totalPages={Math.ceil(filteredCustomers.length / itemsPerPage)}
-              totalItems={filteredCustomers.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-              unitName="khách hàng"
+                      style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px' }}
+                      title="Xóa khách hàng"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )
+                }
+              ]}
             />
           </div>
         </div>
       )}
 
-      {/* Add Customer Modal */}
-      {showAddForm && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleCreateCustomer} style={{ width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '20px', margin: 0 }}>Thêm khách hàng mới</h2>
-              <button type="button" onClick={() => setShowAddForm(false)} style={{ color: 'var(--text-secondary)' }}>
-                <X size={20} />
-              </button>
-            </div>
+      {/* Add Customer Modal - Ant Design Modal & Form */}
+      <Modal
+        title="Thêm khách hàng mới"
+        open={showAddForm}
+        onCancel={() => setShowAddForm(false)}
+        footer={null}
+        width={520}
+      >
+        <Form layout="vertical" onFinish={handleCreateCustomer} style={{ marginTop: '16px' }}>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Họ và tên" required style={{ flex: 1.5 }}>
+              <input type="text" placeholder="VD: Nguyễn Văn A" value={newName} onChange={e => setNewName(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+            </Form.Item>
+            <Form.Item label="Phân loại" style={{ flex: 1 }}>
+              <select value={newClass} onChange={e => setNewClass(e.target.value as any)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+                <option value="normal">Bình thường</option>
+                <option value="vip">Khách VIP ⭐</option>
+                <option value="warning">Khách Cần Chú Ý ⚠️</option>
+              </select>
+            </Form.Item>
+          </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1.5 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Họ và tên *</label>
-                <input type="text" placeholder="VD: Nguyễn Văn A" value={newName} onChange={e => setNewName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Phân loại khách</label>
-                <select value={newClass} onChange={e => setNewClass(e.target.value as any)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}>
-                  <option value="normal">Bình thường</option>
-                  <option value="vip">Khách VIP ⭐</option>
-                  <option value="warning">Khách Cần Chú Ý ⚠️</option>
-                </select>
-              </div>
-            </div>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Số điện thoại" required style={{ flex: 1 }}>
+              <input type="tel" placeholder="VD: 0901234567" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+            </Form.Item>
+            <Form.Item label="Số CCCD" required style={{ flex: 1 }}>
+              <input type="text" placeholder="Nhập số CCCD" value={newCccd} onChange={e => setNewCccd(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+            </Form.Item>
+          </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số điện thoại *</label>
-                <input type="tel" placeholder="VD: 0901234567" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số CCCD *</label>
-                <input type="text" placeholder="Nhập số CCCD" value={newCccd} onChange={e => setNewCccd(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-              </div>
-            </div>
+          <Form.Item label="Số GPLX" required>
+            <input type="text" placeholder="VD: 790123456789" value={newLicense} onChange={e => setNewLicense(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+          </Form.Item>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số GPLX *</label>
-                <input type="text" placeholder="VD: 790123456789" value={newLicense} onChange={e => setNewLicense(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Hình ảnh / Avatar</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {newImage ? (
-                    <img src={newImage} alt="Preview" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-main)', border: '1px dashed var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ImageIcon size={16} color="var(--text-secondary)" />
-                    </div>
-                  )}
-                  <button type="button" className="btn-primary" style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)', padding: '6px 10px' }} onClick={() => setShowGallery(true)}>
-                    Chọn
-                  </button>
-                </div>
-              </div>
-            </div>
+          <Form.Item label="Địa chỉ thường trú">
+            <input type="text" placeholder="Nhập địa chỉ" value={newAddress} onChange={e => setNewAddress(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
+          </Form.Item>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Địa chỉ thường trú</label>
-              <input type="text" placeholder="Nhập địa chỉ của khách hàng" value={newAddress} onChange={e => setNewAddress(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
-            </div>
+          <Form.Item label="Ghi chú nội bộ">
+            <textarea placeholder="VD: Khách trả xe đúng giờ." value={newNotes} onChange={e => setNewNotes(e.target.value)} style={{ width: '100%', height: '70px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', resize: 'vertical' }} />
+          </Form.Item>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ghi chú riêng</label>
-              <textarea placeholder="VD: Khách trả xe rất đúng giờ, xe sạch." value={newNotes} onChange={e => setNewNotes(e.target.value)} style={{ width: '100%', height: '80px', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', resize: 'vertical' }} />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-              <button type="button" onClick={() => setShowAddForm(false)} style={{ padding: '8px 16px', color: 'var(--text-secondary)' }}>Hủy</button>
-              <button type="submit" className="btn-primary">Thêm khách</button>
-            </div>
-          </form>
-        </div>
-      )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+            <button type="button" onClick={() => setShowAddForm(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
+            <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Thêm khách</button>
+          </div>
+        </Form>
+      </Modal>
 
       {/* Edit Customer Modal */}
-      {showEditForm && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleUpdateCustomerSubmit} style={{ width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '20px', margin: 0 }}>Chỉnh sửa thông tin khách hàng</h2>
-              <button type="button" onClick={() => setShowEditForm(false)} style={{ color: 'var(--text-secondary)' }}>
-                <X size={20} />
-              </button>
-            </div>
+      <Modal
+        title="Chỉnh sửa thông tin khách hàng"
+        open={showEditForm}
+        onCancel={() => setShowEditForm(false)}
+        footer={null}
+        width={520}
+      >
+        <Form layout="vertical" onFinish={handleUpdateCustomerSubmit} style={{ marginTop: '16px' }}>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Họ và tên" required style={{ flex: 1.5 }}>
+              <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+            </Form.Item>
+            <Form.Item label="Phân loại" style={{ flex: 1 }}>
+              <select value={editClass} onChange={e => setEditClass(e.target.value as any)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+                <option value="normal">Bình thường</option>
+                <option value="vip">Khách VIP ⭐</option>
+                <option value="warning">Khách Cần Chú Ý ⚠️</option>
+              </select>
+            </Form.Item>
+          </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1.5 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Họ và tên *</label>
-                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Phân loại khách</label>
-                <select value={editClass} onChange={e => setEditClass(e.target.value as any)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}>
-                  <option value="normal">Bình thường</option>
-                  <option value="vip">Khách VIP ⭐</option>
-                  <option value="warning">Khách Cần Chú Ý ⚠️</option>
-                </select>
-              </div>
-            </div>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Số điện thoại" required style={{ flex: 1 }}>
+              <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+            </Form.Item>
+            <Form.Item label="Số CCCD" required style={{ flex: 1 }}>
+              <input type="text" value={editCccd} onChange={e => setEditCccd(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+            </Form.Item>
+          </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số điện thoại *</label>
-                <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số CCCD *</label>
-                <input type="text" value={editCccd} onChange={e => setEditCccd(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-              </div>
-            </div>
+          <Form.Item label="Số GPLX" required>
+            <input type="text" value={editLicense} onChange={e => setEditLicense(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+          </Form.Item>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số GPLX *</label>
-                <input type="text" value={editLicense} onChange={e => setEditLicense(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Hình ảnh / Avatar</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {editImage ? (
-                    <img src={editImage} alt="Preview" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-main)', border: '1px dashed var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ImageIcon size={16} color="var(--text-secondary)" />
-                    </div>
-                  )}
-                  <button type="button" className="btn-primary" style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)', padding: '6px 10px' }} onClick={() => { setGalleryMode('edit'); setShowGallery(true); }}>
-                    Chọn
-                  </button>
-                </div>
-              </div>
-            </div>
+          <Form.Item label="Địa chỉ thường trú">
+            <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
+          </Form.Item>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Địa chỉ thường trú</label>
-              <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
-            </div>
+          <Form.Item label="Ghi chú nội bộ">
+            <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} style={{ width: '100%', height: '70px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', resize: 'vertical' }} />
+          </Form.Item>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ghi chú riêng</label>
-              <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} style={{ width: '100%', height: '80px', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', resize: 'vertical' }} />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-              <button type="button" onClick={() => setShowEditForm(false)} style={{ padding: '8px 16px', color: 'var(--text-secondary)' }}>Hủy</button>
-              <button type="submit" className="btn-primary">Lưu thay đổi</button>
-            </div>
-          </form>
-        </div>
-      )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+            <button type="button" onClick={() => setShowEditForm(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
+            <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Lưu thay đổi</button>
+          </div>
+        </Form>
+      </Modal>
 
       {showGallery && (
         <ImageGallery 
           onClose={() => setShowGallery(false)}
           onSelect={(url) => {
             const imgUrl = Array.isArray(url) ? url[0] : url;
-            if (galleryMode === 'edit') {
-              setEditImage(imgUrl);
-            } else {
-              setNewImage(imgUrl);
-            }
+            setNewImage(imgUrl);
           }}
         />
       )}

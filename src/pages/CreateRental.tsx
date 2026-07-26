@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Steps } from 'antd';
 import { Image as ImageIcon, Receipt, CheckCircle, Search, User, Plus, X, Upload } from 'lucide-react';
 import { useApp, type Rental, type Car } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
@@ -289,19 +290,15 @@ const CreateRental = () => {
         <p style={{ color: 'var(--text-secondary)' }}>Thiết lập hợp đồng và ghi nhận tình trạng bàn giao xe</p>
       </div>
 
-      <div style={{ display: 'flex', gap: '24px', marginBottom: '32px' }}>
-        {[1, 2, 3].map(s => (
-          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: step >= s ? 1 : 0.5 }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: step >= s ? 'var(--primary)' : 'var(--border-strong)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-              {s}
-            </div>
-            <span style={{ fontWeight: step >= s ? 600 : 400 }}>
-              {s === 1 ? 'Chọn xe & Bảng giá' : s === 2 ? 'Khách hàng' : 'Thanh toán & Hợp đồng'}
-            </span>
-            {s !== 3 && <div style={{ width: '40px', height: '2px', background: 'var(--border-light)' }}></div>}
-          </div>
-        ))}
-      </div>
+      <Steps
+        current={step - 1}
+        items={[
+          { title: 'Chọn xe & Bảng giá' },
+          { title: 'Khách hàng' },
+          { title: 'Thanh toán & Hợp đồng' },
+        ]}
+        style={{ marginBottom: '32px' }}
+      />
 
       {/* Unified 2-Column Layout Grid for ALL steps */}
       <div className="rental-layout">

@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Card, Statistic, Table } from 'antd';
 import { useApp } from '../context/AppContext';
-import { BarChart, DollarSign, TrendingUp, Percent, Award, Car, Calendar } from 'lucide-react';
+import { BarChart, Award, Car, Calendar } from 'lucide-react';
 
 const Reports = () => {
   const { cars, expenses, rentals, customers } = useApp();
@@ -94,6 +95,8 @@ const Reports = () => {
   const expensesPercent = Math.min(100, Math.max(10, (totalExpenses / maxRevenue) * 100));
   const profitPercent = Math.min(100, Math.max(10, (profit / maxRevenue) * 100));
 
+  const avgUtilization = cars.length > 0 ? Math.round(sortedUtilization.reduce((sum, u) => sum + u.rate, 0) / cars.length) : 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
 
@@ -132,24 +135,24 @@ const Reports = () => {
         </div>
       </div>
 
-      {/* KPI Summary Cards */}
-      <div className="grid grid-auto-sm gap-md">
-        {[
-          { label: 'Doanh thu (Tổng)', value: `${totalRevenue.toLocaleString()} ₫`, color: 'var(--status-available-text)', bg: 'var(--status-available-bg)', border: 'var(--status-available-border)', icon: <TrendingUp size={20} /> },
-          { label: 'Chi phí hoạt động', value: `${totalExpenses.toLocaleString()} ₫`, color: 'var(--status-maintenance-text)', bg: 'var(--status-maintenance-bg)', border: 'var(--status-maintenance-border)', icon: <DollarSign size={20} /> },
-          { label: 'Lợi nhuận ròng', value: `${profit.toLocaleString()} ₫`, color: 'var(--status-rented-text)', bg: 'var(--status-rented-bg)', border: 'var(--status-rented-border)', icon: <TrendingUp size={20} /> },
-          { label: 'Tỷ lệ khai thác', value: `${cars.length > 0 ? Math.round(sortedUtilization.reduce((sum, u) => sum + u.rate, 0) / cars.length) : 0}%`, color: '#B45309', bg: '#FFFBEB', border: 'var(--accent)', icon: <Percent size={20} /> },
-        ].map((item, i) => (
-          <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: '14px', borderLeft: `3px solid ${item.border}` }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: 'var(--radius-md)', background: item.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
-              {item.icon}
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{item.label}</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: item.color, marginTop: '3px' }} className="font-mono">{item.value}</div>
-            </div>
-          </div>
-        ))}
+      {/* KPI Summary Cards with antd Card & Statistic */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+        <Card style={{ borderLeft: '4px solid #047857', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Doanh thu (Tổng)</div>
+          <Statistic value={totalRevenue} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#047857' }} />
+        </Card>
+        <Card style={{ borderLeft: '4px solid #C2410C', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Chi phí hoạt động</div>
+          <Statistic value={totalExpenses} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#C2410C' }} />
+        </Card>
+        <Card style={{ borderLeft: '4px solid #1D4ED8', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Lợi nhuận ròng</div>
+          <Statistic value={profit} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#1D4ED8' }} />
+        </Card>
+        <Card style={{ borderLeft: '4px solid #B45309', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Tỷ lệ khai thác</div>
+          <Statistic value={avgUtilization} suffix="%" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#B45309' }} />
+        </Card>
       </div>
 
       {/* Financial Chart & Car Utilization */}
@@ -251,34 +254,48 @@ const Reports = () => {
         {/* Expense breakdown by Car */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>Cơ cấu Chi phí Bảo dưỡng Xe</h2>
-          <div className="table-wrap" style={{ maxHeight: '320px', overflowY: 'auto' }}>
-            <table className="data-table">
-              <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-page)' }}>
-                <tr>
-                  <th>Biển số</th>
-                  <th>Bảo dưỡng</th>
-                  <th>Vệ sinh</th>
-                  <th>Chiết khấu/Khác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cars.map(c => {
-                  const carExps = expenses.filter(e => e.ref === c.id);
-                  const maint = carExps.filter(e => e.category === 'Bảo dưỡng').reduce((sum, e) => sum + e.amount, 0);
-                  const clean = carExps.filter(e => e.category === 'Vệ sinh').reduce((sum, e) => sum + e.amount, 0);
-                  const repair = carExps.filter(e => ['Sửa chữa', 'Giấy tờ', 'Chiết khấu chủ xe', 'Khác'].includes(e.category)).reduce((sum, e) => sum + e.amount, 0);
-                  return (
-                    <tr key={c.id}>
-                      <td><span className="license-plate">{c.id}</span></td>
-                      <td className="font-mono" style={{ color: 'var(--text-secondary)' }}>{maint.toLocaleString()} ₫</td>
-                      <td className="font-mono" style={{ color: 'var(--text-secondary)' }}>{clean.toLocaleString()} ₫</td>
-                      <td className="font-mono" style={{ color: 'var(--text-secondary)' }}>{repair.toLocaleString()} ₫</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Table
+            dataSource={cars.map(c => {
+              const carExps = expenses.filter(e => e.ref === c.id);
+              const maint = carExps.filter(e => e.category === 'Bảo dưỡng').reduce((sum, e) => sum + e.amount, 0);
+              const clean = carExps.filter(e => e.category === 'Vệ sinh').reduce((sum, e) => sum + e.amount, 0);
+              const repair = carExps.filter(e => ['Sửa chữa', 'Giấy tờ', 'Chiết khấu chủ xe', 'Khác'].includes(e.category)).reduce((sum, e) => sum + e.amount, 0);
+              return {
+                id: c.id,
+                maint,
+                clean,
+                repair
+              };
+            })}
+            rowKey="id"
+            pagination={false}
+            columns={[
+              {
+                title: 'Biển số',
+                dataIndex: 'id',
+                key: 'id',
+                render: (id) => <span className="license-plate" style={{ fontSize: '11px', padding: '2px 6px' }}>{id}</span>
+              },
+              {
+                title: 'Bảo dưỡng',
+                dataIndex: 'maint',
+                key: 'maint',
+                render: (val) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+              },
+              {
+                title: 'Vệ sinh',
+                dataIndex: 'clean',
+                key: 'clean',
+                render: (val) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+              },
+              {
+                title: 'Chiết khấu / Khác',
+                dataIndex: 'repair',
+                key: 'repair',
+                render: (val) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+              }
+            ]}
+          />
         </div>
 
       </div>

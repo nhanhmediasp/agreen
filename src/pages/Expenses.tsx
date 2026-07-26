@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Tag, X, Search, ChevronLeft, ChevronRight, ShieldAlert, UserCheck, DollarSign, Receipt } from 'lucide-react';
+import { Table, Tag, Modal, Form, Card, Statistic } from 'antd';
+import { Plus, Search, ShieldAlert, UserCheck, DollarSign, Receipt } from 'lucide-react';
 import { useApp, type Expense } from '../context/AppContext';
 import { MoneyInputLeft } from '../components/MoneyInput';
 import { Pagination } from '../components/Pagination';
@@ -19,7 +20,6 @@ const Expenses = () => {
   // Filtering & Pagination States
   const [searchTerm, setSearchTerm] = useState('');
   const [timeFilter, setTimeFilter] = useState<'all' | '7' | '30'>('all');
-  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   const totalAmount = expenses.reduce((sum, item) => sum + item.amount, 0);
@@ -65,7 +65,6 @@ const Expenses = () => {
     setTitle('');
     setAmount('');
     setRef('');
-    setCurrentPage(1);
   };
 
   // Filter Logic General Expenses
@@ -94,9 +93,6 @@ const Expenses = () => {
 
   const filteredList = getFilteredExpenses();
   const sortedList = [...filteredList].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const totalPages = Math.ceil(sortedList.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedList = sortedList.slice(startIndex, startIndex + itemsPerPage);
 
   // Filter Logic Incidental Costs
   const filteredIncidentals = allIncidentalExpenses.filter(i => 
@@ -126,7 +122,7 @@ const Expenses = () => {
       {/* Main Subtabs Navigation */}
       <div style={{ display: 'flex', gap: '12px', borderBottom: '2px solid var(--border)', paddingBottom: '2px' }}>
         <button 
-          onClick={() => { setActiveTab('general'); setCurrentPage(1); }}
+          onClick={() => setActiveTab('general')}
           style={{
             padding: '10px 18px',
             fontSize: '14px',
@@ -145,7 +141,7 @@ const Expenses = () => {
         </button>
 
         <button 
-          onClick={() => { setActiveTab('incidental'); setCurrentPage(1); }}
+          onClick={() => setActiveTab('incidental')}
           style={{
             padding: '10px 18px',
             fontSize: '14px',
@@ -164,7 +160,7 @@ const Expenses = () => {
         </button>
 
         <button 
-          onClick={() => { setActiveTab('owners'); setCurrentPage(1); }}
+          onClick={() => setActiveTab('owners')}
           style={{
             padding: '10px 18px',
             fontSize: '14px',
@@ -186,54 +182,48 @@ const Expenses = () => {
       {/* TAB 1: SỔ CHI PHÍ VẬN HÀNH */}
       {activeTab === 'general' && (
         <>
-          <div className="grid grid-3 gap-md">
-            <div className="card card-pad" style={{ borderLeft: '4px solid var(--accent)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tổng chi phí hệ thống</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--text-primary)' }}>
-                {totalAmount.toLocaleString('vi-VN')} ₫
-              </div>
-            </div>
-            <div className="card card-pad" style={{ borderLeft: '4px solid var(--status-available-border)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bình quân mỗi xe</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--status-available-text)' }}>
-                {(cars.length > 0 ? Math.round(totalAmount / cars.length) : 0).toLocaleString('vi-VN')} ₫
-              </div>
-            </div>
-            <div className="card card-pad" style={{ borderLeft: '4px solid var(--status-rented-border)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Số giao dịch lọc được</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--status-rented-text)' }}>
-                {filteredList.length} / {expenses.length}
-              </div>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <Card style={{ borderLeft: '4px solid var(--accent)', borderRadius: 8 }}>
+              <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Tổng chi phí hệ thống</div>
+              <Statistic value={totalAmount} suffix="₫" valueStyle={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }} />
+            </Card>
+            <Card style={{ borderLeft: '4px solid #047857', borderRadius: 8 }}>
+              <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Bình quân mỗi xe</div>
+              <Statistic value={cars.length > 0 ? Math.round(totalAmount / cars.length) : 0} suffix="₫" valueStyle={{ fontSize: '24px', fontWeight: 700, color: '#047857' }} />
+            </Card>
+            <Card style={{ borderLeft: '4px solid #1D4ED8', borderRadius: 8 }}>
+              <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Số giao dịch lọc được</div>
+              <Statistic value={`${filteredList.length} / ${expenses.length}`} valueStyle={{ fontSize: '24px', fontWeight: 700, color: '#1D4ED8' }} />
+            </Card>
           </div>
 
-          <div className="card" style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px 24px', flexWrap: 'wrap' }}>
+          <div className="card" style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px 24px', flexWrap: 'wrap', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '8px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flex: 1, minWidth: '240px' }}>
               <Search size={18} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
               <input 
                 type="text" 
                 placeholder="Tìm theo nội dung, danh mục, biển số xe..." 
                 value={searchTerm}
-                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                onChange={e => setSearchTerm(e.target.value)}
                 style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontFamily: 'inherit', color: 'var(--text-primary)', fontSize: '13px' }}
               />
             </div>
 
             <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-surface)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
               <button 
-                onClick={() => { setTimeFilter('all'); setCurrentPage(1); }}
+                onClick={() => setTimeFilter('all')}
                 style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: timeFilter === 'all' ? 'var(--primary)' : 'transparent', color: timeFilter === 'all' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 Tất cả
               </button>
               <button 
-                onClick={() => { setTimeFilter('7'); setCurrentPage(1); }}
+                onClick={() => setTimeFilter('7')}
                 style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: timeFilter === '7' ? 'var(--primary)' : 'transparent', color: timeFilter === '7' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 7 ngày
               </button>
               <button 
-                onClick={() => { setTimeFilter('30'); setCurrentPage(1); }}
+                onClick={() => setTimeFilter('30')}
                 style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: timeFilter === '30' ? 'var(--primary)' : 'transparent', color: timeFilter === '30' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 30 ngày
@@ -241,85 +231,60 @@ const Expenses = () => {
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ padding: '16px 24px', fontWeight: 600, width: '70px' }}>STT</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 600 }}>Khoản chi</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 600 }}>Số tiền (₫)</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 600 }}>Danh mục</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 600 }}>Liên kết xe</th>
-                  <th style={{ padding: '16px 24px', fontWeight: 600 }}>Ngày chi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedList.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      Không tìm thấy chi phí nào phù hợp với bộ lọc.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedList.map((item, idx) => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '16px 24px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                        {startIndex + idx + 1}
-                      </td>
-                      <td style={{ padding: '16px 24px', fontWeight: 600 }}>{item.title}</td>
-                      <td style={{ padding: '16px 24px', fontWeight: 700, color: 'var(--primary)' }} className="font-mono">
-                        {item.amount.toLocaleString()} ₫
-                      </td>
-                      <td style={{ padding: '16px 24px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--bg-page)', padding: '4px 12px', borderRadius: '100px', fontSize: '12px', fontWeight: 600, border: '1px solid var(--border)' }}>
-                          <Tag size={12} color="var(--primary)" />
-                          {item.category}
-                        </span>
-                      </td>
-                      <td style={{ padding: '16px 24px' }}>
-                        {item.ref ? (
-                          item.ref.includes('-') ? (
-                            <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '2px 8px' }}>{item.ref}</span>
-                          ) : (
-                            <span style={{ display: 'inline-block', background: 'var(--bg-hover)', color: 'var(--text-secondary)', padding: '3px 9px', borderRadius: 'var(--radius-sm)', fontSize: '12px', fontWeight: 600, border: '1px solid var(--border)' }}>{item.ref}</span>
-                          )
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Chi phí chung</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontSize: '13px' }} className="font-mono">
-                        {new Date(item.date).toLocaleDateString('vi-VN')}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid var(--border)', background: 'var(--bg-page)' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Trang {currentPage} / {totalPages} (Tổng {sortedList.length} khoản chi)
-                </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button 
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'white', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button 
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'white', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
+          <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0', overflow: 'hidden' }}>
+            <Table<Expense>
+              dataSource={sortedList}
+              rowKey="id"
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi`
+              }}
+              columns={[
+                {
+                  title: 'Khoản chi',
+                  dataIndex: 'title',
+                  key: 'title',
+                  sorter: (a, b) => a.title.localeCompare(b.title),
+                  render: (title) => <span style={{ fontWeight: 600, color: '#262626' }}>{title}</span>
+                },
+                {
+                  title: 'Số tiền (₫)',
+                  dataIndex: 'amount',
+                  key: 'amount',
+                  sorter: (a, b) => a.amount - b.amount,
+                  render: (amount) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
+                },
+                {
+                  title: 'Danh mục',
+                  dataIndex: 'category',
+                  key: 'category',
+                  filters: [
+                    { text: 'Bảo dưỡng', value: 'Bảo dưỡng' },
+                    { text: 'Sửa chữa', value: 'Sửa chữa' },
+                    { text: 'Rửa xe', value: 'Rửa xe' },
+                    { text: 'Nhiên liệu', value: 'Nhiên liệu' },
+                  ],
+                  onFilter: (value, record) => record.category === value,
+                  render: (category) => <Tag color="blue">{category}</Tag>
+                },
+                {
+                  title: 'Liên kết xe',
+                  dataIndex: 'ref',
+                  key: 'ref',
+                  render: (ref) => ref ? <span className="license-plate" style={{ fontSize: '11px', padding: '2px 8px' }}>{ref}</span> : <span style={{ color: '#8c8c8c' }}>Chi phí chung</span>
+                },
+                {
+                  title: 'Ngày chi',
+                  dataIndex: 'date',
+                  key: 'date',
+                  sorter: (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+                  render: (date) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{new Date(date).toLocaleDateString('vi-VN')}</span>
+                }
+              ]}
+            />
           </div>
+
         </>
       )}
 
@@ -622,68 +587,60 @@ const Expenses = () => {
         </>
       )}
 
-      {/* Form Ghi nhận Chi phí Vận Hành */}
-      {showAddForm && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleAddExpense} style={{ width: '450px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '20px', margin: 0 }}>Ghi nhận chi phí mới</h2>
-              <button type="button" onClick={() => setShowAddForm(false)} style={{ color: 'var(--text-secondary)' }}>
-                <X size={20} />
-              </button>
-            </div>
+      {/* Form Ghi nhận Chi phí Vận Hành - Ant Design Modal & Form */}
+      <Modal
+        title="Ghi nhận chi phí mới"
+        open={showAddForm}
+        onCancel={() => setShowAddForm(false)}
+        footer={null}
+        width={480}
+      >
+        <Form layout="vertical" onFinish={handleAddExpense} style={{ marginTop: '16px' }}>
+          <Form.Item label="Nội dung chi" required>
+            <input type="text" placeholder="VD: Sửa lốp, thay nhớt..." value={title} onChange={e => setTitle(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+          </Form.Item>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Nội dung chi *</label>
-              <input type="text" placeholder="VD: Sửa lốp, thay nhớt..." value={title} onChange={e => setTitle(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }} required />
-            </div>
+          <Form.Item label="Số tiền (₫)" required>
+            <MoneyInputLeft
+              value={amount}
+              onChange={setAmount}
+              placeholder="500000"
+              style={{ textAlign: 'left', fontWeight: 700 }}
+              required
+            />
+          </Form.Item>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số tiền (₫) *</label>
-              <MoneyInputLeft
-                value={amount}
-                onChange={setAmount}
-                placeholder="500000"
-                style={{ textAlign: 'left', fontWeight: 700 }}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1.2 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Danh mục chi</label>
-                <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }}>
-                  <option value="Bảo dưỡng">Bảo dưỡng</option>
-                  <option value="Sửa chữa">Sửa chữa</option>
-                  <option value="Vệ sinh">Vệ sinh</option>
-                  <option value="Giấy tờ">Giấy tờ</option>
-                  <option value="Chi trả chủ xe">Chi trả chủ xe</option>
-                  <option value="Khác">Hạng mục khác</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ngày chi</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }} />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Liên kết xe (tùy chọn)</label>
-              <select value={ref} onChange={e => setRef(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }}>
-                <option value="">-- Không liên kết xe --</option>
-                {cars.map(c => (
-                  <option key={c.id} value={c.id}>{c.id} - {c.name}</option>
-                ))}
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Danh mục chi" style={{ flex: 1.2 }}>
+              <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+                <option value="Bảo dưỡng">Bảo dưỡng</option>
+                <option value="Sửa chữa">Sửa chữa</option>
+                <option value="Vệ sinh">Vệ sinh</option>
+                <option value="Giấy tờ">Giấy tờ</option>
+                <option value="Chi trả chủ xe">Chi trả chủ xe</option>
+                <option value="Khác">Hạng mục khác</option>
               </select>
-            </div>
+            </Form.Item>
+            <Form.Item label="Ngày chi" style={{ flex: 1 }}>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
+            </Form.Item>
+          </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-              <button type="button" onClick={() => setShowAddForm(false)} style={{ padding: '8px 16px', color: 'var(--text-secondary)' }}>Hủy</button>
-              <button type="submit" className="btn-primary">Ghi nhận</button>
-            </div>
-          </form>
-        </div>
-      )}
+          <Form.Item label="Liên kết xe (tùy chọn)">
+            <select value={ref} onChange={e => setRef(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+              <option value="">-- Không liên kết xe --</option>
+              {cars.map(c => (
+                <option key={c.id} value={c.id}>{c.id} - {c.name}</option>
+              ))}
+            </select>
+          </Form.Item>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+            <button type="button" onClick={() => setShowAddForm(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
+            <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Ghi nhận</button>
+          </div>
+        </Form>
+      </Modal>
     </div>
   );
 };
