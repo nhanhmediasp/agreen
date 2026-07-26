@@ -490,25 +490,25 @@ const CreateRental = () => {
 
               <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc bàn giao</label>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc bàn giao (Bắt đầu)</label>
                   <input 
                     type="number" 
                     value={startKm}
                     onChange={e => setStartKm(e.target.value)}
+                    placeholder="VD: 50000"
                     style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }} 
                   />
                 </div>
-                {initialRentalStatus === 'completed' && (
-                  <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc trả (kết thúc)</label>
-                    <input 
-                      type="number" 
-                      value={endKm}
-                      onChange={e => setEndKm(e.target.value)}
-                      style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }} 
-                    />
-                  </div>
-                )}
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc trả (Kết thúc)</label>
+                  <input 
+                    type="number" 
+                    value={endKm}
+                    onChange={e => setEndKm(e.target.value)}
+                    placeholder="VD: 50250"
+                    style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }} 
+                  />
+                </div>
               </div>
 
               <div>
@@ -1126,7 +1126,8 @@ const CreateRental = () => {
                   </div>
                   <div>Dòng xe: <strong>{selectedCarObj?.name || createdReceiptRental.carId}</strong></div>
                   <div>Màu xe: <strong>{selectedCarObj?.color || 'Đen'}</strong></div>
-                  <div>Số KM xuất bãi: <strong className="font-mono">{createdReceiptRental.startKm.toLocaleString()} km</strong></div>
+                  <div>KM bàn giao (bắt đầu): <strong className="font-mono">{createdReceiptRental.startKm.toLocaleString()} km</strong></div>
+                  <div>KM trả xe (kết thúc): <strong className="font-mono">{createdReceiptRental.endKm !== undefined && createdReceiptRental.endKm !== null ? `${createdReceiptRental.endKm.toLocaleString()} km` : 'Chưa ghi nhận'}</strong></div>
                 </div>
               </div>
 
@@ -1195,7 +1196,7 @@ const CreateRental = () => {
             </div>
 
             {/* Receipt Modal Action Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+            <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
               <button 
                 type="button" 
                 onClick={() => { setCreatedReceiptRental(null); navigate('/contracts'); }}

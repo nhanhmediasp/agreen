@@ -1718,10 +1718,8 @@ const Contracts = () => {
                     <span>Biển số xe:</span>
                     <span className="license-plate font-mono">{selectedRental.carId}</span>
                   </div>
-                  <div>Số KM bàn giao: <strong className="font-mono">{selectedRental.startKm.toLocaleString()} km</strong></div>
-                  {selectedRental.status === 'completed' && selectedRental.endKm !== undefined && selectedRental.endKm !== null && (
-                    <div>Số KM lúc trả: <strong className="font-mono">{Number(selectedRental.endKm).toLocaleString()} km</strong></div>
-                  )}
+                  <div>KM bàn giao (bắt đầu): <strong className="font-mono">{selectedRental.startKm.toLocaleString()} km</strong></div>
+                  <div>KM trả xe (kết thúc): <strong className="font-mono">{selectedRental.endKm !== undefined && selectedRental.endKm !== null ? `${Number(selectedRental.endKm).toLocaleString()} km` : 'Chưa ghi nhận'}</strong></div>
                 </div>
               </div>
 
@@ -1785,7 +1783,7 @@ const Contracts = () => {
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+            <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
               <button 
                 type="button" 
                 onClick={() => setShowPreviewModal(false)}

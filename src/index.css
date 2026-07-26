@@ -1255,21 +1255,44 @@ html, body {
    PRINT STYLES (A4 Single Page optimization)
    ============================================================ */
 @media print {
-  /* Hide all elements on the body by default */
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  
+  html, body {
+    background: #FFFFFF !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all elements on body by default */
   body * {
     visibility: hidden !important;
   }
   
-  /* Show only the contract card and its contents */
+  /* Show print overlay wrapper as fixed full-screen container */
   .print-overlay-wrapper {
     visibility: visible !important;
-    position: relative !important;
-    display: block !important;
-    inset: auto !important;
-    padding: 0 !important;
-    background: transparent !important;
-    overflow: visible !important;
-    z-index: auto !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    padding: 16px !important;
+    margin: 0 !important;
+    background: #FFFFFF !important;
+    overflow: hidden !important;
+    z-index: 999999 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+    box-sizing: border-box !important;
   }
 
   .printable-contract-card,
@@ -1277,36 +1300,36 @@ html, body {
     visibility: visible !important;
   }
 
-  /* Position the contract card to take full page space */
+  /* Single page fit for contract receipt card */
   .printable-contract-card {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: relative !important;
     width: 100% !important;
     max-width: 100% !important;
     box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    border: 1px solid #CBD5E1 !important;
+    padding: 20px !important;
+    margin: 0 auto !important;
+    background: #FFFFFF !important;
+    box-sizing: border-box !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  /* Make grid contents in printable card side-by-side */
+  /* Grid layout side by side for printable card */
   .printable-contract-card div[style*="display: grid"],
   .printable-contract-card div[style*="display:grid"] {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 20px !important;
+    gap: 16px !important;
   }
 
-  /* Hide print buttons container inside card */
-  .printable-contract-card div[style*="justifyContent: space-between"] button,
-  .printable-contract-card div[style*="justify-content: space-between"] button {
+  /* Hide action buttons during print */
+  .no-print,
+  .no-print *,
+  button,
+  .printable-contract-card button {
     display: none !important;
-  }
-
-  /* Ensure background colors and colors are preserved in print */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
   }
 }
