@@ -12,7 +12,14 @@
     "skipLibCheck": true,
     "allowJs": true,
     "resolveJsonModule": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "paths": {
+      "antd": ["./node_modules/antd/es/index.d.ts"],
+      "antd/*": ["./node_modules/antd/es/*"],
+      "@ant-design/icons": ["./node_modules/@ant-design/icons/lib/index.d.ts"],
+      "@ant-design/icons/*": ["./node_modules/@ant-design/icons/lib/*"],
+      "@ant-design/v5-patch-for-react-19": ["./node_modules/@ant-design/v5-patch-for-react-19/es/index.d.ts"]
+    }
   },
   "include": ["src"]
 }
