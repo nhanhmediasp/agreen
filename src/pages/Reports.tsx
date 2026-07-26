@@ -98,13 +98,32 @@ const Reports = () => {
   const avgUtilization = cars.length > 0 ? Math.round(sortedUtilization.reduce((sum, u) => sum + u.rate, 0) / cars.length) : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
       {/* Header & Time Range Filter */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '4px' }}>
         <div>
-          <h1 style={{ fontSize: '20px', margin: 0, fontWeight: 700 }}>Báo cáo & Thống kê</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '3px' }}>Phân tích doanh thu, lợi nhuận và hiệu suất khai thác đội xe</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+              Báo cáo & Thống kê
+            </h1>
+            <span style={{ 
+              background: 'linear-gradient(135deg, #10B981, #059669)', 
+              color: '#FFFFFF', 
+              fontSize: '11px', 
+              fontWeight: '700', 
+              padding: '3px 9px', 
+              borderRadius: '20px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+            }}>
+              Báo cáo
+            </span>
+          </div>
+          <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px', margin: 0 }}>
+            Phân tích doanh thu, lợi nhuận và hiệu suất khai thác đội xe
+          </p>
         </div>
 
         {/* Time Range Selector */}

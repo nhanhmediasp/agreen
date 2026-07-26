@@ -40,7 +40,34 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '4px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+              Tổng quan Vận hành
+            </h1>
+            <span style={{ 
+              background: 'linear-gradient(135deg, #10B981, #059669)', 
+              color: '#FFFFFF', 
+              fontSize: '11px', 
+              fontWeight: '700', 
+              padding: '3px 9px', 
+              borderRadius: '20px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+            }}>
+              Tổng quan
+            </span>
+          </div>
+          <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px', margin: 0 }}>
+            Hệ thống giám sát đội xe, lịch trình bàn giao, trả xe và doanh thu thời gian thực
+          </p>
+        </div>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-4 gap-md">

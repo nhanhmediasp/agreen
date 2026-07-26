@@ -285,9 +285,30 @@ const CreateRental = () => {
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>Tạo đơn thuê mới</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Thiết lập hợp đồng và ghi nhận tình trạng bàn giao xe</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+              Tạo đơn thuê mới
+            </h1>
+            <span style={{ 
+              background: 'linear-gradient(135deg, #10B981, #059669)', 
+              color: '#FFFFFF', 
+              fontSize: '11px', 
+              fontWeight: '700', 
+              padding: '3px 9px', 
+              borderRadius: '20px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+            }}>
+              Tạo Đơn
+            </span>
+          </div>
+          <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px', margin: 0 }}>
+            Quy trình thiết lập hợp đồng nhanh, chọn xe và bàn giao xe cho khách
+          </p>
+        </div>
       </div>
 
       <Steps

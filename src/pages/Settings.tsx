@@ -87,9 +87,30 @@ const SettingsPage = () => {
         </div>
       )}
 
-      <div>
-        <h1 style={{ fontSize: '28px', marginBottom: '8px' }}>Cài đặt hệ thống</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Tùy chỉnh giao diện và trung tâm bảo mật website</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+              Cài đặt hệ thống
+            </h1>
+            <span style={{ 
+              background: 'linear-gradient(135deg, #10B981, #059669)', 
+              color: '#FFFFFF', 
+              fontSize: '11px', 
+              fontWeight: '700', 
+              padding: '3px 9px', 
+              borderRadius: '20px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+            }}>
+              Hệ thống
+            </span>
+          </div>
+          <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px', margin: 0 }}>
+            Tùy chỉnh giao diện, thay đổi logo và trung tâm bảo mật website
+          </p>
+        </div>
       </div>
 
       {/* Tabs */}

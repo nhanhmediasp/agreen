@@ -793,9 +793,36 @@ const FleetManagement = () => {
       ) : (
         /* Danh sách Đội xe chính */
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h1 style={{ fontSize: '24px', margin: 0 }}>Quản lý Đội xe</h1>
-            <button className="btn-primary" onClick={() => setShowAddForm(true)}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+                  Quản lý Đội xe
+                </h1>
+                <span style={{ 
+                  background: 'linear-gradient(135deg, #10B981, #059669)', 
+                  color: '#FFFFFF', 
+                  fontSize: '11px', 
+                  fontWeight: '700', 
+                  padding: '3px 9px', 
+                  borderRadius: '20px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+                }}>
+                  Đội xe
+                </span>
+              </div>
+              <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px', margin: 0 }}>
+                Quản lý danh sách phương tiện, thông tin kỹ thuật, tình trạng hoạt động và chi phí xe
+              </p>
+            </div>
+            
+            <button 
+              className="btn btn-primary" 
+              onClick={() => setShowAddForm(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', fontWeight: 600 }}
+            >
               <Plus size={18} />
               Thêm xe mới
             </button>
