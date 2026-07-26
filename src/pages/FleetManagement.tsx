@@ -363,16 +363,39 @@ const FleetManagement = () => {
     showToast('Đã hoàn tất quy trình trả xe và cập nhật trạng thái xe thành công!', 'success');
   };
 
-  // Car specific timeline dates setup
-  const weekDays = [
-    { name: 'Thứ 2', dateStr: '13', fullDate: '2026-07-13' },
-    { name: 'Thứ 3', dateStr: '14', fullDate: '2026-07-14' },
-    { name: 'Thứ 4', dateStr: '15', fullDate: '2026-07-15' },
-    { name: 'Thứ 5', dateStr: '16', fullDate: '2026-07-16' },
-    { name: 'Thứ 6', dateStr: '17', fullDate: '2026-07-17' },
-    { name: 'Thứ 7', dateStr: '18', fullDate: '2026-07-18' },
-    { name: 'Chủ Nhật', dateStr: '19', fullDate: '2026-07-19' }
-  ];
+  // === Lịch tuần này: Tính động theo giờ Việt Nam ===
+  const todayVN = (() => {
+    // Lấy ngày hôm nay theo timezone Việt Nam
+    const now = new Date();
+    const vnDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }); // en-CA cho format YYYY-MM-DD
+    return vnDateStr; // ví dụ: "2026-07-26"
+  })();
+
+  const weekDays = (() => {
+    const today = new Date(todayVN + 'T00:00:00');
+    // Tìm thứ 2 đầu tuần (0=CN, 1=T2,...)
+    const dayOfWeek = today.getDay(); // 0=CN
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset);
+
+    const dayNames = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const shortNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const fullDate = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const dateStr = String(d.getDate()).padStart(2, '0');
+      const dayIdx = d.getDay();
+      return {
+        name: shortNames[dayIdx],
+        fullName: dayNames[dayIdx],
+        dateStr,
+        fullDate,
+      };
+    });
+  })();
 
   const getCarStatusForDay = (dayDateStr: string) => {
     if (!selectedCarId) return 'ready';
@@ -385,8 +408,8 @@ const FleetManagement = () => {
     });
 
     if (activeRentalOnDay) return 'rented';
-    if (activeCar?.status === 'maintenance' && dayDateStr === '2026-07-15') return 'maintenance';
-    if (activeCar?.status === 'suspended' && dayDateStr === '2026-07-15') return 'suspended';
+    if (activeCar?.status === 'maintenance' && dayDateStr === todayVN) return 'maintenance';
+    if (activeCar?.status === 'suspended' && dayDateStr === todayVN) return 'suspended';
     return 'ready';
   };
 
@@ -595,39 +618,39 @@ const FleetManagement = () => {
             {/* ===== CỘT PHẢI: Giấy tờ + Lịch + Bảng ===== */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-              {/* Thời hạn giấy tờ pháp lý - Card grid 3 cột */}
+              {/* Thời hạn giấy tờ pháp lý - Compact rows */}
               <Card
                 title={<div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}><ShieldCheck size={16} color="#047857" /> Thời hạn giấy tờ pháp lý</div>}
                 style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
-                bodyStyle={{ padding: '16px' }}
+                bodyStyle={{ padding: '8px 16px' }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                   {[
-                    { label: 'Đăng kiểm', date: activeCar.expiryRegistration, icon: '🔍' },
-                    { label: 'Bảo hiểm TNDS', date: activeCar.expiryInsurance, icon: '🛡️' },
-                    { label: 'Phù hiệu xe', date: activeCar.expiryLicense, icon: '📋' }
+                    { label: 'Đăng kiểm', date: activeCar.expiryRegistration },
+                    { label: 'Bảo hiểm TNDS', date: activeCar.expiryInsurance },
+                    { label: 'Phù hiệu xe', date: activeCar.expiryLicense }
                   ].map((doc, idx) => {
                     const expiryDate = new Date(doc.date);
-                    const today = new Date('2026-07-15');
+                    const today = new Date(todayVN + 'T00:00:00');
                     const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                     const isExpired = diffDays <= 0;
                     const isCritical = diffDays > 0 && diffDays < 30;
                     const isWarning = diffDays >= 30 && diffDays <= 60;
-                    const s = isExpired
-                      ? { bg: '#FEF2F2', border: '#FECACA', badgeBg: '#FEE2E2', badgeColor: '#B91C1C' }
-                      : isCritical
-                        ? { bg: '#FFF7ED', border: '#FED7AA', badgeBg: '#FFEDD5', badgeColor: '#C2410C' }
-                        : isWarning
-                          ? { bg: '#FEFCE8', border: '#FDE68A', badgeBg: '#FEF9C3', badgeColor: '#A16207' }
-                          : { bg: '#F0FDF4', border: '#BBF7D0', badgeBg: '#DCFCE7', badgeColor: '#15803D' };
+                    const badgeColor = isExpired ? '#B91C1C' : isCritical ? '#C2410C' : isWarning ? '#A16207' : '#15803D';
+                    const badgeBg = isExpired ? '#FEE2E2' : isCritical ? '#FFEDD5' : isWarning ? '#FEF9C3' : '#DCFCE7';
+                    const dotColor = isExpired ? '#EF4444' : isCritical ? '#F97316' : isWarning ? '#EAB308' : '#22C55E';
                     return (
-                      <div key={idx} style={{ padding: '14px', background: s.bg, borderRadius: '10px', border: `1px solid ${s.border}`, textAlign: 'center' }}>
-                        <div style={{ fontSize: '22px', marginBottom: '6px' }}>{doc.icon}</div>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', marginBottom: '4px' }}>{doc.label}</div>
-                        <div style={{ fontSize: '11px', color: '#64748B', fontFamily: 'monospace', marginBottom: '8px' }}>{new Date(doc.date).toLocaleDateString('vi-VN')}</div>
-                        <div style={{ display: 'inline-block', background: s.badgeBg, color: s.badgeColor, borderRadius: 100, padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>
-                          {isExpired ? `Hết hạn ${Math.abs(diffDays)}n` : `Còn ${diffDays} ngày`}
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: idx < 2 ? '1px solid #F1F5F9' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, display: 'inline-block', flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>{doc.label}</div>
+                            <div style={{ fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>{new Date(doc.date).toLocaleDateString('vi-VN')}</div>
+                          </div>
                         </div>
+                        <span style={{ background: badgeBg, color: badgeColor, borderRadius: 100, padding: '2px 10px', fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          {isExpired ? `Hết ${Math.abs(diffDays)}ng` : `Còn ${diffDays} ngày`}
+                        </span>
                       </div>
                     );
                   })}
@@ -643,7 +666,7 @@ const FleetManagement = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
                   {weekDays.map(day => {
                     const status = getCarStatusForDay(day.fullDate);
-                    const isToday = day.fullDate === '2026-07-15';
+                    const isToday = day.fullDate === todayVN;
                     const dayStyle = isToday
                       ? { bg: '#006837', border: '#006837', dayColor: 'white', dateColor: 'rgba(255,255,255,0.8)', shadow: '0 2px 8px rgba(0,104,55,0.3)' }
                       : status === 'rented'
