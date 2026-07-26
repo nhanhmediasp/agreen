@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Table, Tag, Modal, Form } from 'antd';
-import { Plus, X, Search, ArrowLeft, ShieldAlert, FileText, Edit, Trash, FileCheck, Eye, Filter, Calendar, Clock, Camera, Upload, Image as ImageIcon } from 'lucide-react';
+import { Plus, X, Search, ArrowLeft, ShieldAlert, FileText, Edit, Trash, FileCheck, Eye, Filter, Calendar, Clock, Camera, Upload, DollarSign, Image as ImageIcon } from 'lucide-react';
 import { useApp, type Rental, type Violation } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { Pagination } from '../components/Pagination';
