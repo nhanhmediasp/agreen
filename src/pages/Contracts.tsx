@@ -1630,7 +1630,7 @@ const Contracts = () => {
 
       {/* Modal Hóa Đơn Bàn Giao Xe & Hợp Đồng */}
       {showPreviewModal && selectedRental && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px', overflowY: 'auto' }}>
+        <div className="print-overlay-wrapper" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px', overflowY: 'auto' }}>
           <div 
             className="card printable-contract-card" 
             style={{ 

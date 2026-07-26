@@ -50,8 +50,9 @@ const CreateRental = () => {
   const [isWeekend, setIsWeekend] = useState(false);
   const [weekendSurchargePercent, setWeekendSurchargePercent] = useState('20'); // Editable weekend surcharge
   const [startKm, setStartKm] = useState('0');
+  const [endKm, setEndKm] = useState('0');
   const [startFuel, setStartFuel] = useState('8/8');
-  const [initialRentalStatus, setInitialRentalStatus] = useState<'pending' | 'active'>('pending');
+  const [initialRentalStatus, setInitialRentalStatus] = useState<'pending' | 'active' | 'completed'>('pending');
 
   // Form State - Customer Mode & Searching
   const [customerMode, setCustomerMode] = useState<'select' | 'create'>('select');
@@ -84,6 +85,7 @@ const CreateRental = () => {
   useEffect(() => {
     if (selectedCarObj) {
       setStartKm(selectedCarObj.km.toString());
+      setEndKm(selectedCarObj.km.toString());
     }
   }, [selectedCarId, selectedCarObj]);
 
@@ -204,13 +206,15 @@ const CreateRental = () => {
       paymentStatus,
       status: initialRentalStatus || 'pending',
       startKm: parseInt(startKm) || 0,
+      endKm: initialRentalStatus === 'completed' ? (parseInt(endKm) || parseInt(startKm) || 0) : undefined,
       startFuel,
       source: contractSource,
       fileUrl: contractSource === 'uploaded' ? uploadedFileUrl : undefined,
       fileName: contractSource === 'uploaded' ? (uploadedFileName || 'Hop_Dong_Luu_Tru.pdf') : undefined,
       ownerCommissionAmount,
       createdAt: new Date().toISOString(),
-      deliveredAt: initialRentalStatus === 'active' ? new Date().toISOString() : undefined
+      deliveredAt: (initialRentalStatus === 'active' || initialRentalStatus === 'completed') ? new Date().toISOString() : undefined,
+      returnedAt: initialRentalStatus === 'completed' ? new Date().toISOString() : undefined
     };
 
     addRental(rentalToAdd);
@@ -484,14 +488,27 @@ const CreateRental = () => {
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc bàn giao</label>
-                <input 
-                  type="number" 
-                  value={startKm}
-                  onChange={e => setStartKm(e.target.value)}
-                  style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }} 
-                />
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc bàn giao</label>
+                  <input 
+                    type="number" 
+                    value={startKm}
+                    onChange={e => setStartKm(e.target.value)}
+                    style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }} 
+                  />
+                </div>
+                {initialRentalStatus === 'completed' && (
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc trả (kết thúc)</label>
+                    <input 
+                      type="number" 
+                      value={endKm}
+                      onChange={e => setEndKm(e.target.value)}
+                      style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }} 
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -897,6 +914,7 @@ const CreateRental = () => {
               >
                 <option value="pending">🟡 Chờ bàn giao xe cho khách</option>
                 <option value="active">🔵 Đang thuê (Đã giao xe ngay)</option>
+                <option value="completed">🟢 Đã hoàn thành (Đã trả xe & chốt số KM)</option>
               </select>
             </div>
 
@@ -1031,7 +1049,7 @@ const CreateRental = () => {
 
       {/* RENTAL CONFIRMATION RECEIPT MODAL FOR SCREENSHOT / SHARING */}
       {createdReceiptRental && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px', overflowY: 'auto' }}>
+        <div className="print-overlay-wrapper" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px', overflowY: 'auto' }}>
           <div 
             className="card printable-contract-card" 
             style={{ 

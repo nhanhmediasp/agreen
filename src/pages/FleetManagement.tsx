@@ -14,7 +14,7 @@ import {
   CalendarOutlined, 
   ArrowLeftOutlined 
 } from '@ant-design/icons';
-import { Search, Filter, Plus, Gauge, ShieldCheck, X, Image as ImageIcon, Trash2, Calendar as CalendarIcon, LayoutGrid, List, Receipt, Layers } from 'lucide-react';
+import { Search, Filter, Plus, Gauge, ShieldCheck, X, Image as ImageIcon, Trash2, Calendar as CalendarIcon, LayoutGrid, List, Receipt, Layers, Maximize2 } from 'lucide-react';
 import { useApp, type Car, type Rental, type Expense } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 
@@ -177,6 +177,7 @@ const FleetManagement = () => {
   const [editGalleryImages, setEditGalleryImages] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [gallerySelectTarget, setGallerySelectTarget] = useState<'avatar-add' | 'avatar-edit' | 'gallery-add' | 'gallery-edit'>('avatar-add');
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const normalizePlate = (str: string) => str ? str.toUpperCase().replace(/[-. ]/g, '') : '';
   const activeCar = cars.find(c => normalizePlate(c.id) === normalizePlate(selectedCarId ?? ''));
@@ -560,7 +561,11 @@ const FleetManagement = () => {
 
               {/* Ảnh xe */}
               <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #E8EDF2', overflow: 'hidden' }} bodyStyle={{ padding: '16px' }}>
-                <div style={{ position: 'relative', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px' }}>
+                <div 
+                  onClick={() => setLightboxImage(previewImage || activeCar.image)}
+                  style={{ position: 'relative', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px', cursor: 'zoom-in' }}
+                  title="Click để phóng to ảnh"
+                >
                   <img src={previewImage || activeCar.image} alt={activeCar.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{ position: 'absolute', top: '10px', left: '10px' }}>
                     <span className="license-plate" style={{ fontSize: '16px', padding: '3px 10px', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>{activeCar.id}</span>
@@ -571,6 +576,9 @@ const FleetManagement = () => {
                   {activeCar.status === 'maintenance' && (
                     <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(234,88,12,0.9)', color: 'white', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}>Bảo trì</div>
                   )}
+                  <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.6)', color: 'white', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Maximize2 size={14} />
+                  </div>
                 </div>
 
                 {/* Thư viện ảnh xe thumbnails */}
@@ -2193,6 +2201,20 @@ const FleetManagement = () => {
           }}
         />
       )}
+
+      {/* Lightbox Modal for gallery viewing */}
+      <Modal
+        open={!!lightboxImage}
+        onCancel={() => setLightboxImage(null)}
+        footer={null}
+        width={750}
+        bodyStyle={{ padding: 0 }}
+        centered
+      >
+        {lightboxImage && (
+          <img src={lightboxImage} alt="Fullscreen View" style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain', display: 'block', margin: '0 auto', borderRadius: '4px' }} />
+        )}
+      </Modal>
     </div>
   );
 };

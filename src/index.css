@@ -1255,38 +1255,29 @@ html, body {
    PRINT STYLES (A4 Single Page optimization)
    ============================================================ */
 @media print {
-  html, body {
-    height: 100% !important;
-    overflow: hidden !important;
-    background: #FFFFFF !important;
-    font-size: 12px !important;
+  /* Hide all elements on the body by default */
+  body * {
+    visibility: hidden !important;
   }
   
-  /* Hide all dashboard chrome, menus, backdrops and buttons */
-  .app-container,
-  .sidebar,
-  .topbar,
-  .page-content,
-  .modal-overlay,
-  button,
-  .btn-primary,
-  .btn-secondary,
-  .btn-ghost,
-  div[style*="borderTop"],
-  div[style*="border-top"] {
-    display: none !important;
+  /* Show only the contract card and its contents */
+  .print-overlay-wrapper {
+    visibility: visible !important;
+    position: relative !important;
+    display: block !important;
+    inset: auto !important;
+    padding: 0 !important;
     background: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
+    overflow: visible !important;
+    z-index: auto !important;
   }
-  
-  /* Show only the contract card */
+
   .printable-contract-card,
   .printable-contract-card * {
     visibility: visible !important;
-    display: block !important;
   }
 
+  /* Position the contract card to take full page space */
   .printable-contract-card {
     position: absolute !important;
     left: 0 !important;
@@ -1308,12 +1299,14 @@ html, body {
   }
 
   /* Hide print buttons container inside card */
-  .printable-contract-card div[style*="justifyContent: space-between"],
-  .printable-contract-card div[style*="justify-content: space-between"] {
-    display: flex !important;
-  }
   .printable-contract-card div[style*="justifyContent: space-between"] button,
   .printable-contract-card div[style*="justify-content: space-between"] button {
     display: none !important;
+  }
+
+  /* Ensure background colors and colors are preserved in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

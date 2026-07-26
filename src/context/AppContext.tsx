@@ -1064,6 +1064,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? {
         ...cust, activeRentals: cust.activeRentals + 1, totalRentals: cust.totalRentals + 1
       } : cust));
+    } else if (rental.status === 'completed') {
+      const selectedCar = cars.find(c => c.id === rental.carId);
+      const newKm = Math.max(selectedCar ? selectedCar.km : 0, rental.endKm || 0);
+      setCars(prev => prev.map(c => c.id === rental.carId ? {
+        ...c, km: newKm
+      } : c));
+      updateCar(rental.carId, { km: newKm });
+      setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? {
+        ...cust, totalRentals: cust.totalRentals + 1
+      } : cust));
     } else {
       setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? {
         ...cust, totalRentals: cust.totalRentals + 1
