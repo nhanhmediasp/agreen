@@ -759,32 +759,31 @@ const FleetManagement = () => {
 
               {/* Lịch sử & Chi phí - Tabs */}
               <Card style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2', overflow: 'hidden' }} bodyStyle={{ padding: 0 }}>
-                <div style={{ padding: '0 20px', borderBottom: '1px solid #E8EDF2', background: '#FAFBFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                  <div style={{ display: 'flex', gap: '20px' }}>
+                <div style={{ padding: '12px 20px', borderBottom: '1px solid #E8EDF2', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '8px', background: '#F1F5F9', padding: '4px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                     <button
                       onClick={() => setActiveDetailTab('rentals')}
                       style={{
-                        padding: '16px 4px',
-                        fontSize: '14px',
-                        fontWeight: activeDetailTab === 'rentals' ? '700' : '600',
-                        color: activeDetailTab === 'rentals' ? '#006837' : '#64748B',
-                        borderBottom: activeDetailTab === 'rentals' ? '3px solid #006837' : '3px solid transparent',
-                        background: 'none',
-                        borderTop: 'none',
-                        borderLeft: 'none',
-                        borderRight: 'none',
+                        padding: '8px 16px',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: activeDetailTab === 'rentals' ? '#FFFFFF' : '#475569',
+                        background: activeDetailTab === 'rentals' ? '#006837' : 'transparent',
+                        borderRadius: '6px',
+                        border: 'none',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        transition: 'all 0.2s',
-                        outline: 'none'
+                        transition: 'all 0.15s ease',
+                        outline: 'none',
+                        boxShadow: activeDetailTab === 'rentals' ? '0 2px 6px rgba(0,104,55,0.2)' : 'none'
                       }}
                     >
                       <span>📜</span> Lịch sử đặt xe 
                       <span style={{ 
-                        background: activeDetailTab === 'rentals' ? '#EBF5EE' : '#F1F5F9',
-                        color: activeDetailTab === 'rentals' ? '#006837' : '#64748B',
+                        background: activeDetailTab === 'rentals' ? 'rgba(255,255,255,0.2)' : '#E2E8F0',
+                        color: activeDetailTab === 'rentals' ? '#FFFFFF' : '#64748B',
                         fontSize: '11px',
                         fontWeight: 700,
                         padding: '1px 6px',
@@ -797,27 +796,26 @@ const FleetManagement = () => {
                     <button
                       onClick={() => setActiveDetailTab('expenses')}
                       style={{
-                        padding: '16px 4px',
-                        fontSize: '14px',
-                        fontWeight: activeDetailTab === 'expenses' ? '700' : '600',
-                        color: activeDetailTab === 'expenses' ? '#006837' : '#64748B',
-                        borderBottom: activeDetailTab === 'expenses' ? '3px solid #006837' : '3px solid transparent',
-                        background: 'none',
-                        borderTop: 'none',
-                        borderLeft: 'none',
-                        borderRight: 'none',
+                        padding: '8px 16px',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: activeDetailTab === 'expenses' ? '#FFFFFF' : '#475569',
+                        background: activeDetailTab === 'expenses' ? '#006837' : 'transparent',
+                        borderRadius: '6px',
+                        border: 'none',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        transition: 'all 0.2s',
-                        outline: 'none'
+                        transition: 'all 0.15s ease',
+                        outline: 'none',
+                        boxShadow: activeDetailTab === 'expenses' ? '0 2px 6px rgba(0,104,55,0.2)' : 'none'
                       }}
                     >
                       <span>💰</span> Chi phí xe 
                       <span style={{ 
-                        background: activeDetailTab === 'expenses' ? '#EBF5EE' : '#F1F5F9',
-                        color: activeDetailTab === 'expenses' ? '#006837' : '#64748B',
+                        background: activeDetailTab === 'expenses' ? 'rgba(255,255,255,0.2)' : '#E2E8F0',
+                        color: activeDetailTab === 'expenses' ? '#FFFFFF' : '#64748B',
                         fontSize: '11px',
                         fontWeight: 700,
                         padding: '1px 6px',
@@ -830,7 +828,7 @@ const FleetManagement = () => {
                   {activeDetailTab === 'expenses' && (
                     <Button type="primary" size="small" icon={<PlusOutlined />}
                       onClick={() => { setExpenseDate(new Date().toISOString().split('T')[0]); setShowAddExpenseModal(true); }}
-                      style={{ background: '#006837', borderRadius: '6px', margin: '8px 0' }}
+                      style={{ background: '#006837', borderRadius: '6px', margin: '4px 0' }}
                     >Thêm chi phí</Button>
                   )}
                 </div>
