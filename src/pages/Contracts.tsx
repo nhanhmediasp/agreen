@@ -95,6 +95,8 @@ const Contracts = () => {
   const [editFile, setEditFile] = useState('');
   const [editPaymentStatus, setEditPaymentStatus] = useState<Rental['paymentStatus']>('paid');
   const [editStatus, setEditStatus] = useState<Rental['status']>('completed');
+  const [editStartKm, setEditStartKm] = useState('0');
+  const [editEndKm, setEditEndKm] = useState('0');
 
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [violationEditId, setViolationEditId] = useState<string | null>(null);
@@ -207,6 +209,8 @@ const Contracts = () => {
     setEditFile(rental.fileUrl || '');
     setEditPaymentStatus(rental.paymentStatus);
     setEditStatus(rental.status);
+    setEditStartKm(rental.startKm.toString());
+    setEditEndKm((rental.endKm || rental.startKm || 0).toString());
     setEditOwnerCommission((rental.ownerCommissionAmount ?? Math.round(rental.totalAmount * 0.7)).toString());
     setShowEditModal(true);
   };
@@ -224,6 +228,8 @@ const Contracts = () => {
       paymentStatus: editPaymentStatus,
       status: editStatus,
       fileUrl: editFile,
+      startKm: parseInt(editStartKm) || 0,
+      endKm: editStatus === 'completed' ? (parseInt(editEndKm) || parseInt(editStartKm) || 0) : null,
       ownerCommissionAmount: parseInt(editOwnerCommission) || 0
     });
 
@@ -456,8 +462,8 @@ const Contracts = () => {
                         </div>
                         <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                           <div>📏 KM bàn giao: <strong style={{ color: '#0F172A' }}>{selectedDetailRental.startKm.toLocaleString()} km</strong></div>
-                          {selectedDetailRental.status === 'completed' && selectedDetailRental.endKm !== undefined && (
-                            <div>🏁 KM kết thúc: <strong style={{ color: '#16a34a' }}>{selectedDetailRental.endKm.toLocaleString()} km</strong> (Đã chạy {(selectedDetailRental.endKm - selectedDetailRental.startKm).toLocaleString()} km)</div>
+                          {selectedDetailRental.status === 'completed' && selectedDetailRental.endKm !== undefined && selectedDetailRental.endKm !== null && (
+                            <div>🏁 KM kết thúc: <strong style={{ color: '#16a34a' }}>{Number(selectedDetailRental.endKm).toLocaleString()} km</strong> (Đã chạy {(Number(selectedDetailRental.endKm) - selectedDetailRental.startKm).toLocaleString()} km)</div>
                           )}
                         </div>
                       </div>
@@ -1521,6 +1527,15 @@ const Contracts = () => {
             </Form.Item>
           </div>
 
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Số KM lúc bàn giao" style={{ flex: 1 }}>
+              <input type="number" value={editStartKm} onChange={e => setEditStartKm(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
+            </Form.Item>
+            <Form.Item label="Số KM lúc trả xe (kết thúc)" style={{ flex: 1 }}>
+              <input type="number" value={editEndKm} onChange={e => setEditEndKm(e.target.value)} disabled={editStatus !== 'completed'} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: editStatus !== 'completed' ? '#f5f5f5' : 'white' }} />
+            </Form.Item>
+          </div>
+
           <Form.Item label="Tệp đính kèm (URL hợp đồng scan)">
             <div style={{ display: 'flex', gap: '8px' }}>
               <input type="text" value={editFile} onChange={e => setEditFile(e.target.value)} style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
@@ -1704,8 +1719,8 @@ const Contracts = () => {
                     <span className="license-plate font-mono">{selectedRental.carId}</span>
                   </div>
                   <div>Số KM bàn giao: <strong className="font-mono">{selectedRental.startKm.toLocaleString()} km</strong></div>
-                  {selectedRental.status === 'completed' && selectedRental.endKm !== undefined && (
-                    <div>Số KM lúc trả: <strong className="font-mono">{selectedRental.endKm.toLocaleString()} km</strong></div>
+                  {selectedRental.status === 'completed' && selectedRental.endKm !== undefined && selectedRental.endKm !== null && (
+                    <div>Số KM lúc trả: <strong className="font-mono">{Number(selectedRental.endKm).toLocaleString()} km</strong></div>
                   )}
                 </div>
               </div>

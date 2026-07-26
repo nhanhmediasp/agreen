@@ -1081,8 +1081,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   const updateRental = (id: string, updatedFields: Partial<Rental>) => {
+    const originalRental = rentals.find(r => r.id === id);
     setRentals(prev => prev.map(r => r.id === id ? { ...r, ...updatedFields } : r));
     apiFetch(`/rentals/${id}`, { method: 'PUT', body: JSON.stringify(updatedFields) }).catch(() => {});
+
+    const finalStatus = updatedFields.status !== undefined ? updatedFields.status : originalRental?.status;
+    const finalEndKm = updatedFields.endKm !== undefined ? updatedFields.endKm : originalRental?.endKm;
+    const carId = originalRental?.carId;
+
+    if (carId) {
+      if (finalStatus === 'completed') {
+        const selectedCar = cars.find(c => c.id === carId);
+        const newKm = Math.max(selectedCar ? selectedCar.km : 0, finalEndKm || 0);
+        setCars(prev => prev.map(c => c.id === carId ? {
+          ...c,
+          status: 'ready',
+          km: newKm,
+          customer: undefined,
+          timeRemaining: undefined
+        } : c));
+        updateCar(carId, { status: 'ready', km: newKm });
+      } else if (finalStatus === 'active' || finalStatus === 'pending') {
+        setCars(prev => prev.map(c => c.id === carId ? {
+          ...c,
+          status: 'rented',
+          customer: originalRental?.customerName
+        } : c));
+        updateCar(carId, { status: 'rented' });
+      }
+    }
   };
 
   const deleteRental = (id: string) => {
