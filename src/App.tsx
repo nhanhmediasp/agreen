@@ -353,6 +353,58 @@ function AccountDropdown() {
   );
 }
 
+function VNDatetimeClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeStr = now.toLocaleTimeString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const dateStr = now.toLocaleDateString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-end',
+      padding: '5px 12px',
+      background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+      border: '1px solid #bbf7d0',
+      borderRadius: '10px',
+      lineHeight: 1.3,
+      userSelect: 'none',
+    }}>
+      <span style={{
+        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+        fontSize: '16px',
+        fontWeight: 700,
+        color: '#006837',
+        letterSpacing: '0.04em',
+      }}>
+        {timeStr}
+      </span>
+      <span style={{ fontSize: '10.5px', color: '#059669', fontWeight: 500 }}>
+        {dateStr} • GMT+7
+      </span>
+    </div>
+  );
+}
+
 function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
@@ -383,6 +435,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="topbar-right">
+            <VNDatetimeClock />
             <Link to="/rental/new">
               <button className="btn-primary" style={{ gap: '6px' }}>
                 <Plus size={15} />
