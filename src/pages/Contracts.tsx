@@ -229,7 +229,7 @@ const Contracts = () => {
       status: editStatus,
       fileUrl: editFile,
       startKm: parseInt(editStartKm) || 0,
-      endKm: editStatus === 'completed' ? (parseInt(editEndKm) || parseInt(editStartKm) || 0) : null,
+      endKm: (editEndKm !== '' && editEndKm !== undefined && editEndKm !== null && !isNaN(parseInt(editEndKm))) ? parseInt(editEndKm) : undefined,
       ownerCommissionAmount: parseInt(editOwnerCommission) || 0
     });
 
@@ -1543,7 +1543,7 @@ const Contracts = () => {
               <input type="number" value={editStartKm} onChange={e => setEditStartKm(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
             </Form.Item>
             <Form.Item label="Số KM lúc trả xe (kết thúc)" style={{ flex: 1 }}>
-              <input type="number" value={editEndKm} onChange={e => setEditEndKm(e.target.value)} disabled={editStatus !== 'completed'} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: editStatus !== 'completed' ? '#f5f5f5' : 'white' }} />
+              <input type="number" value={editEndKm} onChange={e => setEditEndKm(e.target.value)} placeholder="VD: 50250" style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
             </Form.Item>
           </div>
 

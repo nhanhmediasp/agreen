@@ -349,7 +349,7 @@ app.post('/api/rentals', async (req, res) => {
         Number(r.rentalFee)||0, Number(r.deliveryFee)||0, Number(r.deposit)||0,
         Number(r.extraFee)||0, Number(r.totalAmount)||0,
         r.paymentStatus||'deposit', r.status||'pending',
-        Number(r.startKm)||0, r.endKm||null,
+        Number(r.startKm)||0, (r.endKm !== null && r.endKm !== undefined && r.endKm !== '') ? Number(r.endKm) : null,
         r.startFuel||'full', r.endFuel||null,
         r.source||'system', r.fileUrl||'', r.fileName||'',
         Number(r.ownerCommissionAmount)||0,

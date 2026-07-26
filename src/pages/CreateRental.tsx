@@ -206,7 +206,7 @@ const CreateRental = () => {
       paymentStatus,
       status: initialRentalStatus || 'pending',
       startKm: parseInt(startKm) || 0,
-      endKm: initialRentalStatus === 'completed' ? (parseInt(endKm) || parseInt(startKm) || 0) : undefined,
+      endKm: (endKm !== '' && endKm !== undefined && endKm !== null && !isNaN(parseInt(endKm))) ? parseInt(endKm) : undefined,
       startFuel,
       source: contractSource,
       fileUrl: contractSource === 'uploaded' ? uploadedFileUrl : undefined,
