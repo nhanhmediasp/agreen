@@ -521,7 +521,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
 
   // STANDARD MAIN VIEW (ORDERS LIST & DRIVERS LIST OR DRIVER DETAIL)
   return (
-    <div className="page-container" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="page-container" style={{ width: '100%' }}>
       
       {activeDriverId ? (
         (() => {
