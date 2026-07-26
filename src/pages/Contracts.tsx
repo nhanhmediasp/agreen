@@ -78,6 +78,12 @@ const Contracts = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // KPI Statistics for Contracts
+  const totalContractsCount = rentals.length;
+  const totalContractRevenue = rentals.reduce((sum, r) => sum + (r.totalAmount || 0), 0);
+  const activeContractsCount = rentals.filter(r => r.status === 'active').length;
+  const paidContractsCount = rentals.filter(r => r.paymentStatus === 'paid').length;
+
   // Edit Form State (Main Modal)
   const [editId, setEditId] = useState('');
   const [editCarId, setEditCarId] = useState('');
@@ -960,18 +966,97 @@ const Contracts = () => {
         </div>
       ) : (
         /* 2. DANH SÁCH ĐƠN THUÊ CHÍNH */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '4px' }}>
             <div>
-              <h1 style={{ fontSize: '24px', margin: 0 }}>Quản lý Đơn thuê (Hợp đồng)</h1>
-              <p style={{ color: 'var(--text-secondary)' }}>Danh sách đơn thuê, quản lý thông tin hợp đồng và tệp đính kèm</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+                  Quản lý Đơn thuê (Hợp đồng)
+                </h1>
+                <span style={{ 
+                  background: 'linear-gradient(135deg, #10B981, #059669)', 
+                  color: '#FFFFFF', 
+                  fontSize: '11px', 
+                  fontWeight: '700', 
+                  padding: '3px 9px', 
+                  borderRadius: '20px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+                }}>
+                  Hợp đồng
+                </span>
+              </div>
+              <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px', margin: 0 }}>
+                Danh sách đơn thuê, quản lý thông tin hợp đồng và tệp đính kèm
+              </p>
             </div>
+            
             <Link to="/rental/new" style={{ textDecoration: 'none' }}>
-              <button className="btn-primary">
+              <button 
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', fontWeight: 600 }}
+              >
                 <Plus size={18} />
                 Tạo đơn thuê mới
               </button>
             </Link>
+          </div>
+
+          {/* KPI Cards */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+            gap: '16px', 
+            marginBottom: '4px' 
+          }}>
+            {/* Total Contracts */}
+            <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>Tổng Đơn Thuê</span>
+                <div style={{ background: '#EFF6FF', color: '#2563EB', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileText size={20} />
+                </div>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: '#0F172A', marginTop: '10px' }}>{totalContractsCount} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64748B' }}>đơn</span></div>
+              <div style={{ fontSize: '12px', color: '#10B981', marginTop: '4px', fontWeight: 500 }}>Vận hành liên tục</div>
+            </div>
+
+            {/* Total Revenue */}
+            <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>Tổng Doanh Thu HĐ</span>
+                <div style={{ background: '#ECFDF5', color: '#059669', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <DollarSign size={20} />
+                </div>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: '#059669', marginTop: '10px' }}>{totalContractRevenue.toLocaleString('vi-VN')} đ</div>
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>Doanh thu hợp đồng thuê xe</div>
+            </div>
+
+            {/* Active Contracts */}
+            <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>Đang Cho Thuê</span>
+                <div style={{ background: '#FEF3C7', color: '#D97706', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Clock size={20} />
+                </div>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: '#D97706', marginTop: '10px' }}>{activeContractsCount} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64748B' }}>xe</span></div>
+              <div style={{ fontSize: '12px', color: '#B45309', marginTop: '4px', fontWeight: 500 }}>Đang hoạt động trên đường</div>
+            </div>
+
+            {/* Paid Contracts */}
+            <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>Đơn Đã Thanh Toán</span>
+                <div style={{ background: '#F5F3FF', color: '#7C3AED', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileCheck size={20} />
+                </div>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: '#7C3AED', marginTop: '10px' }}>{paidContractsCount} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64748B' }}>HĐ</span></div>
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>Đã hoàn tất thanh toán</div>
+            </div>
           </div>
 
           {selectedRentalIds.length > 0 && (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Table, Tag, Card, Statistic, Descriptions, Space, Empty, Segmented, Button, Breadcrumb, Badge } from 'antd';
+import { Table, Tag, Card, Statistic, Descriptions, Space, Empty, Segmented, Button, Breadcrumb, Badge, Modal } from 'antd';
 import { 
   EditOutlined, 
   DeleteOutlined, 
@@ -78,6 +78,8 @@ const FleetManagement = () => {
   };
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeDetailTab, setActiveDetailTab] = useState<'rentals' | 'expenses'>('rentals');
+  const [showMonthCalendar, setShowMonthCalendar] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(() => new Date());
 
   // Car Expense Form State
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
@@ -413,6 +415,32 @@ const FleetManagement = () => {
     return 'ready';
   };
 
+  const getMonthDays = (baseDate: Date) => {
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const firstDayOfWeek = firstDay.getDay(); 
+    const offset = firstDayOfWeek === 0 ? -6 : 1 - firstDayOfWeek;
+    
+    const startDate = new Date(firstDay);
+    startDate.setDate(firstDay.getDate() + offset);
+    
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      const fullDate = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const isCurrentMonth = d.getMonth() === month;
+      days.push({
+        date: d,
+        dateStr: String(d.getDate()).padStart(2, '0'),
+        fullDate,
+        isCurrentMonth
+      });
+    }
+    return days;
+  };
+
   const getOwnerNameByPhone = (phone: string) => {
     const match = owners.find(o => o.phone === phone);
     return match ? match.name : phone;
@@ -659,7 +687,24 @@ const FleetManagement = () => {
 
               {/* Lịch đặt xe tuần này - Redesigned */}
               <Card
-                title={<div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}><CalendarIcon size={16} color="#1D4ED8" /> Lịch đặt xe tuần này</div>}
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
+                      <CalendarIcon size={16} color="#1D4ED8" /> Lịch đặt xe tuần này
+                    </div>
+                    <Button 
+                      type="link" 
+                      size="small" 
+                      onClick={() => {
+                        setCalendarDate(new Date());
+                        setShowMonthCalendar(true);
+                      }}
+                      style={{ fontSize: '12.5px', color: '#1D4ED8', padding: 0, height: 'auto', display: 'flex', alignItems: 'center', fontWeight: 600 }}
+                    >
+                      Xem thêm →
+                    </Button>
+                  </div>
+                }
                 style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
                 bodyStyle={{ padding: '16px' }}
               >
@@ -1725,6 +1770,152 @@ const FleetManagement = () => {
             </div>
           </form>
         </div>
+      )}
+
+      {showMonthCalendar && activeCar && (
+        <Modal
+          open={showMonthCalendar}
+          onCancel={() => setShowMonthCalendar(false)}
+          footer={null}
+          width={700}
+          title={
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>
+              🗓️ Chi tiết lịch đặt xe theo tháng
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+              <div>
+                <strong style={{ fontSize: '15px', color: '#0F172A' }}>{activeCar.name}</strong>
+                <span className="license-plate font-mono" style={{ fontSize: '11px', padding: '1px 6px', marginLeft: '8px' }}>{activeCar.id}</span>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Button 
+                  onClick={() => {
+                    const prev = new Date(calendarDate);
+                    prev.setMonth(prev.getMonth() - 1);
+                    setCalendarDate(prev);
+                  }}
+                  size="small"
+                >
+                  Tháng trước
+                </Button>
+                <strong style={{ fontSize: '14px', minWidth: '110px', textAlign: 'center', color: '#0F172A' }}>
+                  {String(calendarDate.getMonth() + 1).padStart(2, '0')} / {calendarDate.getFullYear()}
+                </strong>
+                <Button 
+                  onClick={() => {
+                    const next = new Date(calendarDate);
+                    next.setMonth(next.getMonth() + 1);
+                    setCalendarDate(next);
+                  }}
+                  size="small"
+                >
+                  Tháng sau
+                </Button>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center' }}>
+              {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((w, idx) => (
+                <div key={idx} style={{ fontWeight: 700, color: '#475569', fontSize: '11px', padding: '4px 0', textTransform: 'uppercase', borderBottom: '2px solid #E2E8F0' }}>
+                  {w}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+              {getMonthDays(calendarDate).map((day, idx) => {
+                const status = getCarStatusForDay(day.fullDate);
+                const isToday = day.fullDate === todayVN;
+                const isCurrentMonth = day.isCurrentMonth;
+                
+                let cellBg = '#FFFFFF';
+                let cellBorder = '#E2E8F0';
+                let color = '#374151';
+                let badgeText = 'Trống';
+                let badgeBg = '#F0FDF4';
+                let badgeColor = '#16A34A';
+
+                if (isToday) {
+                  cellBg = '#F0FDF4';
+                  cellBorder = '#16A34A';
+                  color = '#16A34A';
+                }
+
+                if (status === 'rented') {
+                  cellBg = '#EFF6FF';
+                  cellBorder = '#93C5FD';
+                  color = '#1D4ED8';
+                  badgeText = 'Bận';
+                  badgeBg = '#DBEAFE';
+                  badgeColor = '#1D4ED8';
+                } else if (status === 'maintenance' || status === 'suspended') {
+                  cellBg = '#FFF7ED';
+                  cellBorder = '#FED7AA';
+                  color = '#EA580C';
+                  badgeText = status === 'maintenance' ? 'Bản trì' : 'Ngưng';
+                  badgeBg = '#FFEDD5';
+                  badgeColor = '#EA580C';
+                }
+
+                return (
+                  <div 
+                    key={idx} 
+                    style={{ 
+                      padding: '8px 2px', 
+                      borderRadius: '6px', 
+                      border: `1px solid ${cellBorder}`, 
+                      background: cellBg, 
+                      textAlign: 'center', 
+                      opacity: isCurrentMonth ? 1 : 0.35,
+                      minHeight: '52px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', fontWeight: isToday ? 800 : 600, color }}>
+                      {day.dateStr}
+                    </span>
+                    <div>
+                      <span 
+                        style={{ 
+                          display: 'inline-block', 
+                          background: badgeBg, 
+                          color: badgeColor, 
+                          borderRadius: '3px', 
+                          padding: '0 4px', 
+                          fontSize: '9px', 
+                          fontWeight: 700 
+                        }}
+                      >
+                        {badgeText}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', borderTop: '1px solid #E2E8F0', paddingTop: '10px', fontSize: '11px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#F0FDF4', border: '1px solid #16A34A' }} />
+                <span>Sẵn sàng (Trống)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#EFF6FF', border: '1px solid #93C5FD' }} />
+                <span>Có khách (Bận)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#FFF7ED', border: '1px solid #FED7AA' }} />
+                <span>Bảo trì / Tạm ngưng</span>
+              </div>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {showGallery && (
