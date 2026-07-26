@@ -159,15 +159,15 @@ app.get('/api/vehicles', async (req, res) => {
 
 app.post('/api/vehicles', async (req, res) => {
   try {
-    const { plate_number, brand, model, year, color, seats, transmission, fuel_type, daily_rate, hourly_rate, weekly_rate, owner_id, status, current_mileage, registration_expiry, insurance_expiry, license_expiry, image_url, notes } = req.body;
+    const { plate_number, brand, model, year, color, seats, transmission, fuel_type, daily_rate, hourly_rate, weekly_rate, owner_id, status, current_mileage, registration_expiry, insurance_expiry, license_expiry, image_url, gallery_urls, notes } = req.body;
     const result = await query(
-      `INSERT INTO vehicles (plate_number, brand, model, year, color, seats, transmission, fuel_type, daily_rate, hourly_rate, weekly_rate, owner_id, status, current_mileage, registration_expiry, insurance_expiry, license_expiry, image_url, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+      `INSERT INTO vehicles (plate_number, brand, model, year, color, seats, transmission, fuel_type, daily_rate, hourly_rate, weekly_rate, owner_id, status, current_mileage, registration_expiry, insurance_expiry, license_expiry, image_url, gallery_urls, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        ON CONFLICT (plate_number) DO UPDATE SET
          brand=$2, model=$3, year=$4, color=$5, seats=$6, transmission=$7, fuel_type=$8,
          daily_rate=$9, hourly_rate=$10, weekly_rate=$11, owner_id=$12, status=$13,
          current_mileage=$14, registration_expiry=$15, insurance_expiry=$16,
-         license_expiry=$17, image_url=$18, notes=$19, updated_at=NOW()
+         license_expiry=$17, image_url=$18, gallery_urls=$19, notes=$20, updated_at=NOW()
        RETURNING *`,
       [
         plate_number, brand, model || '', Number(year)||2024, color||'Trắng', Number(seats)||4,
@@ -175,7 +175,7 @@ app.post('/api/vehicles', async (req, res) => {
         Number(daily_rate)||0, Number(hourly_rate)||0, Number(weekly_rate)||0,
         owner_id||null, status||'Available', Number(current_mileage)||0,
         registration_expiry||null, insurance_expiry||null, license_expiry||null,
-        image_url||'', notes||''
+        image_url||'', Array.isArray(gallery_urls) ? JSON.stringify(gallery_urls) : (gallery_urls || '[]'), notes||''
       ]
     );
     res.json({ success: true, data: result.rows[0] });
@@ -186,7 +186,10 @@ app.post('/api/vehicles', async (req, res) => {
 
 app.put('/api/vehicles/:id', async (req, res) => {
   try {
-    const allowed = ['brand','model','year','color','seats','transmission','fuel_type','daily_rate','hourly_rate','weekly_rate','owner_id','status','current_mileage','registration_expiry','insurance_expiry','license_expiry','image_url','notes'];
+    if (req.body.gallery_urls !== undefined) {
+      req.body.gallery_urls = Array.isArray(req.body.gallery_urls) ? JSON.stringify(req.body.gallery_urls) : req.body.gallery_urls;
+    }
+    const allowed = ['brand','model','year','color','seats','transmission','fuel_type','daily_rate','hourly_rate','weekly_rate','owner_id','status','current_mileage','registration_expiry','insurance_expiry','license_expiry','image_url','gallery_urls','notes'];
     const fields = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
     if (Object.keys(fields).length === 0) return res.json({ success: true });
     const keys = Object.keys(fields);

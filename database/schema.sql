@@ -28,6 +28,7 @@ BEGIN
         ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC(12, 2) DEFAULT 0.00;
         ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS weekly_rate NUMERIC(12, 2) DEFAULT 0.00;
         ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS license_expiry DATE;
+        ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS gallery_urls TEXT DEFAULT '[]';
     END IF;
 
     -- Update owners table if exists
@@ -112,6 +113,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
     insurance_expiry DATE,
     license_expiry DATE,
     image_url TEXT DEFAULT '',
+    gallery_urls TEXT DEFAULT '[]',
     notes TEXT DEFAULT '',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
