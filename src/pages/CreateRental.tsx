@@ -1048,7 +1048,7 @@ const CreateRental = () => {
       {createdReceiptRental && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px', overflowY: 'auto' }}>
           <div 
-            className="card" 
+            className="card printable-contract-card" 
             style={{ 
               width: '100%', 
               maxWidth: '680px', 

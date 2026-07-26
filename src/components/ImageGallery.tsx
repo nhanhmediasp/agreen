@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, X, Check, Trash2, AlertCircle, FileText } from 'lucide-react';
+import { Upload, X, Check, Trash2, AlertCircle, FileText, Search } from 'lucide-react';
 
 interface ImageGalleryProps {
   onSelect: (imageUrl: string | string[], fileName?: string) => void;
@@ -11,6 +11,7 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
   const [images, setImages] = useState<{ id: string; url: string; name: string; usedIn: string | null }[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
+  const [gallerySearchTerm, setGallerySearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load uploaded files from the Express backend API on mount
@@ -132,15 +133,31 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
     return url.startsWith('data:application/pdf') || url.includes('.pdf') || url.includes('application/pdf');
   };
 
+  const filteredImages = images.filter(img => 
+    (img.name || '').toLowerCase().includes(gallerySearchTerm.toLowerCase())
+  );
+
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
       <div className="card" style={{ width: '800px', maxWidth: '95vw', height: '600px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
         {/* Header */}
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '18px' }}>Thư viện tệp & ảnh chung</h2>
-          <button onClick={onClose} style={{ color: 'var(--text-secondary)' }}>
-            <X size={24} />
-          </button>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0, fontSize: '18px' }}>Thư viện tệp & ảnh chung</h2>
+            <button onClick={onClose} style={{ color: 'var(--text-secondary)' }}>
+              <X size={24} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', background: '#F1F5F9', padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            <Search size={16} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
+            <input 
+              type="text" 
+              placeholder="Tìm kiếm ảnh, tệp theo tên..." 
+              value={gallerySearchTerm}
+              onChange={e => setGallerySearchTerm(e.target.value)}
+              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '13.5px' }}
+            />
+          </div>
         </div>
 
         {/* Content */}
@@ -157,14 +174,14 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
                 ref={fileInputRef}
                 type="file" 
                 accept="image/*,application/pdf" 
-                multiple={multiple}
+                multiple={true}
                 onChange={handleFileUpload}
                 style={{ display: 'none' }} 
               />
             </label>
 
             {/* Images & PDFs */}
-            {images.map(img => {
+            {filteredImages.map(img => {
               const isSelected = selectedIds.includes(img.id);
               const isPdf = isPdfUrl(img.url);
               return (

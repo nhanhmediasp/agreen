@@ -20,6 +20,7 @@ export interface Car {
   pricePerDay: number;
   pricePerHour: number;
   pricePerWeek: number;
+  images?: string[];
 }
 
 export interface Customer {
@@ -180,6 +181,8 @@ interface AppContextType {
   updateOwner: (id: string, updatedFields: Partial<Owner>) => void;
   deleteOwner: (id: string) => void;
   addExpense: (expense: Expense) => void;
+  updateExpense: (id: string, updatedFields: Partial<Expense>) => void;
+  deleteExpense: (id: string) => void;
   addRental: (rental: Rental) => void;
   updateRental: (id: string, updatedFields: Partial<Rental>) => void;
   deleteRental: (id: string) => void;
@@ -490,6 +493,11 @@ function mapCarFromDB(db: Record<string, unknown>): Car {
     pricePerDay: Number(db.daily_rate) || 0,
     pricePerHour: Number(db.hourly_rate) || 0,
     pricePerWeek: Number(db.weekly_rate) || 0,
+    images: Array.isArray(db.gallery_urls)
+      ? db.gallery_urls
+      : typeof db.gallery_urls === 'string'
+        ? (() => { try { return JSON.parse(db.gallery_urls); } catch { return []; } })()
+        : [],
   };
 }
 
@@ -1022,6 +1030,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(() => {});
   };
 
+  const updateExpense = (id: string, updatedFields: Partial<Expense>) => {
+    setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updatedFields } : e));
+    apiFetch(`/expenses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updatedFields)
+    }).catch(() => {});
+  };
+
+  const deleteExpense = (id: string) => {
+    setExpenses(prev => prev.filter(e => e.id !== id));
+    apiFetch(`/expenses/${id}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+  };
+
   // ============================================================
   // RENTAL ACTIONS – dữ liệu quan trọng nhất, lưu ngay vào DB
   // ============================================================
@@ -1264,6 +1287,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateOwner,
       deleteOwner,
       addExpense,
+      updateExpense,
+      deleteExpense,
       addRental,
       updateRental,
       deleteRental,

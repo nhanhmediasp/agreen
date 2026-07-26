@@ -6,7 +6,7 @@ import { MoneyInputLeft } from '../components/MoneyInput';
 import { Pagination } from '../components/Pagination';
 
 const Expenses = () => {
-  const { expenses, addExpense, cars, rentals, owners, showToast } = useApp();
+  const { expenses, addExpense, updateExpense, deleteExpense, cars, rentals, owners, showToast } = useApp();
   const [activeTab, setActiveTab] = useState<'general' | 'incidental' | 'owners'>('general');
   const [showAddForm, setShowAddForm] = useState(false);
   
@@ -19,8 +19,19 @@ const Expenses = () => {
 
   // Filtering & Pagination States
   const [searchTerm, setSearchTerm] = useState('');
-  const [timeFilter, setTimeFilter] = useState<'all' | '7' | '30'>('all');
+  const [timeFilter, setTimeFilter] = useState<'all' | '7' | '30' | 'custom'>('all');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const itemsPerPage = 10;
+
+  // Edit Operational Expense States
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editCategory, setEditCategory] = useState('Bảo dưỡng');
+  const [editDate, setEditDate] = useState('2026-07-15');
+  const [editRef, setEditRef] = useState('');
 
   const totalAmount = expenses.reduce((sum, item) => sum + item.amount, 0);
 
@@ -67,6 +78,38 @@ const Expenses = () => {
     setRef('');
   };
 
+  const handleOpenEdit = (expense: Expense) => {
+    setEditingExpenseId(expense.id);
+    setEditTitle(expense.title);
+    setEditAmount(expense.amount.toString());
+    setEditCategory(expense.category);
+    setEditDate(expense.date);
+    setEditRef(expense.ref);
+    setShowEditForm(true);
+  };
+
+  const handleUpdateExpense = () => {
+    if (!editingExpenseId || !editTitle || !editAmount) return;
+
+    updateExpense(editingExpenseId, {
+      title: editTitle,
+      amount: parseInt(editAmount) || 0,
+      category: editCategory,
+      date: editDate,
+      ref: editRef
+    });
+
+    setShowEditForm(false);
+    showToast('Đã cập nhật chi phí vận hành!', 'success');
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa khoản chi phí vận hành này?')) {
+      deleteExpense(id);
+      showToast('Đã xóa khoản chi phí!', 'success');
+    }
+  };
+
   // Filter Logic General Expenses
   const getFilteredExpenses = () => {
     const today = new Date('2026-07-15');
@@ -80,6 +123,12 @@ const Expenses = () => {
       if (!matchesSearch) return false;
 
       if (timeFilter === 'all') return true;
+      if (timeFilter === 'custom') {
+        const itemDateStr = item.date.split('T')[0];
+        if (startDateFilter && itemDateStr < startDateFilter) return false;
+        if (endDateFilter && itemDateStr > endDateFilter) return false;
+        return true;
+      }
       const expenseDate = new Date(item.date);
       const diffTime = today.getTime() - expenseDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -251,8 +300,41 @@ const Expenses = () => {
               >
                 30 ngày
               </button>
+              <button 
+                onClick={() => setTimeFilter('custom')}
+                style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: timeFilter === 'custom' ? 'var(--primary)' : 'transparent', color: timeFilter === 'custom' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                Tùy chỉnh
+              </button>
             </div>
           </div>
+
+          {timeFilter === 'custom' && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#F8FAFC', padding: '12px 16px', borderRadius: '8px', border: '1px solid #E2E8F0', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569' }}>Lọc từ ngày:</span>
+              <input 
+                type="date" 
+                value={startDateFilter} 
+                onChange={e => setStartDateFilter(e.target.value)} 
+                style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }} 
+              />
+              <span style={{ color: '#64748B', fontSize: '13px' }}>đến ngày:</span>
+              <input 
+                type="date" 
+                value={endDateFilter} 
+                onChange={e => setEndDateFilter(e.target.value)} 
+                style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }} 
+              />
+              {(startDateFilter || endDateFilter) && (
+                <button 
+                  onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}
+                  style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: '4px' }}
+                >
+                  Xóa lọc
+                </button>
+              )}
+            </div>
+          )}
 
           <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0', overflow: 'hidden' }}>
             <Table<Expense>
@@ -303,6 +385,26 @@ const Expenses = () => {
                   key: 'date',
                   sorter: (a: Expense, b: Expense) => new Date(a.date).getTime() - new Date(b.date).getTime(),
                   render: (date: string) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{new Date(date).toLocaleDateString('vi-VN')}</span>
+                },
+                {
+                  title: 'Thao tác',
+                  key: 'actions',
+                  render: (_: unknown, record: Expense) => (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleOpenEdit(record)}
+                        style={{ padding: '4px 10px', background: 'none', border: '1px solid #d9d9d9', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#1677ff' }}
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        onClick={() => handleDelete(record.id)}
+                        style={{ padding: '4px 10px', background: 'none', border: '1px solid #ffa39e', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#ff4d4f' }}
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  )
                 }
               ]}
             />
@@ -661,6 +763,61 @@ const Expenses = () => {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
             <button type="button" onClick={() => setShowAddForm(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
             <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Ghi nhận</button>
+          </div>
+        </Form>
+      </Modal>
+
+      {/* Form Chỉnh sửa Chi phí Vận Hành - Ant Design Modal & Form */}
+      <Modal
+        title="Chỉnh sửa chi phí"
+        open={showEditForm}
+        onCancel={() => setShowEditForm(false)}
+        footer={null}
+        width={480}
+      >
+        <Form layout="vertical" onFinish={handleUpdateExpense} style={{ marginTop: '16px' }}>
+          <Form.Item label="Nội dung chi" required>
+            <input type="text" placeholder="VD: Sửa lốp, thay nhớt..." value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
+          </Form.Item>
+
+          <Form.Item label="Số tiền (₫)" required>
+            <MoneyInputLeft
+              value={editAmount}
+              onChange={setEditAmount}
+              placeholder="500000"
+              style={{ textAlign: 'left', fontWeight: 700 }}
+              required
+            />
+          </Form.Item>
+
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <Form.Item label="Danh mục chi" style={{ flex: 1.2 }}>
+              <select value={editCategory} onChange={e => setEditCategory(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+                <option value="Bảo dưỡng">Bảo dưỡng</option>
+                <option value="Sửa chữa">Sửa chữa</option>
+                <option value="Vệ sinh">Vệ sinh</option>
+                <option value="Giấy tờ">Giấy tờ</option>
+                <option value="Chi trả chủ xe">Chi trả chủ xe</option>
+                <option value="Khác">Hạng mục khác</option>
+              </select>
+            </Form.Item>
+            <Form.Item label="Ngày chi" style={{ flex: 1 }}>
+              <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
+            </Form.Item>
+          </div>
+
+          <Form.Item label="Liên kết xe (tùy chọn)">
+            <select value={editRef} onChange={e => setEditRef(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+              <option value="">-- Không liên kết xe --</option>
+              {cars.map(c => (
+                <option key={c.id} value={c.id}>{c.id} - {c.name}</option>
+              ))}
+            </select>
+          </Form.Item>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+            <button type="button" onClick={() => setShowEditForm(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
+            <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Cập nhật</button>
           </div>
         </Form>
       </Modal>

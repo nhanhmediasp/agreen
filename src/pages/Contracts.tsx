@@ -1615,7 +1615,7 @@ const Contracts = () => {
       {showPreviewModal && selectedRental && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px', overflowY: 'auto' }}>
           <div 
-            className="card" 
+            className="card printable-contract-card" 
             style={{ 
               width: '100%', 
               maxWidth: '680px', 
@@ -1679,15 +1679,21 @@ const Contracts = () => {
               {/* Vehicle Box */}
               <div style={{ background: 'var(--bg-page)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                 <h3 style={{ fontSize: '13px', margin: '0 0 10px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  🚗 XE BÀN GIAO
+                  🚗 XE BÀN GIAO & TRẢ
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>Biển số xe:</span>
                     <span className="license-plate font-mono">{selectedRental.carId}</span>
                   </div>
-                  <div>Số KM xuất bãi: <strong className="font-mono">{selectedRental.startKm.toLocaleString()} km</strong></div>
-                  <div>Mức xăng/điện bàn giao: <strong className="font-mono">{selectedRental.startFuel}</strong></div>
+                  <div>Số KM bàn giao: <strong className="font-mono">{selectedRental.startKm.toLocaleString()} km</strong></div>
+                  {selectedRental.status === 'completed' && selectedRental.endKm !== undefined && (
+                    <div>Số KM lúc trả: <strong className="font-mono">{selectedRental.endKm.toLocaleString()} km</strong></div>
+                  )}
+                  <div>Mức xăng bàn giao: <strong className="font-mono">{selectedRental.startFuel}</strong></div>
+                  {selectedRental.status === 'completed' && selectedRental.endFuel && (
+                    <div>Mức xăng lúc trả: <strong className="font-mono">{selectedRental.endFuel}</strong></div>
+                  )}
                 </div>
               </div>
 

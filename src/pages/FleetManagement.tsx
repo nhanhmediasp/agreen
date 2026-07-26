@@ -172,10 +172,20 @@ const FleetManagement = () => {
   const [surcharge, setSurcharge] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'debt'>('paid');
 
+  // Gallery States
+  const [newGalleryImages, setNewGalleryImages] = useState<string[]>([]);
+  const [editGalleryImages, setEditGalleryImages] = useState<string[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [gallerySelectTarget, setGallerySelectTarget] = useState<'avatar-add' | 'avatar-edit' | 'gallery-add' | 'gallery-edit'>('avatar-add');
+
   const normalizePlate = (str: string) => str ? str.toUpperCase().replace(/[-. ]/g, '') : '';
   const activeCar = cars.find(c => normalizePlate(c.id) === normalizePlate(selectedCarId ?? ''));
   const activeRental = rentals.find(r => normalizePlate(r.carId) === normalizePlate(selectedCarId ?? '') && r.status === 'active');
   const carRentals = rentals.filter(r => normalizePlate(r.carId) === normalizePlate(selectedCarId ?? '')).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+
+  useEffect(() => {
+    setPreviewImage(null);
+  }, [selectedCarId]);
 
 
 
@@ -256,7 +266,8 @@ const FleetManagement = () => {
       expiryLicense: '2027-06-01',
       pricePerDay: parseInt(newPriceDay) || 800000,
       pricePerHour: parseInt(newPriceHour) || 100000,
-      pricePerWeek: parseInt(newPriceWeek) || 5000000
+      pricePerWeek: parseInt(newPriceWeek) || 5000000,
+      images: newGalleryImages
     };
 
     addCar(carToAdd);
@@ -273,6 +284,7 @@ const FleetManagement = () => {
     setNewKm('');
     setSelectedOwnerPhone('');
     setNewOwnerName('');
+    setNewGalleryImages([]);
     setNewOwnerPhone('');
     setNewOwnerAddress('');
     setNewPhone('');
@@ -296,6 +308,7 @@ const FleetManagement = () => {
     setEditPriceDay((activeCar.pricePerDay || 800000).toString());
     setEditPriceHour((activeCar.pricePerHour || 100000).toString());
     setEditPriceWeek((activeCar.pricePerWeek || 5000000).toString());
+    setEditGalleryImages(activeCar.images || []);
     setShowEditForm(true);
   };
 
@@ -315,7 +328,8 @@ const FleetManagement = () => {
       status: activeCar?.status === 'rented' ? 'rented' : editStatus,
       pricePerDay: parseInt(editPriceDay) || 800000,
       pricePerHour: parseInt(editPriceHour) || 100000,
-      pricePerWeek: parseInt(editPriceWeek) || 5000000
+      pricePerWeek: parseInt(editPriceWeek) || 5000000,
+      images: editGalleryImages
     });
 
     setShowEditForm(false);
@@ -547,7 +561,7 @@ const FleetManagement = () => {
               {/* Ảnh xe */}
               <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #E8EDF2', overflow: 'hidden' }} bodyStyle={{ padding: '16px' }}>
                 <div style={{ position: 'relative', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px' }}>
-                  <img src={activeCar.image} alt={activeCar.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={previewImage || activeCar.image} alt={activeCar.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{ position: 'absolute', top: '10px', left: '10px' }}>
                     <span className="license-plate" style={{ fontSize: '16px', padding: '3px 10px', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>{activeCar.id}</span>
                   </div>
@@ -558,6 +572,43 @@ const FleetManagement = () => {
                     <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(234,88,12,0.9)', color: 'white', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}>Bảo trì</div>
                   )}
                 </div>
+
+                {/* Thư viện ảnh xe thumbnails */}
+                {activeCar.images && activeCar.images.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }} className="custom-scrollbar">
+                    <div 
+                      onClick={() => setPreviewImage(activeCar.image)}
+                      style={{ 
+                        width: '56px', 
+                        height: '42px', 
+                        borderRadius: '4px', 
+                        overflow: 'hidden', 
+                        border: `2px solid ${(previewImage === null || previewImage === activeCar.image) ? '#006837' : '#E2E8F0'}`,
+                        cursor: 'pointer',
+                        flexShrink: 0
+                      }}
+                    >
+                      <img src={activeCar.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    {activeCar.images.map((imgUrl, i) => (
+                      <div 
+                        key={i}
+                        onClick={() => setPreviewImage(imgUrl)}
+                        style={{ 
+                          width: '56px', 
+                          height: '42px', 
+                          borderRadius: '4px', 
+                          overflow: 'hidden', 
+                          border: `2px solid ${previewImage === imgUrl ? '#006837' : '#E2E8F0'}`,
+                          cursor: 'pointer',
+                          flexShrink: 0
+                        }}
+                      >
+                        <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {activeCar.status === 'rented' && (
                   <div style={{ background: '#EFF6FF', padding: '12px', borderRadius: '8px', border: '1px solid #BFDBFE', marginBottom: '12px' }}>
@@ -607,7 +658,16 @@ const FleetManagement = () => {
                     <div key={i} style={{ padding: '10px 16px', borderBottom: i < 4 ? '1px solid #F1F5F9' : 'none', borderRight: i % 2 === 0 ? '1px solid #F1F5F9' : 'none' }}>
                       <div style={{ fontSize: '10.5px', color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>{item.label}</div>
                       <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
-                        {item.label === 'Màu sắc' ? (
+                        {item.label === 'Chủ xe' ? (
+                          (() => {
+                            const foundOwner = owners.find(o => o.phone === activeCar.ownerPhone);
+                            return foundOwner ? (
+                              <Link to={`/owners?id=${foundOwner.id}`} style={{ color: '#006837', textDecoration: 'underline' }}>
+                                {item.value}
+                              </Link>
+                            ) : item.value;
+                          })()
+                        ) : item.label === 'Màu sắc' ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span style={{ width: 12, height: 12, borderRadius: '50%', background: activeCar.color === 'Đen' ? '#0f172a' : activeCar.color === 'Trắng' ? '#e2e8f0' : activeCar.color === 'Đỏ' ? '#dc2626' : activeCar.color === 'Vàng cát' ? '#d4a84b' : '#94a3b8', border: '1.5px solid #cbd5e1', display: 'inline-block' }} />
                             {item.value}
@@ -617,6 +677,45 @@ const FleetManagement = () => {
                     </div>
                   ))}
                 </div>
+              </Card>
+
+              {/* Thống kê doanh số xe */}
+              <Card
+                title={<div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: '#0F172A' }}><DollarOutlined style={{ color: '#059669' }} /> Doanh số & Hiệu suất</div>}
+                style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
+                bodyStyle={{ padding: '16px' }}
+              >
+                {(() => {
+                  const carRentals = rentals.filter(r => r.carId === activeCar.id);
+                  const totalRevenue = carRentals.reduce((sum, r) => sum + (r.totalAmount || 0), 0);
+                  const daysRented = carRentals.reduce((sum, r) => {
+                    const days = Math.ceil((new Date(r.endDate).getTime() - new Date(r.startDate).getTime()) / (1000 * 60 * 60 * 24));
+                    return sum + Math.max(1, days);
+                  }, 0);
+                  
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #F1F5F9', paddingBottom: '8px' }}>
+                        <span style={{ color: '#64748B', fontSize: '13px' }}>Tổng doanh thu:</span>
+                        <strong style={{ color: '#059669', fontSize: '15px', fontFamily: 'monospace' }}>{totalRevenue.toLocaleString()} ₫</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #F1F5F9', paddingBottom: '8px' }}>
+                        <span style={{ color: '#64748B', fontSize: '13px' }}>Tổng lượt thuê:</span>
+                        <strong style={{ color: '#0F172A', fontSize: '14px' }}>{carRentals.length} lượt</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #F1F5F9', paddingBottom: '8px' }}>
+                        <span style={{ color: '#64748B', fontSize: '13px' }}>Số ngày lăn bánh:</span>
+                        <strong style={{ color: '#0F172A', fontSize: '14px' }}>{daysRented} ngày</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748B', fontSize: '13px' }}>Doanh thu TB / lượt:</span>
+                        <strong style={{ color: '#1D4ED8', fontSize: '14px', fontFamily: 'monospace' }}>
+                          {carRentals.length > 0 ? Math.round(totalRevenue / carRentals.length).toLocaleString() : 0} ₫
+                        </strong>
+                      </div>
+                    </div>
+                  );
+                })()}
               </Card>
 
               {/* Bảng giá thuê - Compact */}
@@ -1631,8 +1730,8 @@ const FleetManagement = () => {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Hình ảnh xe</label>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ảnh đại diện xe *</label>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '14px' }}>
                 {newImage ? (
                   <img src={newImage} alt="Preview" style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-md)', objectFit: 'cover' }} />
                 ) : (
@@ -1640,8 +1739,35 @@ const FleetManagement = () => {
                     <ImageIcon size={20} color="var(--text-secondary)" />
                   </div>
                 )}
-                <button type="button" className="btn-primary" style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)' }} onClick={() => { setGalleryTarget('add'); setShowGallery(true); }}>
+                <button type="button" className="btn-primary" style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)' }} onClick={() => { setGallerySelectTarget('avatar-add'); setShowGallery(true); }}>
                   Chọn từ thư viện
+                </button>
+              </div>
+            </div>
+
+            {/* Thư viện ảnh xe */}
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Thư viện ảnh xe</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                {newGalleryImages.map((imgUrl, i) => (
+                  <div key={i} style={{ position: 'relative', width: '60px', height: '60px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button 
+                      type="button"
+                      onClick={() => setNewGalleryImages(prev => prev.filter((_, idx) => idx !== i))}
+                      style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  type="button" 
+                  onClick={() => { setGallerySelectTarget('gallery-add'); setShowGallery(true); }}
+                  style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-md)', border: '1.5px dashed var(--primary)', background: '#F0FDF4', color: 'var(--primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px', fontWeight: 600, gap: '2px' }}
+                >
+                  <Plus size={16} />
+                  <span>Ảnh</span>
                 </button>
               </div>
             </div>
@@ -1716,8 +1842,20 @@ const FleetManagement = () => {
 
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>SĐT Đối tác góp xe</label>
-                <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Chủ xe / Đối tác góp xe *</label>
+                <select 
+                  value={editPhone} 
+                  onChange={e => setEditPhone(e.target.value)} 
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', background: 'white' }} 
+                  required
+                >
+                  <option value="">-- Chọn chủ xe --</option>
+                  {owners.map(o => (
+                    <option key={o.id} value={o.phone}>
+                      {o.name} - {o.phone}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Trạng thái xe</label>
@@ -1738,11 +1876,38 @@ const FleetManagement = () => {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Hình ảnh xe</label>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ảnh đại diện xe *</label>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '14px' }}>
                 <img src={editImage} alt="Preview" style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-md)', objectFit: 'cover' }} />
-                <button type="button" className="btn-primary" style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)' }} onClick={() => { setGalleryTarget('edit'); setShowGallery(true); }}>
+                <button type="button" className="btn-primary" style={{ background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-strong)' }} onClick={() => { setGallerySelectTarget('avatar-edit'); setShowGallery(true); }}>
                   Thay ảnh khác
+                </button>
+              </div>
+            </div>
+
+            {/* Thư viện ảnh xe */}
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Thư viện ảnh xe</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                {editGalleryImages.map((imgUrl, i) => (
+                  <div key={i} style={{ position: 'relative', width: '60px', height: '60px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button 
+                      type="button"
+                      onClick={() => setEditGalleryImages(prev => prev.filter((_, idx) => idx !== i))}
+                      style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  type="button" 
+                  onClick={() => { setGallerySelectTarget('gallery-edit'); setShowGallery(true); }}
+                  style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-md)', border: '1.5px dashed var(--primary)', background: '#F0FDF4', color: 'var(--primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px', fontWeight: 600, gap: '2px' }}
+                >
+                  <Plus size={16} />
+                  <span>Ảnh</span>
                 </button>
               </div>
             </div>
@@ -2027,10 +2192,19 @@ const FleetManagement = () => {
       {showGallery && (
         <ImageGallery 
           onClose={() => setShowGallery(false)}
+          multiple={gallerySelectTarget === 'gallery-add' || gallerySelectTarget === 'gallery-edit'}
           onSelect={(url) => {
-            const finalUrl = Array.isArray(url) ? url[0] : url;
-            if (galleryTarget === 'add') setNewImage(finalUrl);
-            else setEditImage(finalUrl);
+            if (gallerySelectTarget === 'avatar-add') {
+              setNewImage(Array.isArray(url) ? url[0] : url);
+            } else if (gallerySelectTarget === 'avatar-edit') {
+              setEditImage(Array.isArray(url) ? url[0] : url);
+            } else if (gallerySelectTarget === 'gallery-add') {
+              const urls = Array.isArray(url) ? url : [url];
+              setNewGalleryImages(prev => [...prev, ...urls]);
+            } else if (gallerySelectTarget === 'gallery-edit') {
+              const urls = Array.isArray(url) ? url : [url];
+              setEditGalleryImages(prev => [...prev, ...urls]);
+            }
           }}
         />
       )}
