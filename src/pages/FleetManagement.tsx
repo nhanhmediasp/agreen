@@ -697,7 +697,7 @@ const FleetManagement = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #F1F5F9', paddingBottom: '8px' }}>
                         <span style={{ color: '#64748B', fontSize: '13px' }}>Tổng doanh thu:</span>
-                        <strong style={{ color: '#059669', fontSize: '15px', fontFamily: 'monospace' }}>{totalRevenue.toLocaleString()} ₫</strong>
+                        <strong style={{ color: '#059669', fontSize: '15px' }}>{totalRevenue.toLocaleString()} ₫</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #F1F5F9', paddingBottom: '8px' }}>
                         <span style={{ color: '#64748B', fontSize: '13px' }}>Tổng lượt thuê:</span>
@@ -709,7 +709,7 @@ const FleetManagement = () => {
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: '#64748B', fontSize: '13px' }}>Doanh thu TB / lượt:</span>
-                        <strong style={{ color: '#1D4ED8', fontSize: '14px', fontFamily: 'monospace' }}>
+                        <strong style={{ color: '#1D4ED8', fontSize: '14px' }}>
                           {carRentals.length > 0 ? Math.round(totalRevenue / carRentals.length).toLocaleString() : 0} ₫
                         </strong>
                       </div>
@@ -735,7 +735,7 @@ const FleetManagement = () => {
                         <span style={{ fontSize: '13px', fontWeight: 700, color: item.color }}>{item.type}</span>
                         <span style={{ fontSize: '11px', color: item.color, opacity: 0.7, marginLeft: 6 }}>{item.note}</span>
                       </div>
-                      <span style={{ fontSize: '15px', fontWeight: 800, color: item.color, fontFamily: 'monospace' }}>{item.price.toLocaleString('vi-VN')}₫</span>
+                      <span style={{ fontSize: '15px', fontWeight: 800, color: item.color }}>{item.price.toLocaleString('vi-VN')}₫</span>
                     </div>
                   ))}
                 </div>
@@ -942,11 +942,11 @@ const FleetManagement = () => {
                         render: (_: unknown, record: Rental) => (<span style={{ fontSize: '12px', color: '#475569' }} className="font-mono">{new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}</span>) },
                       { title: 'Tổng tiền', dataIndex: 'totalAmount', key: 'totalAmount',
                         sorter: (a: Rental, b: Rental) => a.totalAmount - b.totalAmount,
-                        render: (val: number) => (<span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#006837' }}>{(val || 0).toLocaleString()} ₫</span>) },
+                        render: (val: number) => (<span style={{ fontWeight: 700, color: '#006837' }}>{(val || 0).toLocaleString()} ₫</span>) },
                       { title: 'Trạng thái', dataIndex: 'status', key: 'status',
                         render: (st: string) => st === 'active'
-                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Đang thuê</span>
-                          : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#F0FDF4', color: '#16A34A', border: '1px solid #86EFAC', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Hoàn tất</span> }
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Đang thuê</span>
+                          : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#F0FDF4', color: '#16A34A', border: '#86EFAC', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Hoàn tất</span> }
                     ]}
                   />
                 ) : (
@@ -959,7 +959,7 @@ const FleetManagement = () => {
                       { title: 'Danh mục', dataIndex: 'category', key: 'category', render: (cat: string) => <Tag color="blue">{cat}</Tag> },
                       { title: 'Số tiền', dataIndex: 'amount', key: 'amount', align: 'right',
                         sorter: (a: Expense, b: Expense) => a.amount - b.amount,
-                        render: (val: number) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#DC2626' }}>{(val || 0).toLocaleString()} ₫</span> }
+                        render: (val: number) => <span style={{ fontWeight: 700, color: '#DC2626' }}>{(val || 0).toLocaleString()} ₫</span> }
                     ]}
                   />
                 )}
@@ -1178,7 +1178,7 @@ const FleetManagement = () => {
                         </div>
                         <div style={{ background: '#f0fdf4', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bbf7d0', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', width: 'fit-content', marginTop: '2px' }}>
                           <span style={{ color: '#166534', fontWeight: 600 }}>Giá:</span>
-                          <strong className="font-mono" style={{ color: '#15803d', fontSize: '14.5px', fontWeight: 800 }}>
+                          <strong style={{ color: '#15803d', fontSize: '14.5px', fontWeight: 800 }}>
                             {(car.pricePerDay || 800000).toLocaleString('vi-VN')} ₫/ngày
                           </strong>
                         </div>
@@ -1262,7 +1262,7 @@ const FleetManagement = () => {
                       dataIndex: 'pricePerDay',
                       key: 'pricePerDay',
                       sorter: (a: Car, b: Car) => (a.pricePerDay || 0) - (b.pricePerDay || 0),
-                      render: (price: number) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1677ff' }}>{(price || 800000).toLocaleString('vi-VN')} ₫</span>
+                      render: (price: number) => <span style={{ fontWeight: 700, color: '#1677ff' }}>{(price || 800000).toLocaleString('vi-VN')} ₫</span>
                     },
                     {
                       title: 'Trạng thái',
@@ -1955,24 +1955,9 @@ const FleetManagement = () => {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Mức nhiên liệu còn lại</label>
-                <select value={returnFuel} onChange={e => setReturnFuel(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}>
-                  <option value="8/8 (Đầy)">8/8 (Đầy)</option>
-                  <option value="7/8">7/8</option>
-                  <option value="6/8">6/8</option>
-                  <option value="5/8">5/8</option>
-                  <option value="4/8 (Nửa)">4/8 (Nửa)</option>
-                  <option value="3/8">3/8</option>
-                  <option value="2/8">2/8</option>
-                  <option value="1/8 (Cạn)">1/8 (Cạn)</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Phụ phí phát sinh (nếu có)</label>
-                <input type="number" placeholder="Quá giờ, vệ sinh, hư hỏng..." value={surcharge} onChange={e => setSurcharge(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
-              </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Phụ phí phát sinh (nếu có)</label>
+              <input type="number" placeholder="Quá giờ, vệ sinh, hư hỏng..." value={surcharge} onChange={e => setSurcharge(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
             </div>
 
             <div>

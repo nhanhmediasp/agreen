@@ -299,19 +299,19 @@ const Reports = () => {
                 title: 'Bảo dưỡng',
                 dataIndex: 'maint',
                 key: 'maint',
-                render: (val: number) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
               },
               {
                 title: 'Vệ sinh',
                 dataIndex: 'clean',
                 key: 'clean',
-                render: (val: number) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
               },
               {
                 title: 'Chiết khấu / Khác',
                 dataIndex: 'repair',
                 key: 'repair',
-                render: (val: number) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
               }
             ]}
           />

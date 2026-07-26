@@ -484,29 +484,14 @@ const CreateRental = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc bàn giao</label>
-                  <input 
-                    type="number" 
-                    value={startKm}
-                    onChange={e => setStartKm(e.target.value)}
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }} 
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Mức nhiên liệu lúc giao</label>
-                  <select 
-                    value={startFuel}
-                    onChange={e => setStartFuel(e.target.value)}
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }}
-                  >
-                    <option value="8/8 (Đầy)">8/8 (Đầy)</option>
-                    <option value="6/8">6/8</option>
-                    <option value="4/8">4/8 (Nửa bình)</option>
-                    <option value="2/8">2/8</option>
-                  </select>
-                </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số KM lúc bàn giao</label>
+                <input 
+                  type="number" 
+                  value={startKm}
+                  onChange={e => setStartKm(e.target.value)}
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }} 
+                />
               </div>
 
               <div>
@@ -927,7 +912,7 @@ const CreateRental = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: 700, fontSize: '15px' }}>TỔNG CỘNG:</span>
-            <span style={{ fontWeight: 800, fontSize: '24px', color: 'var(--accent)' }} className="font-mono">{totalAmount.toLocaleString()} ₫</span>
+            <span style={{ fontWeight: 800, fontSize: '24px', color: 'var(--accent)' }}>{totalAmount.toLocaleString()} ₫</span>
           </div>
         </div>
 
@@ -1124,7 +1109,6 @@ const CreateRental = () => {
                   <div>Dòng xe: <strong>{selectedCarObj?.name || createdReceiptRental.carId}</strong></div>
                   <div>Màu xe: <strong>{selectedCarObj?.color || 'Đen'}</strong></div>
                   <div>Số KM xuất bãi: <strong className="font-mono">{createdReceiptRental.startKm.toLocaleString()} km</strong></div>
-                  <div>Mức xăng/điện bàn giao: <strong className="font-mono">{createdReceiptRental.startFuel}</strong></div>
                 </div>
               </div>
 

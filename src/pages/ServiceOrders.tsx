@@ -1457,7 +1457,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                         </div>
                       )}
                       <div>📏 Quãng đường: <strong>{distance} KM</strong> ({order.startKm} ➔ {order.endKm} km)</div>
-                      <div>💰 Cước chuyến đi: <strong className="font-mono" style={{ color: '#006837', fontSize: '15px' }}>{order.totalAmount.toLocaleString('vi-VN')} ₫</strong></div>
+                      <div>💰 Cước chuyến đi: <strong style={{ color: '#006837', fontSize: '15px' }}>{order.totalAmount.toLocaleString('vi-VN')} ₫</strong></div>
                       <div style={{ fontSize: '12px', color: '#D97706' }}>🏷️ Chiết khấu tài xế ({commRate}%): <strong>{commAmount.toLocaleString('vi-VN')} ₫</strong></div>
                     </div>
 

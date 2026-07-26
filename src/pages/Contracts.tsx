@@ -454,7 +454,12 @@ const Contracts = () => {
                         <div style={{ marginTop: '4px' }}>
                           <span className="license-plate" style={{ fontSize: '11px', padding: '2px 8px' }}>{carObj.id}</span>
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Số KM ban đầu: {selectedDetailRental.startKm.toLocaleString()} km</div>
+                        <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div>📏 KM bàn giao: <strong style={{ color: '#0F172A' }}>{selectedDetailRental.startKm.toLocaleString()} km</strong></div>
+                          {selectedDetailRental.status === 'completed' && selectedDetailRental.endKm !== undefined && (
+                            <div>🏁 KM kết thúc: <strong style={{ color: '#16a34a' }}>{selectedDetailRental.endKm.toLocaleString()} km</strong> (Đã chạy {(selectedDetailRental.endKm - selectedDetailRental.startKm).toLocaleString()} km)</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1294,7 +1299,7 @@ const Contracts = () => {
                   dataIndex: 'totalAmount',
                   key: 'totalAmount',
                   sorter: (a: Rental, b: Rental) => a.totalAmount - b.totalAmount,
-                  render: (amount: number) => <span className="font-mono" style={{ fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
+                  render: (amount: number) => <span style={{ fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
                 },
                 {
                   title: 'Thời gian thuê',
@@ -1302,6 +1307,18 @@ const Contracts = () => {
                   render: (_: unknown, record: Rental) => (
                     <div style={{ fontSize: '12px', color: '#595959' }} className="font-mono">
                       {new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}
+                    </div>
+                  )
+                },
+                {
+                  title: 'Số KM',
+                  key: 'km_range',
+                  render: (_: unknown, record: Rental) => (
+                    <div style={{ fontSize: '12.5px', color: '#475569' }} className="font-mono">
+                      <div>Giao: <strong>{record.startKm.toLocaleString()}</strong> km</div>
+                      {record.status === 'completed' && record.endKm !== undefined && (
+                        <div style={{ marginTop: '2px', color: '#16a34a' }}>Nhận: <strong>{record.endKm.toLocaleString()}</strong> km</div>
+                      )}
                     </div>
                   )
                 },
@@ -1689,10 +1706,6 @@ const Contracts = () => {
                   <div>Số KM bàn giao: <strong className="font-mono">{selectedRental.startKm.toLocaleString()} km</strong></div>
                   {selectedRental.status === 'completed' && selectedRental.endKm !== undefined && (
                     <div>Số KM lúc trả: <strong className="font-mono">{selectedRental.endKm.toLocaleString()} km</strong></div>
-                  )}
-                  <div>Mức xăng bàn giao: <strong className="font-mono">{selectedRental.startFuel}</strong></div>
-                  {selectedRental.status === 'completed' && selectedRental.endFuel && (
-                    <div>Mức xăng lúc trả: <strong className="font-mono">{selectedRental.endFuel}</strong></div>
                   )}
                 </div>
               </div>

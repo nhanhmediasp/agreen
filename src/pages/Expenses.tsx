@@ -358,7 +358,7 @@ const Expenses = () => {
                   dataIndex: 'amount',
                   key: 'amount',
                   sorter: (a: Expense, b: Expense) => a.amount - b.amount,
-                  render: (amount: number) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
+                  render: (amount: number) => <span style={{ fontWeight: 700, color: '#1677ff' }}>{(amount || 0).toLocaleString()} ₫</span>
                 },
                 {
                   title: 'Danh mục',
@@ -419,19 +419,19 @@ const Expenses = () => {
           <div className="grid grid-3 gap-md">
             <div className="card card-pad" style={{ borderLeft: '4px solid var(--status-maintenance-border)' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tổng phát sinh ghi nhận</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--status-maintenance-text)' }}>
+              <div style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--status-maintenance-text)' }}>
                 {totalIncidentalAmount.toLocaleString('vi-VN')} ₫
               </div>
             </div>
             <div className="card card-pad" style={{ borderLeft: '4px solid var(--status-available-border)' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Đã thu tiền khách</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--status-available-text)' }}>
+              <div style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--status-available-text)' }}>
                 {allIncidentalExpenses.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0).toLocaleString('vi-VN')} ₫
               </div>
             </div>
             <div className="card card-pad" style={{ borderLeft: '4px solid var(--status-overdue-border)' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chưa thu tiền khách</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--status-overdue-text)' }}>
+              <div style={{ fontSize: '22px', fontWeight: 700, marginTop: '6px', color: 'var(--status-overdue-text)' }}>
                 {allIncidentalExpenses.filter(i => i.status === 'unpaid').reduce((s, i) => s + i.amount, 0).toLocaleString('vi-VN')} ₫
               </div>
             </div>
@@ -651,10 +651,10 @@ const Expenses = () => {
                                 ))}
                               </div>
                             </td>
-                            <td style={{ padding: '16px 20px', fontWeight: 600 }} className="font-mono">
+                            <td style={{ padding: '16px 20px', fontWeight: 600 }}>
                               {grossRevenue.toLocaleString()} ₫
                             </td>
-                            <td style={{ padding: '16px 20px', fontWeight: 800, color: 'var(--primary)' }} className="font-mono">
+                            <td style={{ padding: '16px 20px', fontWeight: 800, color: 'var(--primary)' }}>
                               {payoutTotal.toLocaleString()} ₫
                             </td>
                             <td style={{ padding: '16px 20px', textAlign: 'right' }}>

@@ -187,7 +187,7 @@ const Owners = () => {
           <div className="grid grid-auto-sm gap-md">
             <div className="card" style={{ padding: '16px 20px' }}>
               <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Doanh số xe phát sinh</span>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
                 {totalGrossRevenue.toLocaleString()} ₫
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{ownerRentals.length} lượt thuê xe</div>
@@ -213,7 +213,7 @@ const Owners = () => {
                   <Receipt size={12} /> Tạo phiếu chi
                 </button>
               </div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--status-maintenance-text)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--status-maintenance-text)', marginTop: '4px' }}>
                 {ownerPayoutAmount.toLocaleString()} ₫
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Khoản trả lại cho chủ xe</div>
@@ -221,7 +221,7 @@ const Owners = () => {
 
             <div className="card" style={{ padding: '16px 20px', borderLeft: '4px solid var(--status-available-border)' }}>
               <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Doanh thu Garage giữ lại</span>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--status-available-text)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--status-available-text)', marginTop: '4px' }}>
                 {companyNetRevenue.toLocaleString()} ₫
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Lợi nhuận ròng của Garage</div>
@@ -583,7 +583,7 @@ const Owners = () => {
                           </td>
                           <td style={{ padding: '16px 24px' }}>{o.address}</td>
                           <td style={{ padding: '16px 24px', fontWeight: 700 }}>{oCars.length} xe</td>
-                          <td style={{ padding: '16px 24px', fontWeight: 800, color: 'var(--primary)' }} className="font-mono">
+                          <td style={{ padding: '16px 24px', fontWeight: 800, color: 'var(--primary)' }}>
                             {oPayoutTotal.toLocaleString()} ₫
                           </td>
                           <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontSize: '13px' }}>{o.notes}</td>

@@ -833,6 +833,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         insurance_expiry: car.expiryInsurance || null,
         license_expiry: car.expiryLicense || null,
         image_url: car.image,
+        gallery_urls: car.images || [],
         owner_id: ownerId,
         notes: ''
       }),
@@ -862,6 +863,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (updatedFields.pricePerWeek !== undefined) dbFields.weekly_rate = updatedFields.pricePerWeek;
     if (updatedFields.color) dbFields.color = updatedFields.color;
     if (updatedFields.seats !== undefined) dbFields.seats = updatedFields.seats;
+    if (updatedFields.images !== undefined) dbFields.gallery_urls = updatedFields.images;
     
     if (Object.keys(dbFields).length > 0) {
       apiFetch(`/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) }).then(res => {

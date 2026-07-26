@@ -152,7 +152,7 @@ const Dashboard: React.FC = () => {
                   <div>Hãng xe: <strong>{selectedCarDetail.brand} ({selectedCarDetail.seats} chỗ)</strong></div>
                   <div>Màu sắc: <strong>{selectedCarDetail.color}</strong></div>
                   <div>Số KM: <strong className="font-mono">{selectedCarDetail.km.toLocaleString()} km</strong></div>
-                  <div>Giá thuê/ngày: <strong className="font-mono" style={{ color: 'var(--primary)' }}>{selectedCarDetail.pricePerDay.toLocaleString()} ₫</strong></div>
+                  <div>Giá thuê/ngày: <strong style={{ color: 'var(--primary)' }}>{selectedCarDetail.pricePerDay.toLocaleString()} ₫</strong></div>
                   <div>SĐT chủ xe: <strong className="font-mono">{selectedCarDetail.ownerPhone}</strong></div>
                 </div>
               </div>
