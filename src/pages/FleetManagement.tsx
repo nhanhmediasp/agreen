@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Table, Tag } from 'antd';
 import { Search, Filter, Plus, Gauge, ShieldCheck, X, Image as ImageIcon, Trash2, CheckSquare, Calendar as CalendarIcon, ArrowLeft, Edit, LayoutGrid, List, Receipt, Layers } from 'lucide-react';
 import { useApp, type Car } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
@@ -1165,96 +1166,101 @@ const FleetManagement = () => {
                 ))}
               </div>
             ) : (
-              /* DẠNG XEM DÒNG (LIST/ROW VIEW) */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {filteredCars.map(car => (
-                  <div 
-                    key={car.id} 
-                    className="card" 
-                    style={{ 
-                      padding: '12px 20px', 
-                      cursor: 'pointer', 
-                      border: '1px solid var(--border-light)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '20px'
-                    }}
-                    onClick={() => setSelectedCarId(car.id)}
-                  >
-                    {/* Small Image with status overlays */}
-                    <div style={{ width: '120px', height: '80px', borderRadius: 'var(--radius-md)', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                      <img src={car.image} alt={car.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      {car.status === 'rented' && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0, 104, 55, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 800 }}>
-                          THUÊ
+              /* DẠNG XEM BẢNG ANTD TABLE */
+              <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0', overflow: 'hidden', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03)' }}>
+                <Table<Car>
+                  dataSource={filteredCars}
+                  rowKey="id"
+                  onRow={(record) => ({
+                    onClick: () => setSelectedCarId(record.id),
+                    style: { cursor: 'pointer' }
+                  })}
+                  pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} / ${total} xe`
+                  }}
+                  columns={[
+                    {
+                      title: 'Phương tiện',
+                      dataIndex: 'name',
+                      key: 'name',
+                      render: (_, record) => (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <img src={record.image} alt={record.name} style={{ width: '60px', height: '40px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #f0f0f0' }} />
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#262626', fontSize: '14px' }}>{record.name}</div>
+                            <div style={{ fontSize: '12px', color: '#8c8c8c' }}>{record.brand} • {record.seats} chỗ • {record.color}</div>
+                          </div>
                         </div>
-                      )}
-                      {car.status === 'maintenance' && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(239, 68, 68, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 800 }}>
-                          🛠️ BẢO TRÌ
-                        </div>
-                      )}
-                      {car.status === 'suspended' && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(100, 116, 139, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 800 }}>
-                          ⚠️ NGƯNG
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div style={{ flex: 1.5, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <strong style={{ fontSize: '16px' }}>{car.name}</strong>
-                      <span className="license-plate" style={{ fontSize: '12px', alignSelf: 'flex-start', padding: '2px 8px' }}>{car.id}</span>
-                    </div>
-
-                    {/* Owner, Price & Customer tags */}
-                    <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px' }}>
-                      <div style={{ color: 'var(--text-secondary)' }}>
-                        Chủ xe: <strong>{getOwnerNameByPhone(car.ownerPhone)}</strong>
-                      </div>
-                      <div style={{ background: '#f0fdf4', padding: '4px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid #bbf7d0', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', width: 'fit-content', marginTop: '2px' }}>
-                        <span style={{ color: '#166534', fontWeight: 600 }}>Giá:</span>
-                        <strong className="font-mono" style={{ color: '#15803d', fontSize: '13.5px', fontWeight: 800 }}>
-                          {(car.pricePerDay || 800000).toLocaleString('vi-VN')} ₫/ngày
-                        </strong>
-                      </div>
-                      {car.status === 'rented' && car.customer && (
-                        <div style={{ color: 'var(--primary)' }}>
-                          Khách thuê: <strong>{car.customer}</strong>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Price / KM */}
-                    <div style={{ flex: 1.5, display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                      <div>Giá ngày: <strong style={{ color: 'var(--accent)' }}>{(car.pricePerDay || 800000).toLocaleString()} ₫</strong></div>
-                      <div>Số KM: <strong>{(car.km || 0).toLocaleString()} km</strong></div>
-                    </div>
-
-                    {/* Status & Countdown */}
-                    <div style={{ flex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                      {car.status === 'ready' && (
-                        <span style={{ color: 'var(--status-ready-text)', background: 'var(--status-ready-bg)', padding: '6px 16px', borderRadius: '100px', fontSize: '12px', fontWeight: 600 }}>Sẵn sàng</span>
-                      )}
-                      {car.status === 'rented' && (
-                        <>
-                          <span style={{ color: 'var(--status-rented-text)', background: 'var(--status-rented-bg)', padding: '4px 12px', borderRadius: '100px', fontSize: '12px', fontWeight: 600 }}>Đang thuê</span>
-                          {rentals.find(r => r.carId === car.id && r.status === 'active') && (
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--status-rented-text)', fontWeight: 700 }}>
-                              ⏳ <LiveCountdown endDateStr={rentals.find(r => r.carId === car.id && r.status === 'active')!.endDate} />
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {car.status === 'maintenance' && (
-                        <span style={{ color: 'var(--status-maintenance-text)', background: 'var(--status-maintenance-bg)', padding: '6px 16px', borderRadius: '100px', fontSize: '12px', fontWeight: 600 }}>Bảo trì</span>
-                      )}
-                      {car.status === 'suspended' && (
-                        <span style={{ color: 'var(--status-suspended-text)', background: 'var(--status-suspended-bg)', padding: '6px 16px', borderRadius: '100px', fontSize: '12px', fontWeight: 600 }}>Tạm ngưng</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                      )
+                    },
+                    {
+                      title: 'Biển số xe',
+                      dataIndex: 'id',
+                      key: 'id',
+                      sorter: (a, b) => a.id.localeCompare(b.id),
+                      render: (id) => <span className="license-plate" style={{ fontSize: '12px', padding: '2px 8px' }}>{id}</span>
+                    },
+                    {
+                      title: 'Chủ sở hữu',
+                      dataIndex: 'ownerPhone',
+                      key: 'ownerPhone',
+                      render: (phone) => <span style={{ color: '#595959', fontSize: '13px' }}>{getOwnerNameByPhone(phone)}</span>
+                    },
+                    {
+                      title: 'Số KM',
+                      dataIndex: 'km',
+                      key: 'km',
+                      sorter: (a, b) => a.km - b.km,
+                      render: (km) => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#262626' }}>{(km || 0).toLocaleString()} km</span>
+                    },
+                    {
+                      title: 'Giá ngày',
+                      dataIndex: 'pricePerDay',
+                      key: 'pricePerDay',
+                      sorter: (a, b) => (a.pricePerDay || 0) - (b.pricePerDay || 0),
+                      render: (price) => <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1677ff' }}>{(price || 800000).toLocaleString('vi-VN')} ₫</span>
+                    },
+                    {
+                      title: 'Trạng thái',
+                      dataIndex: 'status',
+                      key: 'status',
+                      filters: [
+                        { text: 'Sẵn sàng', value: 'ready' },
+                        { text: 'Đang thuê', value: 'rented' },
+                        { text: 'Bảo trì', value: 'maintenance' },
+                        { text: 'Tạm ngưng', value: 'suspended' },
+                      ],
+                      onFilter: (value, record) => record.status === value,
+                      render: (_, record) => {
+                        if (record.status === 'rented') {
+                          return <Tag color="processing" style={{ borderRadius: 12, fontWeight: 600 }}>🔵 Đang thuê</Tag>;
+                        } else if (record.status === 'ready') {
+                          return <Tag color="success" style={{ borderRadius: 12, fontWeight: 600 }}>🟢 Sẵn sàng</Tag>;
+                        } else if (record.status === 'maintenance') {
+                          return <Tag color="warning" style={{ borderRadius: 12, fontWeight: 600 }}>🟠 Bảo trì</Tag>;
+                        }
+                        return <Tag color="default" style={{ borderRadius: 12, fontWeight: 600 }}>⚪ Tạm ngưng</Tag>;
+                      }
+                    },
+                    {
+                      title: 'Thao tác',
+                      key: 'actions',
+                      render: (_, record) => (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCarId(record.id);
+                          }}
+                          style={{ padding: '4px 10px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, color: '#595959' }}
+                        >
+                          Chi tiết →
+                        </button>
+                      )
+                    }
+                  ]}
+                />
               </div>
             )
           )}
