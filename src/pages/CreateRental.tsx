@@ -358,6 +358,27 @@ const CreateRental = () => {
       pricePerWeek: parseInt(quickPriceWeek) || 5000000
     };
 
+    const success = await addCar(carToAdd);
+    if (success) {
+      setSelectedCarId(carToAdd.id);
+      setShowQuickAddCarModal(false);
+      
+      // Reset fields
+      setQuickPlate('');
+      setQuickBrand('');
+      setQuickName('');
+      setQuickYear('2022');
+      setQuickSeats(5);
+      setQuickColor('');
+      setQuickKm('');
+      setQuickPhone('');
+      setQuickImage('');
+      setQuickPriceDay('800000');
+      setQuickPriceHour('100000');
+      setQuickPriceWeek('5000000');
+    }
+  };
+
   const readyCars = cars.filter(c => c.status === 'ready');
 
   // Car search results
