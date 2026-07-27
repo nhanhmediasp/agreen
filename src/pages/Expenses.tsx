@@ -112,7 +112,7 @@ const Expenses = () => {
 
   // Filter Logic General Expenses
   const getFilteredExpenses = () => {
-    const today = new Date('2026-07-15');
+    const today = new Date();
     
     return expenses.filter(item => {
       const matchesSearch = 

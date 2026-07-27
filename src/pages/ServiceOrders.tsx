@@ -337,7 +337,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         showToast('Vui lòng nhập Tên và Số điện thoại tài xế mới!', 'error');
         return;
       }
-      const newDriverId = `DRV-${Date.now().toString().slice(-4)}`;
+      const newDriverId = `DRV-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
       const newDriverObj: Driver = {
         id: newDriverId,
         name: orderForm.quickDriverName,
@@ -395,7 +395,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
       showToast(`Đã cập nhật đơn dịch vụ ${editingOrder.id}`, 'success');
     } else {
       const newOrder: ServiceOrder = {
-        id: `SRV-${Date.now().toString().slice(-4)}`,
+        id: `SRV-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
         carId: orderForm.carId,
         driverId: selectedDriverId,
         driverName: selectedDriverName,
@@ -483,7 +483,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
       showToast(`Đã cập nhật thông tin tài xế ${driverForm.name}`, 'success');
     } else {
       const newDriver: Driver = {
-        id: `DRV-${Date.now().toString().slice(-4)}`,
+        id: `DRV-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
         name: driverForm.name,
         phone: driverForm.phone,
         licenseNumber: driverForm.licenseNumber || `GPLX-${Date.now().toString().slice(-6)}`,

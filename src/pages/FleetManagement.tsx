@@ -98,7 +98,7 @@ const FleetManagement = () => {
       title: expenseTitle,
       amount: parseInt(expenseAmount) || 0,
       category: expenseCategory,
-      date: expenseDate || new Date().toISOString().split('T')[0],
+      date: expenseDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }),
       ref: selectedCarId,
       location: expenseLocation || 'Chưa cập nhật'
     });
@@ -934,7 +934,7 @@ const FleetManagement = () => {
                   </div>
                   {activeDetailTab === 'expenses' && (
                     <Button type="primary" size="small" icon={<PlusOutlined />}
-                      onClick={() => { setExpenseDate(new Date().toISOString().split('T')[0]); setShowAddExpenseModal(true); }}
+                      onClick={() => { setExpenseDate(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })); setShowAddExpenseModal(true); }}
                       style={{ background: '#006837', borderRadius: '6px', margin: '4px 0' }}
                     >Thêm chi phí</Button>
                   )}

@@ -330,6 +330,21 @@ app.get('/api/rentals', async (req, res) => {
 app.post('/api/rentals', async (req, res) => {
   try {
     const r = req.body;
+    
+    // Option A Validation: Check if car and customer exist
+    if (r.carId) {
+      const carCheck = await query('SELECT plate_number FROM vehicles WHERE plate_number = $1', [r.carId]);
+      if (carCheck.rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'Xe không tồn tại trong hệ thống (Sai biển số).' });
+      }
+    }
+    if (r.customerPhone) {
+      const customerCheck = await query('SELECT phone FROM customers WHERE phone = $1', [r.customerPhone]);
+      if (customerCheck.rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'Khách hàng không tồn tại trong hệ thống (Sai số điện thoại).' });
+      }
+    }
+
     const result = await query(
       `INSERT INTO rentals (id, car_id, customer_name, customer_phone, start_date, end_date,
         rental_fee, delivery_fee, deposit, extra_fee, total_amount, payment_status, status,
@@ -365,9 +380,27 @@ app.post('/api/rentals', async (req, res) => {
 
 app.put('/api/rentals/:id', async (req, res) => {
   try {
-    const allowed = ['status','payment_status','end_km','end_fuel','extra_fee','total_amount','condition_images','notes','delivered_at','returned_at'];
+    const allowed = ['car_id','customer_name','customer_phone','status','payment_status','end_km','end_fuel','extra_fee','total_amount','condition_images','notes','delivered_at','returned_at'];
     const r = req.body;
+    
+    // Option A Validation: Check if car and customer exist (if attempting to update them)
+    if (r.carId) {
+      const carCheck = await query('SELECT plate_number FROM vehicles WHERE plate_number = $1', [r.carId]);
+      if (carCheck.rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'Xe không tồn tại trong hệ thống (Sai biển số).' });
+      }
+    }
+    if (r.customerPhone) {
+      const customerCheck = await query('SELECT phone FROM customers WHERE phone = $1', [r.customerPhone]);
+      if (customerCheck.rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'Khách hàng không tồn tại trong hệ thống (Sai số điện thoại).' });
+      }
+    }
+
     const fields = Object.fromEntries(Object.entries({
+      car_id: r.carId,
+      customer_name: r.customerName,
+      customer_phone: r.customerPhone,
       status: r.status,
       payment_status: r.paymentStatus,
       end_km: r.endKm,
@@ -420,7 +453,7 @@ app.post('/api/expenses', async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (id) DO NOTHING
        RETURNING *`,
-      [id||`EXP-${Date.now()}`, title||'', category||'Other', Number(amount)||0, expense_date||new Date().toISOString().split('T')[0], vehicle_id||null, ref||'', location||'', description||'']
+      [id||`EXP-${Date.now()}`, title||'', category||'Other', Number(amount)||0, expense_date||new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }), vehicle_id||null, ref||'', location||'', description||'']
     );
     res.json({ success: true, data: result.rows[0] || {} });
   } catch (error) {

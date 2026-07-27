@@ -174,7 +174,7 @@ interface AppContextType {
   updateCar: (id: string, updatedFields: Partial<Car>) => void;
   deleteCar: (id: string) => void;
   updateCarStatus: (id: string, status: Car['status'], customer?: string, timeRemaining?: string) => void;
-  addCustomer: (customer: Customer) => void;
+  addCustomer: (customer: Customer) => Promise<boolean>;
   updateCustomer: (id: string, updatedFields: Partial<Customer>) => void;
   deleteCustomer: (id: string) => void;
   addOwner: (owner: Owner) => void;
@@ -899,29 +899,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   // CUSTOMER ACTIONS
   // ============================================================
-  const addCustomer = (customer: Customer) => {
+  const addCustomer = async (customer: Customer): Promise<boolean> => {
     setCustomers(prev => [customer, ...prev]);
-    apiFetch('/customers', {
-      method: 'POST',
-      body: JSON.stringify({
-        full_name: customer.name, phone: customer.phone, email: '',
-        id_card: customer.cccd, driver_license: customer.license,
-        address: customer.address, classification: customer.classification,
-        status: customer.classification === 'vip' ? 'VIP' : customer.classification === 'warning' ? 'Blacklisted' : 'Active',
-        notes: customer.notes, image_url: customer.image
-      }),
-    }).then(res => {
+    try {
+      const res = await apiFetch('/customers', {
+        method: 'POST',
+        body: JSON.stringify({
+          full_name: customer.name, phone: customer.phone, email: '',
+          id_card: customer.cccd, driver_license: customer.license,
+          address: customer.address, classification: customer.classification,
+          status: customer.classification === 'vip' ? 'VIP' : customer.classification === 'warning' ? 'Blacklisted' : 'Active',
+          notes: customer.notes, image_url: customer.image
+        }),
+      });
       if (res.success && res.data) {
         setCustomers(prev => prev.map(c => c.id === customer.id ? mapCustomerFromDB(res.data) : c));
         showToast('Đã lưu khách hàng vào CSDL!', 'success');
+        return true;
       } else {
         showToast(`Lỗi lưu khách hàng: ${res.error}`, 'error');
         setCustomers(prev => prev.filter(c => c.id !== customer.id));
+        return false;
       }
-    }).catch(err => {
+    } catch (err: any) {
       showToast(`Lỗi mạng khi lưu khách hàng: ${err.message || err}`, 'error');
       setCustomers(prev => prev.filter(c => c.id !== customer.id));
-    });
+      return false;
+    }
   };
 
   const updateCustomer = (id: string, updatedFields: Partial<Customer>) => {

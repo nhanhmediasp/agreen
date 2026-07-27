@@ -257,7 +257,7 @@ const CreateRental = () => {
     showToast('Đã xóa ảnh bàn giao xe!', 'info');
   };
 
-  const handleFinishRental = () => {
+  const handleFinishRental = async () => {
     const finalPhone = customerMode === 'select' ? selectedCustomerPhone : customerPhone;
     
     if (!selectedCarId || !customerName || !finalPhone || !startDate || !endDate) {
@@ -278,7 +278,7 @@ const CreateRental = () => {
         return;
       }
       
-      addCustomer({
+      const success = await addCustomer({
         id: Date.now().toString(),
         name: customerName,
         phone: customerPhone,
@@ -293,10 +293,14 @@ const CreateRental = () => {
         statusText: 'Đã xác minh',
         image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
       });
+      
+      if (!success) {
+        return;
+      }
     }
 
     const rentalToAdd: Rental = {
-      id: `RNT-${Date.now().toString().slice(-4)}`,
+      id: `RNT-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
       carId: selectedCarId,
       customerName,
       customerPhone: finalPhone,
