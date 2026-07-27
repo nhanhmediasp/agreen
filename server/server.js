@@ -645,14 +645,18 @@ app.get('/api/credentials', (req, res) => {
 // trên cùng 1 cổng, không cần Nginx proxy cho /api/
 // ============================================================
 const DIST_DIR = path.join(process.cwd(), 'dist');
-if (fs.existsSync(DIST_DIR)) {
-  app.use(express.static(DIST_DIR));
-  // SPA fallback: mọi route không phải /api/ hoặc /uploads/ → trả về index.html
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(DIST_DIR, 'index.html'));
-  });
-  console.log(`📁 Serving frontend from: ${DIST_DIR}`);
-}
+app.use(express.static(DIST_DIR));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    return next();
+  }
+  const indexPath = path.join(DIST_DIR, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send('<div style="font-family: sans-serif; text-align: center; padding: 50px;"><h2>⚠️ Chưa tìm thấy thư mục build (dist/)!</h2><p>Vui lòng mở Terminal trên aaPanel và chạy lệnh:</p><pre style="background: #f4f4f4; padding: 15px; display: inline-block;">cd /www/wwwroot/agreen && npm run build && pm2 restart agreen-api</pre></div>');
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Agreen API Server running on port ${PORT}`);

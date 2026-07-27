@@ -134,8 +134,11 @@ function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
             <BarChart size={17} />
             <span>Báo cáo & Thống kê</span>
           </Link>
-
           <div className="nav-section-title" style={{ marginTop: '6px' }}>Hệ thống</div>
+          <Link to="/thong-tin-xe" onClick={onClose} target="_blank" className="nav-item">
+            <Search size={17} />
+            <span>Tra cứu xe</span>
+          </Link>
           <Link to="/settings" onClick={onClose} className={`nav-item${isActive('/settings')}`}>
             <Settings size={17} />
             <span>Cài đặt</span>
