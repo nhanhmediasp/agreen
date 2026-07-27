@@ -66,8 +66,8 @@ const PublicStatus = () => {
           <div style={{ width: '48px', height: '48px', backgroundColor: 'var(--primary)', borderRadius: '12px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ color: 'white', fontWeight: 'bold', fontSize: '20px' }}>A</span>
           </div>
-          <h1 style={{ fontSize: '24px', margin: 0 }}>Hệ thống Tra cứu Đối tác</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>Dành cho chủ xe/đối tác góp xe</p>
+          <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 700 }}>Agreen - Tra cứu Trạng Thái Xe</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>Dịch Vụ Cho Thuê Xe Điện Tự Lái • Hotline: 0386619758</p>
         </div>
 
         {!showResults ? (

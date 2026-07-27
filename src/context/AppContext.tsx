@@ -646,7 +646,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       logoHistory: ['Auto'], 
       favicon: 'Auto', 
       primaryColor: '#006837', 
-      siteTitle: 'Hệ thống Quản lý Vận hành Xe AGREEN', 
+      siteTitle: 'Agreen - Dịch Vụ Cho Thuê Xe Điện Tự Lái - 0386619758', 
       allowIndexing: true 
     };
     try {
@@ -751,7 +751,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (settings.siteTitle) {
       document.title = settings.siteTitle;
     } else {
-      document.title = 'Hệ thống Quản lý Vận hành Xe AGREEN';
+      document.title = 'Agreen - Dịch Vụ Cho Thuê Xe Điện Tự Lái - 0386619758';
     }
 
     // 2. Favicon

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Steps } from 'antd';
-import { Image as ImageIcon, Receipt, CheckCircle, Search, User, Plus, X, Upload } from 'lucide-react';
+import { Image as ImageIcon, Receipt, CheckCircle, Search, User, Plus, X, Upload, Trash } from 'lucide-react';
 import { useApp, type Rental, type Car } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { MoneyInput, MoneyInputLeft } from '../components/MoneyInput';
@@ -159,6 +159,34 @@ const CreateRental = () => {
     return match ? match.name : phone;
   };
 
+  const handleUploadCarImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    const newUrls: string[] = [];
+    let processed = 0;
+
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result) {
+          newUrls.push(evt.target.result as string);
+        }
+        processed++;
+        if (processed === files.length) {
+          setCarImages(prev => [...prev, ...newUrls]);
+          showToast(`Đã tải lên thành công ${files.length} ảnh bàn giao xe!`, 'success');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const handleDeleteCarImage = (index: number) => {
+    setCarImages(prev => prev.filter((_, i) => i !== index));
+    showToast('Đã xóa ảnh bàn giao xe!', 'info');
+  };
+
   const handleFinishRental = () => {
     const finalPhone = customerMode === 'select' ? selectedCustomerPhone : customerPhone;
     
@@ -212,6 +240,7 @@ const CreateRental = () => {
       fileUrl: contractSource === 'uploaded' ? uploadedFileUrl : undefined,
       fileName: contractSource === 'uploaded' ? (uploadedFileName || 'Hop_Dong_Luu_Tru.pdf') : undefined,
       ownerCommissionAmount,
+      conditionImages: carImages,
       createdAt: new Date().toISOString(),
       deliveredAt: (initialRentalStatus === 'active' || initialRentalStatus === 'completed') ? new Date().toISOString() : undefined,
       returnedAt: initialRentalStatus === 'completed' ? new Date().toISOString() : undefined
@@ -511,22 +540,73 @@ const CreateRental = () => {
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Ảnh tình trạng bàn giao xe</label>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  {carImages.map((img, i) => (
-                    <div key={i} style={{ width: '100px', height: '100px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
-                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    </div>
-                  ))}
-                  <div 
-                    style={{ width: '100px', height: '100px', borderRadius: 'var(--radius-md)', border: '1px dashed var(--primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--primary)', background: 'var(--status-ready-bg)' }}
-                    onClick={() => { setGalleryMode('car'); setShowGallery(true); }}
-                  >
-                    <ImageIcon size={24} style={{ marginBottom: '4px' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 500 }}>Thêm ảnh</span>
+              <div style={{ background: '#F8FAFC', padding: '18px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+                      <ImageIcon size={18} color="var(--primary)" />
+                      Ảnh tình trạng bàn giao xe
+                      {carImages.length > 0 && (
+                        <span style={{ background: 'var(--primary)', color: 'white', borderRadius: '12px', padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}>
+                          {carImages.length} ảnh
+                        </span>
+                      )}
+                    </label>
+                    <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
+                      Chọn hoặc tải lên nhiều ảnh cùng lúc (đồng hồ KM, vết xước, nội/ngoại thất xe lúc giao)
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <label style={{ cursor: 'pointer', background: 'var(--primary)', color: 'white', padding: '8px 14px', borderRadius: 'var(--radius-md)', fontSize: '12.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <Upload size={15} /> Tải nhiều ảnh từ máy / ĐT
+                      <input 
+                        type="file" 
+                        multiple 
+                        accept="image/*" 
+                        onChange={handleUploadCarImages} 
+                        style={{ display: 'none' }} 
+                      />
+                    </label>
+                    <button 
+                      type="button" 
+                      onClick={() => { setGalleryMode('car'); setShowGallery(true); }}
+                      style={{ background: 'white', color: 'var(--primary)', border: '1px solid var(--primary)', padding: '8px 14px', borderRadius: 'var(--radius-md)', fontSize: '12.5px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                    >
+                      <ImageIcon size={15} /> Chọn nhiều từ thư viện
+                    </button>
                   </div>
                 </div>
+
+                {carImages.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '12px', marginTop: '12px' }}>
+                    {carImages.map((img, i) => (
+                      <div key={i} style={{ position: 'relative', height: '100px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-strong)', background: '#fff' }}>
+                        <img src={img} alt={`Ảnh bàn giao ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCarImage(i)}
+                          title="Xóa ảnh"
+                          style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}
+                        >
+                          <Trash size={12} />
+                        </button>
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '10px', padding: '2px 4px', textAlign: 'center' }}>
+                          Ảnh #{i + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div 
+                    style={{ border: '2px dashed var(--border-strong)', borderRadius: 'var(--radius-md)', padding: '24px', textAlign: 'center', cursor: 'pointer', background: 'white' }}
+                    onClick={() => { setGalleryMode('car'); setShowGallery(true); }}
+                  >
+                    <ImageIcon size={32} color="var(--text-secondary)" style={{ marginBottom: '6px', opacity: 0.5 }} />
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                      Bấm vào đây hoặc chọn <strong>"Tải nhiều ảnh từ máy / ĐT"</strong> để chọn hàng loạt ảnh bàn giao xe
+                    </div>
+                  </div>
+                )}
               </div>
 
 
@@ -1034,10 +1114,12 @@ const CreateRental = () => {
       {showGallery && (
         <ImageGallery 
           onClose={() => setShowGallery(false)} 
+          multiple={galleryMode === 'car'}
           onSelect={(urls) => {
             const arr = Array.isArray(urls) ? urls : [urls];
             if (galleryMode === 'car') {
-              setCarImages(arr);
+              setCarImages(prev => Array.from(new Set([...prev, ...arr])));
+              showToast(`Đã thêm ${arr.length} ảnh bàn giao xe từ thư viện!`, 'success');
             } else if (galleryMode === 'contract') {
               setUploadedFileUrl(arr[0]);
             } else if (galleryMode === 'quickCar') {
@@ -1071,10 +1153,10 @@ const CreateRental = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--primary)', paddingBottom: '16px' }}>
               <div>
                 <h2 style={{ color: 'var(--primary)', fontSize: '22px', fontWeight: 800, margin: 0 }}>
-                  AUTOMANAGE GARAGE
+                  AGREEN - CHO THUÊ XE ĐIỆN TỰ LÁI
                 </h2>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Dịch Vụ Cho Thuê Xe Tự Lái & Có Tài Xế • Hotline: 0901 234 567
+                  Dịch Vụ Cho Thuê Xe Điện Tự Lái • Hotline: 0386619758
                 </div>
               </div>
 

@@ -1678,10 +1678,10 @@ const Contracts = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--primary)', paddingBottom: '16px' }}>
               <div>
                 <h2 style={{ color: 'var(--primary)', fontSize: '22px', fontWeight: 800, margin: 0 }}>
-                  AUTOMANAGE GARAGE
+                  AGREEN - CHO THUÊ XE ĐIỆN TỰ LÁI
                 </h2>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Dịch Vụ Cho Thuê Xe Tự Lái & Có Tài Xế • Hotline: 0901 234 567
+                  Dịch Vụ Cho Thuê Xe Điện Tự Lái • Hotline: 0386619758
                 </div>
               </div>
 
@@ -1860,6 +1860,7 @@ const Contracts = () => {
       {showGallery && (
         <ImageGallery 
           onClose={() => setShowGallery(false)} 
+          multiple={galleryMode === 'condition'}
           onSelect={(urls, name) => {
             const arr = Array.isArray(urls) ? urls : [urls];
             if (galleryMode === 'contract') {

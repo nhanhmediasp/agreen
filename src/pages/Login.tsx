@@ -240,10 +240,10 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
             <Car size={34} color="white" />
           </div>
           <h1 style={{ fontSize: '26px', fontWeight: 800, margin: '0 0 6px', color: '#0f172a', letterSpacing: '-0.5px' }}>
-            AutoManage
+            Agreen
           </h1>
-          <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-            Hệ thống quản lý cho thuê xe & Đội xe
+          <p style={{ fontSize: '14px', color: '#64748b', margin: 0, fontWeight: 500 }}>
+            Dịch Vụ Cho Thuê Xe Điện Tự Lái • 0386619758
           </p>
         </div>
 

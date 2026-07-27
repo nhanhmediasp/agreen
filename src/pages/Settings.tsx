@@ -21,7 +21,7 @@ const SettingsPage = () => {
   const [localColor, setLocalColor] = useState(settings.primaryColor);
   const [localLogo, setLocalLogo] = useState(settings.logo);
   const [localFavicon, setLocalFavicon] = useState(settings.favicon || 'Auto');
-  const [localSiteTitle, setLocalSiteTitle] = useState(settings.siteTitle || 'Hệ thống Quản lý Vận hành Xe AGREEN');
+  const [localSiteTitle, setLocalSiteTitle] = useState(settings.siteTitle || 'Agreen - Dịch Vụ Cho Thuê Xe Điện Tự Lái - 0386619758');
   const [localAllowIndexing, setLocalAllowIndexing] = useState(settings.allowIndexing !== false);
   const [showGallery, setShowGallery] = useState(false);
   const [galleryTarget, setGalleryTarget] = useState<'logo' | 'favicon'>('logo');
@@ -146,7 +146,7 @@ const SettingsPage = () => {
                     value={localSiteTitle}
                     onChange={e => setLocalSiteTitle(e.target.value)}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}
-                    placeholder="VD: AGREEN - Hệ thống Quản lý Vận hành xe tự lái"
+                    placeholder="VD: Agreen - Dịch Vụ Cho Thuê Xe Điện Tự Lái - 0386619758"
                   />
                 </div>
                 <div>

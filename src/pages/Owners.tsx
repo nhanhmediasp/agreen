@@ -220,11 +220,11 @@ const Owners = () => {
             </div>
 
             <div className="card" style={{ padding: '16px 20px', borderLeft: '4px solid var(--status-available-border)' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Doanh thu Garage giữ lại</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Doanh thu Agreen giữ lại</span>
               <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--status-available-text)', marginTop: '4px' }}>
                 {companyNetRevenue.toLocaleString()} ₫
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Lợi nhuận ròng của Garage</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Lợi nhuận ròng của Agreen</div>
             </div>
           </div>
 
