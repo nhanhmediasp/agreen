@@ -6,15 +6,19 @@ import { BarChart, Award, Car, Calendar } from 'lucide-react';
 const Reports = () => {
   const { cars, expenses, rentals, customers } = useApp();
 
-  const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'quarter' | 'custom'>('30d');
+  const [timeRange, setTimeRange] = useState<'1d' | '7d' | '30d' | 'quarter' | 'custom'>('1d');
   const [startDate, setStartDate] = useState('2026-06-15');
   const [endDate, setEndDate] = useState('2026-07-15');
 
   // Filter rentals and expenses based on time range
   const filteredRentals = rentals.filter(r => {
     const rentalDate = new Date(r.startDate.split('T')[0]);
-    const refDate = new Date('2026-07-15'); // Current system reference date
+    const refDate = new Date(); // Current system reference date
 
+    if (timeRange === '1d') {
+      const daysDiff = (refDate.getTime() - rentalDate.getTime()) / (1000 * 60 * 60 * 24);
+      return daysDiff >= 0 && daysDiff <= 1;
+    }
     if (timeRange === '7d') {
       const daysDiff = (refDate.getTime() - rentalDate.getTime()) / (1000 * 60 * 60 * 24);
       return daysDiff >= 0 && daysDiff <= 7;
@@ -38,8 +42,12 @@ const Reports = () => {
 
   const filteredExpenses = expenses.filter(exp => {
     const expDate = new Date(exp.date);
-    const refDate = new Date('2026-07-15');
+    const refDate = new Date();
 
+    if (timeRange === '1d') {
+      const daysDiff = (refDate.getTime() - expDate.getTime()) / (1000 * 60 * 60 * 24);
+      return daysDiff >= 0 && daysDiff <= 1;
+    }
     if (timeRange === '7d') {
       const daysDiff = (refDate.getTime() - expDate.getTime()) / (1000 * 60 * 60 * 24);
       return daysDiff >= 0 && daysDiff <= 7;
@@ -75,7 +83,7 @@ const Reports = () => {
       const diff = end.getTime() - start.getTime();
       return sum + Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     }, 0);
-    const periodDays = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+    const periodDays = timeRange === '1d' ? 1 : timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
     const utilizationRate = Math.min(100, Math.round((totalDaysUsed / periodDays) * 100));
     return {
       ...c,
@@ -128,7 +136,7 @@ const Reports = () => {
 
         {/* Time Range Selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
-          {(['7d', '30d', 'quarter', 'custom'] as const).map(range => (
+          {(['1d', '7d', '30d', 'quarter', 'custom'] as const).map(range => (
             <button
               key={range}
               onClick={() => setTimeRange(range)}
@@ -140,7 +148,7 @@ const Reports = () => {
                 transition: 'all 0.15s',
               }}
             >
-              {{ '7d': '7 ngày', '30d': '30 ngày', 'quarter': 'Quý này', 'custom': 'Tùy chỉnh' }[range]}
+              {{ '1d': 'Hôm nay', '7d': '7 ngày', '30d': '30 ngày', 'quarter': 'Quý này', 'custom': 'Tùy chỉnh' }[range]}
             </button>
           ))}
           {timeRange === 'custom' && (

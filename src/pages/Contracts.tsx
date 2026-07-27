@@ -1582,7 +1582,7 @@ const Contracts = () => {
         footer={null}
         width={500}
       >
-        <Form layout="vertical" onFinish={handleViolationSubmit} style={{ marginTop: '16px' }}>
+        <form onSubmit={handleViolationSubmit} style={{ marginTop: '16px' }}>
           <Form.Item label="Nội dung chi phí phát sinh" required>
             <input 
               type="text" 
@@ -1651,7 +1651,7 @@ const Contracts = () => {
               {violationEditId ? 'Lưu thay đổi' : 'Ghi nhận vi phạm'}
             </button>
           </div>
-        </Form>
+        </form>
       </Modal>
 
       {/* Modal Hóa Đơn Bàn Giao Xe & Hợp Đồng */}

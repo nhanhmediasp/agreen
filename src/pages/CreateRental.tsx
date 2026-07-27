@@ -9,7 +9,7 @@ import { MoneyInput, MoneyInputLeft } from '../components/MoneyInput';
 const CreateRental = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { cars, addCar, addRental, customers, addCustomer, owners, showToast } = useApp();
+  const { cars, addCar, addRental, customers, addCustomer, owners, showToast, rentals } = useApp();
   
   const queryParams = new URLSearchParams(location.search);
   const preselectedCarId = queryParams.get('car') || '';
@@ -38,13 +38,89 @@ const CreateRental = () => {
   const [quickPriceDay, setQuickPriceDay] = useState('800000');
   const [quickPriceWeek, setQuickPriceWeek] = useState('5000000');
 
-  const [startDate, setStartDate] = useState(() => {
-    // Default to today
-    const now = new Date();
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T08:00`;
-  });
+  const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [pickupTime, setPickupTime] = useState('08:00');
+  const [returnTime, setReturnTime] = useState('20:00');
+  const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+  const getMonthDays = (baseDate: Date) => {
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const firstDayOfWeek = firstDay.getDay(); 
+    const offset = firstDayOfWeek === 0 ? -6 : 1 - firstDayOfWeek;
+    
+    const dStart = new Date(firstDay);
+    dStart.setDate(firstDay.getDate() + offset);
+    
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(dStart);
+      d.setDate(dStart.getDate() + i);
+      const fullDate = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const isCurrentMonth = d.getMonth() === month;
+      days.push({
+        date: d,
+        dateStr: String(d.getDate()).padStart(2, '0'),
+        fullDate,
+        isCurrentMonth
+      });
+    }
+    return days;
+  };
+
+  const getCarStatusForDay = (dayDateStr: string, carId: string) => {
+    if (!carId) return { status: 'ready', customer: null };
+    const targetDate = new Date(dayDateStr);
+    const activeRentalOnDay = rentals?.find(r => {
+      if (r.carId !== carId) return false;
+      const start = new Date(r.startDate.split('T')[0]);
+      const end = new Date(r.endDate.split('T')[0]);
+      return targetDate >= start && targetDate <= end && ['pending', 'active'].includes(r.status);
+    });
+
+    if (activeRentalOnDay) return { status: 'rented', customer: activeRentalOnDay.customerName };
+    return { status: 'ready', customer: null };
+  };
+
+  const handleDayClick = (dayStr: string) => {
+    const status = getCarStatusForDay(dayStr, selectedCarId);
+    if (status.status !== 'ready') {
+      showToast('Ngày này xe đã có lịch đặt, vui lòng chọn ngày khác!', 'error');
+      return;
+    }
+
+    if (selectedDates.length === 0 || selectedDates.length === 2) {
+      setSelectedDates([dayStr]);
+    } else if (selectedDates.length === 1) {
+      const start = new Date(selectedDates[0]);
+      const end = new Date(dayStr);
+      if (end < start) {
+        setSelectedDates([dayStr, selectedDates[0]]);
+      } else {
+        const daysBetween = Math.round((end.getTime() - start.getTime()) / 86400000);
+        let hasConflict = false;
+        for (let i = 1; i <= daysBetween; i++) {
+          const d = new Date(start);
+          d.setDate(start.getDate() + i);
+          const dStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+          if (getCarStatusForDay(dStr, selectedCarId).status !== 'ready') {
+            hasConflict = true;
+            break;
+          }
+        }
+        if (hasConflict) {
+          showToast('Khoảng thời gian bạn chọn có chứa ngày đã được đặt, vui lòng chọn lại!', 'error');
+          setSelectedDates([dayStr]);
+        } else {
+          setSelectedDates([selectedDates[0], dayStr]);
+        }
+      }
+    }
+  };
   const [pricingType, setPricingType] = useState<'hourly' | 'daily' | 'weekly'>('daily');
   const [customDuration, setCustomDuration] = useState('2'); // Default 2 units
   const [isWeekend, setIsWeekend] = useState(false);
@@ -89,28 +165,22 @@ const CreateRental = () => {
     }
   }, [selectedCarId, selectedCarObj]);
 
-  // Synchronize customDuration -> endDate
   useEffect(() => {
-    if (!startDate) return;
-    const start = new Date(startDate);
-    const dur = parseFloat(customDuration) || 0;
-    
-    if (pricingType === 'hourly') {
-      start.setHours(start.getHours() + Math.ceil(dur));
-    } else if (pricingType === 'weekly') {
-      start.setDate(start.getDate() + Math.ceil(dur * 7));
-    } else { // daily
-      start.setDate(start.getDate() + Math.ceil(dur));
+    if (selectedDates.length > 0) {
+      const start = selectedDates[0];
+      const end = selectedDates.length > 1 ? selectedDates[1] : start;
+      setStartDate(`${start}T${pickupTime}`);
+      setEndDate(`${end}T${returnTime}`);
+      
+      const diffMs = new Date(end).getTime() - new Date(start).getTime();
+      const diffDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1);
+      setCustomDuration(diffDays.toString());
+    } else {
+      setStartDate('');
+      setEndDate('');
+      setCustomDuration('0');
     }
-
-    const pad = (num: number) => num.toString().padStart(2, '0');
-    const y = start.getFullYear();
-    const m = pad(start.getMonth() + 1);
-    const d = pad(start.getDate());
-    const hh = pad(start.getHours());
-    const mm = pad(start.getMinutes());
-    setEndDate(`${y}-${m}-${d}T${hh}:${mm}`);
-  }, [startDate, pricingType, customDuration]);
+  }, [selectedDates, pickupTime, returnTime]);
 
   // Handle selected customer change
   const handleSelectCustomer = (phoneVal: string) => {
@@ -202,6 +272,12 @@ const CreateRental = () => {
 
     // If Mode is Create Customer, add it globally
     if (customerMode === 'create') {
+      const existingCustomer = customers.find(c => c.phone === customerPhone);
+      if (existingCustomer) {
+        showToast('Số điện thoại khách hàng đã tồn tại! Vui lòng chọn khách hàng có sẵn.', 'error');
+        return;
+      }
+      
       addCustomer({
         id: Date.now().toString(),
         name: customerName,
@@ -437,38 +513,99 @@ const CreateRental = () => {
                     </button>
                   </div>
                 )}
+                {selectedCarId && (
+                  <div style={{ marginTop: '16px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '12px 16px', borderBottom: '1px solid var(--border-strong)' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600 }}>Lịch đặt xe tháng {calendarDate.getMonth() + 1}/{calendarDate.getFullYear()}</div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button type="button" onClick={() => { const d = new Date(calendarDate); d.setMonth(d.getMonth() - 1); setCalendarDate(d); }} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid var(--border-strong)', background: 'white' }}>Tháng trước</button>
+                        <button type="button" onClick={() => { const d = new Date(calendarDate); d.setMonth(d.getMonth() + 1); setCalendarDate(d); }} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid var(--border-strong)', background: 'white' }}>Tháng sau</button>
+                      </div>
+                    </div>
+                    <div style={{ padding: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '8px' }}>
+                        {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(w => (
+                          <div key={w} style={{ fontWeight: 700, color: '#475569', fontSize: '11px' }}>{w}</div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                        {getMonthDays(calendarDate).map((day, idx) => {
+                          const st = getCarStatusForDay(day.fullDate, selectedCarId);
+                          const isToday = day.fullDate === todayVN;
+                          const isSelected = selectedDates.includes(day.fullDate) || 
+                                              (selectedDates.length === 2 && day.fullDate > selectedDates[0] && day.fullDate < selectedDates[1]);
+                          const isStart = selectedDates[0] === day.fullDate;
+                          const isEnd = selectedDates[1] === day.fullDate;
+
+                          let bg = '#FFFFFF';
+                          let border = '#E2E8F0';
+                          let color = '#374151';
+
+                          if (st.status === 'rented') {
+                            bg = '#FEE2E2';
+                            border = '#FCA5A5';
+                            color = '#B91C1C';
+                          } else if (isSelected) {
+                            bg = '#DBEAFE';
+                            border = '#60A5FA';
+                            color = '#1D4ED8';
+                            if (isStart || isEnd) {
+                              bg = '#3B82F6';
+                              color = '#FFFFFF';
+                            }
+                          } else if (isToday) {
+                            bg = '#F0FDF4';
+                            border = '#16A34A';
+                            color = '#16A34A';
+                          }
+
+                          return (
+                            <div 
+                              key={idx} 
+                              onClick={() => handleDayClick(day.fullDate)}
+                              style={{ 
+                                padding: '6px 2px', borderRadius: '6px', border: `1px solid ${border}`, background: bg, 
+                                textAlign: 'center', opacity: day.isCurrentMonth ? 1 : 0.35, minHeight: '48px',
+                                cursor: st.status === 'ready' ? 'pointer' : 'not-allowed',
+                                display: 'flex', flexDirection: 'column', justifyContent: 'center'
+                              }}
+                            >
+                              <span style={{ fontSize: '12px', fontWeight: (isToday || isSelected) ? 700 : 500, color }}>
+                                {day.dateStr}
+                              </span>
+                              {st.status === 'rented' && (
+                                <span style={{ fontSize: '9px', color: '#991B1B', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 2px' }} title={st.customer || ''}>
+                                  {st.customer?.split(' ')[st.customer?.split(' ').length - 1] || 'Kín'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', gap: '16px', marginTop: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '12px', height: '12px', background: '#3B82F6', borderRadius: '2px' }}></div> Ngày chọn</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '12px', height: '12px', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: '2px' }}></div> Đã có khách</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1.2 }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Bảng giá áp dụng</label>
-                  <select 
-                    value={pricingType} 
-                    onChange={e => {
-                      setPricingType(e.target.value as any);
-                      if (e.target.value === 'hourly') setCustomDuration('4');
-                      else if (e.target.value === 'weekly') setCustomDuration('1');
-                      else setCustomDuration('2');
-                    }}
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }}
-                  >
-                    <option value="daily">Theo ngày ({selectedCarObj ? selectedCarObj.pricePerDay.toLocaleString() : '800k'} ₫/ngày)</option>
-                    <option value="hourly">Theo giờ ({selectedCarObj ? selectedCarObj.pricePerHour.toLocaleString() : '100k'} ₫/giờ)</option>
-                    <option value="weekly">Theo tuần ({selectedCarObj ? selectedCarObj.pricePerWeek.toLocaleString() : '5M'} ₫/tuần)</option>
-                  </select>
+                  <div style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', background: '#F8FAFC', color: 'var(--text-main)', fontWeight: 600 }}>
+                    Theo ngày ({selectedCarObj ? selectedCarObj.pricePerDay.toLocaleString() : '800k'} ₫/ngày)
+                  </div>
                 </div>
 
                 <div style={{ flex: 0.8 }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
-                    Số lượng ({pricingType === 'hourly' ? 'Giờ' : pricingType === 'weekly' ? 'Tuần' : 'Ngày'})
+                    Số ngày thuê
                   </label>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    value={customDuration} 
-                    onChange={e => setCustomDuration(e.target.value)}
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit', fontWeight: 600 }}
-                  />
+                  <div style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', background: '#F8FAFC', color: 'var(--primary)', fontWeight: 700 }}>
+                    {customDuration} ngày
+                  </div>
                 </div>
               </div>
 
@@ -494,24 +631,24 @@ const CreateRental = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Thời gian nhận & trả xe (Tự động tính)</label>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Thời gian nhận & trả xe cụ thể</label>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Ngày nhận xe</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Giờ nhận xe</span>
                     <input 
-                      type="datetime-local" 
-                      value={startDate}
-                      onChange={e => setStartDate(e.target.value)}
+                      type="time" 
+                      value={pickupTime}
+                      onChange={e => setPickupTime(e.target.value)}
                       style={{ width: '100%', marginTop: '4px', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '15px', fontFamily: 'inherit' }} 
                     />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Ngày trả xe dự kiến</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Giờ trả xe</span>
                     <input 
-                      type="datetime-local" 
-                      value={endDate}
-                      disabled
-                      style={{ width: '100%', marginTop: '4px', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '15px', fontFamily: 'inherit', background: '#f3f4f6' }} 
+                      type="time" 
+                      value={returnTime}
+                      onChange={e => setReturnTime(e.target.value)}
+                      style={{ width: '100%', marginTop: '4px', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '15px', fontFamily: 'inherit' }} 
                     />
                   </div>
                 </div>

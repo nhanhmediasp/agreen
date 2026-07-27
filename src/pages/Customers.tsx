@@ -109,6 +109,12 @@ const Customers = () => {
       return;
     }
 
+    const existingCustomer = customers.find(c => c.phone === newPhone);
+    if (existingCustomer) {
+      showToast('Số điện thoại khách hàng đã tồn tại trong hệ thống!', 'error');
+      return;
+    }
+
     const customerToAdd: Customer = {
       id: Date.now().toString(),
       name: newName,
@@ -451,7 +457,13 @@ const Customers = () => {
               dataSource={filteredCustomers}
               rowKey="id"
               onRow={(customer: Customer) => ({
-                onClick: () => setSelectedCustomerId(customer.id),
+                onClick: (e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.ant-checkbox-wrapper') || target.closest('.ant-table-selection-column')) {
+                    return;
+                  }
+                  setSelectedCustomerId(customer.id);
+                },
                 style: { cursor: 'pointer' }
               })}
               rowSelection={{
