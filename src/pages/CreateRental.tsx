@@ -44,6 +44,7 @@ const CreateRental = () => {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [pickupTime, setPickupTime] = useState('08:00');
   const [returnTime, setReturnTime] = useState('20:00');
+  const [timeConflictError, setTimeConflictError] = useState('');
   const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
 
   const getMonthDays = (baseDate: Date) => {
@@ -73,51 +74,51 @@ const CreateRental = () => {
   };
 
   const getCarStatusForDay = (dayDateStr: string, carId: string) => {
-    if (!carId) return { status: 'ready', customer: null };
-    const targetDate = new Date(dayDateStr);
-    const activeRentalOnDay = rentals?.find(r => {
+    if (!carId) return { status: 'ready', customer: null, rentals: [] };
+    const targetDateStart = new Date(`${dayDateStr}T00:00:00`).getTime();
+    const targetDateEnd = new Date(`${dayDateStr}T23:59:59`).getTime();
+    
+    const activeRentalsOnDay = rentals?.filter(r => {
       if (r.carId !== carId) return false;
-      const start = new Date(r.startDate.split('T')[0]);
-      const end = new Date(r.endDate.split('T')[0]);
-      return targetDate >= start && targetDate <= end && ['pending', 'active'].includes(r.status);
+      if (!['pending', 'active'].includes(r.status)) return false;
+      const start = new Date(r.startDate).getTime();
+      const end = new Date(r.endDate).getTime();
+      return start <= targetDateEnd && end >= targetDateStart;
     });
 
-    if (activeRentalOnDay) return { status: 'rented', customer: activeRentalOnDay.customerName };
-    return { status: 'ready', customer: null };
+    if (activeRentalsOnDay && activeRentalsOnDay.length > 0) {
+      let isFullyBooked = false;
+      for (const r of activeRentalsOnDay) {
+        if (new Date(r.startDate).getTime() <= targetDateStart && new Date(r.endDate).getTime() >= targetDateEnd) {
+          isFullyBooked = true;
+          break;
+        }
+      }
+      return { 
+        status: isFullyBooked ? 'rented' : 'partial', 
+        customer: activeRentalsOnDay[0].customerName,
+        rentals: activeRentalsOnDay
+      };
+    }
+    return { status: 'ready', customer: null, rentals: [] };
   };
 
   const handleDayClick = (dayStr: string) => {
     const status = getCarStatusForDay(dayStr, selectedCarId);
-    if (status.status !== 'ready') {
-      showToast('Ngày này xe đã có lịch đặt, vui lòng chọn ngày khác!', 'error');
+    if (status.status === 'rented') {
+      showToast('Ngày này xe đã kín lịch hoàn toàn, vui lòng chọn ngày khác!', 'error');
       return;
     }
 
     if (selectedDates.length === 0 || selectedDates.length === 2) {
       setSelectedDates([dayStr]);
     } else if (selectedDates.length === 1) {
-      const start = new Date(selectedDates[0]);
-      const end = new Date(dayStr);
-      if (end < start) {
+      const startStr = selectedDates[0];
+      const endStr = dayStr;
+      if (new Date(endStr) < new Date(startStr)) {
         setSelectedDates([dayStr, selectedDates[0]]);
       } else {
-        const daysBetween = Math.round((end.getTime() - start.getTime()) / 86400000);
-        let hasConflict = false;
-        for (let i = 1; i <= daysBetween; i++) {
-          const d = new Date(start);
-          d.setDate(start.getDate() + i);
-          const dStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
-          if (getCarStatusForDay(dStr, selectedCarId).status !== 'ready') {
-            hasConflict = true;
-            break;
-          }
-        }
-        if (hasConflict) {
-          showToast('Khoảng thời gian bạn chọn có chứa ngày đã được đặt, vui lòng chọn lại!', 'error');
-          setSelectedDates([dayStr]);
-        } else {
-          setSelectedDates([selectedDates[0], dayStr]);
-        }
+        setSelectedDates([selectedDates[0], dayStr]);
       }
     }
   };
@@ -181,6 +182,33 @@ const CreateRental = () => {
       setCustomDuration('0');
     }
   }, [selectedDates, pickupTime, returnTime]);
+
+  useEffect(() => {
+    if (startDate && endDate && selectedCarId) {
+      const s = new Date(startDate).getTime();
+      const e = new Date(endDate).getTime();
+      if (e <= s) {
+        setTimeConflictError('Thời gian trả xe phải sau thời gian nhận xe.');
+        return;
+      }
+      
+      const hasConflict = rentals?.some(r => {
+        if (r.carId !== selectedCarId) return false;
+        if (!['pending', 'active'].includes(r.status)) return false;
+        const rS = new Date(r.startDate).getTime();
+        const rE = new Date(r.endDate).getTime();
+        return s < rE && e > rS;
+      });
+
+      if (hasConflict) {
+        setTimeConflictError('Khoảng thời gian bị trùng lịch thuê khác!');
+      } else {
+        setTimeConflictError('');
+      }
+    } else {
+      setTimeConflictError('');
+    }
+  }, [startDate, endDate, selectedCarId, rentals]);
 
   // Handle selected customer change
   const handleSelectCustomer = (phoneVal: string) => {
@@ -550,6 +578,10 @@ const CreateRental = () => {
                             bg = '#FEE2E2';
                             border = '#FCA5A5';
                             color = '#B91C1C';
+                          } else if (st.status === 'partial') {
+                            bg = '#FEF3C7';
+                            border = '#FDE68A';
+                            color = '#92400E';
                           } else if (isSelected) {
                             bg = '#DBEAFE';
                             border = '#60A5FA';
@@ -579,17 +611,35 @@ const CreateRental = () => {
                                 {day.dateStr}
                               </span>
                               {st.status === 'rented' && (
-                                <span style={{ fontSize: '9px', color: '#991B1B', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 2px' }} title={st.customer || ''}>
-                                  {st.customer?.split(' ')[st.customer?.split(' ').length - 1] || 'Kín'}
+                                <span style={{ fontSize: '9px', color: '#991B1B', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 2px' }}>
+                                  Kín ngày
                                 </span>
+                              )}
+                              {st.status === 'partial' && (
+                                <div style={{ display: 'flex', flexDirection: 'column', marginTop: '2px', gap: '1px' }}>
+                                  {st.rentals?.map((r: any, i: number) => {
+                                    const rStart = new Date(r.startDate);
+                                    const rEnd = new Date(r.endDate);
+                                    const fmtTime = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                                    // If rental spans multiple days, only show relevant time for this day
+                                    const tStart = rStart.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) < day.fullDate ? '00:00' : fmtTime(rStart);
+                                    const tEnd = rEnd.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) > day.fullDate ? '23:59' : fmtTime(rEnd);
+                                    return (
+                                      <span key={i} style={{ fontSize: '8.5px', color: '#92400E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 1px' }} title={`${tStart} - ${tEnd} (${r.customerName})`}>
+                                        {tStart}-{tEnd}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
                               )}
                             </div>
                           );
                         })}
                       </div>
-                      <div style={{ display: 'flex', gap: '16px', marginTop: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '12px', height: '12px', background: '#3B82F6', borderRadius: '2px' }}></div> Ngày chọn</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '12px', height: '12px', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: '2px' }}></div> Đã có khách</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '12px', height: '12px', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '2px' }}></div> Có lịch trống</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '12px', height: '12px', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: '2px' }}></div> Kín ngày</div>
                       </div>
                     </div>
                   </div>
@@ -756,9 +806,9 @@ const CreateRental = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
                 <button 
                   className="btn-primary" 
-                  disabled={!selectedCarId || !startDate || !endDate} 
+                  disabled={!selectedCarId || !startDate || !endDate || !!timeConflictError} 
                   onClick={() => setStep(2)}
-                  style={{ padding: '12px 32px', fontSize: '16px', opacity: (!selectedCarId || !startDate || !endDate) ? 0.5 : 1, cursor: (!selectedCarId || !startDate || !endDate) ? 'not-allowed' : 'pointer' }}
+                  style={{ padding: '12px 32px', fontSize: '16px', opacity: (!selectedCarId || !startDate || !endDate || !!timeConflictError) ? 0.5 : 1, cursor: (!selectedCarId || !startDate || !endDate || !!timeConflictError) ? 'not-allowed' : 'pointer' }}
                 >
                   Tiếp tục
                 </button>
