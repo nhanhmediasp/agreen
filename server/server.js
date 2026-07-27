@@ -349,14 +349,14 @@ app.post('/api/rentals', async (req, res) => {
       `INSERT INTO rentals (id, car_id, customer_name, customer_phone, start_date, end_date,
         rental_fee, delivery_fee, deposit, extra_fee, total_amount, payment_status, status,
         start_km, end_km, start_fuel, end_fuel, source, file_url, file_name,
-        owner_commission_amount, condition_images, notes, delivered_at, returned_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+        owner_commission_amount, condition_images, notes, delivered_at, returned_at, violations)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
        ON CONFLICT (id) DO UPDATE SET
          status=EXCLUDED.status, payment_status=EXCLUDED.payment_status,
          end_km=EXCLUDED.end_km, end_fuel=EXCLUDED.end_fuel,
          extra_fee=EXCLUDED.extra_fee, total_amount=EXCLUDED.total_amount,
          condition_images=EXCLUDED.condition_images, notes=EXCLUDED.notes,
-         returned_at=EXCLUDED.returned_at, updated_at=NOW()
+         returned_at=EXCLUDED.returned_at, violations=EXCLUDED.violations, updated_at=NOW()
        RETURNING *`,
       [
         r.id || `HD-${Date.now()}`, r.carId, r.customerName, r.customerPhone,
@@ -369,7 +369,8 @@ app.post('/api/rentals', async (req, res) => {
         r.source||'system', r.fileUrl||'', r.fileName||'',
         Number(r.ownerCommissionAmount)||0,
         JSON.stringify(r.conditionImages||[]),
-        r.notes||'', r.deliveredAt||null, r.returnedAt||null
+        r.notes||'', r.deliveredAt||null, r.returnedAt||null,
+        JSON.stringify(r.violations||[])
       ]
     );
     res.json({ success: true, data: result.rows[0] });
@@ -410,7 +411,8 @@ app.put('/api/rentals/:id', async (req, res) => {
       condition_images: r.conditionImages ? JSON.stringify(r.conditionImages) : undefined,
       notes: r.notes,
       delivered_at: r.deliveredAt,
-      returned_at: r.returnedAt
+      returned_at: r.returnedAt,
+      violations: r.violations ? JSON.stringify(r.violations) : undefined
     }).filter(([,v]) => v !== undefined));
 
     if (Object.keys(fields).length === 0) return res.json({ success: true });

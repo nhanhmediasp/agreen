@@ -32,4 +32,8 @@ pool.on('error', (err, _client) => {
 
 export const query = (text, params) => pool.query(text, params);
 export const getClient = () => pool.connect();
+
+// Auto-migrate schema
+pool.query("ALTER TABLE rentals ADD COLUMN IF NOT EXISTS violations JSONB DEFAULT '[]'").catch(e => console.error('Migration error:', e));
+
 export default pool;

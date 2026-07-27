@@ -285,8 +285,8 @@ const Contracts = () => {
     });
   };
 
-  const handleViolationSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleViolationSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!selectedDetailRentalId || !selectedDetailRental) return;
 
     const amountNum = parseInt(violationAmount) || 0;
@@ -1582,7 +1582,7 @@ const Contracts = () => {
         footer={null}
         width={500}
       >
-        <form onSubmit={handleViolationSubmit} style={{ marginTop: '16px' }}>
+        <Form layout="vertical" onFinish={() => handleViolationSubmit()} style={{ marginTop: '16px' }}>
           <Form.Item label="Nội dung chi phí phát sinh" required>
             <input 
               type="text" 
@@ -1626,7 +1626,7 @@ const Contracts = () => {
               />
               <button 
                 type="button" 
-                style={{ padding: '8px 12px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}
+                style={{ padding: '8px 12px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                 onClick={() => { setGalleryMode('evidence'); setShowGallery(true); }}
               >
                 Chọn ảnh
@@ -1648,10 +1648,10 @@ const Contracts = () => {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
             <button type="button" onClick={() => setShowViolationModal(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
             <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
-              {violationEditId ? 'Lưu thay đổi' : 'Ghi nhận vi phạm'}
+              {violationEditId ? 'Lưu thay đổi' : 'Ghi nhận chi phí'}
             </button>
           </div>
-        </form>
+        </Form>
       </Modal>
 
       {/* Modal Hóa Đơn Bàn Giao Xe & Hợp Đồng */}

@@ -79,7 +79,7 @@ const Owners = () => {
     o.phone.includes(searchTerm)
   );
 
-  const handleCreateOwner = (e: React.FormEvent) => {
+  const handleCreateOwner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newPhone) {
       showToast('Vui lòng nhập đầy đủ Tên và Số điện thoại!', 'error');
@@ -96,15 +96,18 @@ const Owners = () => {
       commissionRate: parseInt(newCommissionRate) || 75
     };
 
-    addOwner(ownerToAdd);
-    setShowAddForm(false);
-    
-    // Clear
-    setNewName('');
-    setNewPhone('');
-    setNewAddress('');
-    setNewNotes('');
-    setNewImage('');
+    const success = await addOwner(ownerToAdd);
+    if (success) {
+      setShowAddForm(false);
+      
+      // Clear
+      setNewName('');
+      setNewPhone('');
+      setNewAddress('');
+      setNewNotes('');
+      setNewImage('');
+      setNewCommissionRate('75');
+    }
   };
 
   const handleOpenEdit = () => {
@@ -135,7 +138,7 @@ const Owners = () => {
     showToast('Đã cập nhật thông tin chủ xe thành công!', 'success');
   };
 
-  const handleCreateCommissionExpense = () => {
+  const handleCreateCommissionExpense = async () => {
     if (!activeOwner) return;
     if (ownerPayoutAmount <= 0) {
       showToast('Chủ xe chưa có doanh số phát sinh để thanh toán chiết khấu!', 'error');
@@ -143,7 +146,7 @@ const Owners = () => {
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
-    addExpense({
+    const success = await addExpense({
       id: Date.now().toString(),
       title: `Chiết khấu doanh thu cho chủ xe ${activeOwner.name}`,
       amount: ownerPayoutAmount,
@@ -153,7 +156,9 @@ const Owners = () => {
       location: 'Chuyển khoản / Tiền mặt'
     });
 
-    showToast(`Đã tạo phiếu chi thanh toán chiết khấu ${ownerPayoutAmount.toLocaleString()} ₫ cho chủ xe ${activeOwner.name}!`, 'success');
+    if (success) {
+      showToast(`Đã tạo phiếu chi thanh toán chiết khấu ${ownerPayoutAmount.toLocaleString()} ₫ cho chủ xe ${activeOwner.name}!`, 'success');
+    }
   };
 
   const handleDeleteOwner = () => {

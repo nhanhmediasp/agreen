@@ -535,6 +535,8 @@ function mapOwnerFromDB(db: Record<string, unknown>): Owner {
 function mapRentalFromDB(db: Record<string, unknown>): Rental {
   let conditionImages: string[] = [];
   try { conditionImages = JSON.parse(db.condition_images as string || '[]'); } catch { conditionImages = []; }
+  let violations: Violation[] = [];
+  try { violations = JSON.parse(db.violations as string || '[]'); } catch { violations = []; }
   return {
     id: db.id as string,
     carId: db.car_id as string,
@@ -557,6 +559,7 @@ function mapRentalFromDB(db: Record<string, unknown>): Rental {
     fileName: db.file_name as string || undefined,
     ownerCommissionAmount: Number(db.owner_commission_amount) || 0,
     conditionImages,
+    violations,
     deliveredAt: db.delivered_at as string || undefined,
     returnedAt: db.returned_at as string || undefined,
     createdAt: db.created_at as string || undefined,
@@ -803,52 +806,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   // CAR ACTIONS – đồng bộ với PostgreSQL
   // ============================================================
-  const addCar = (car: Car) => {
-    // Optimistic UI update
-    setCars(prev => [car, ...prev]);
-    if (car.image && !images.some(img => img.url === car.image)) {
-      setImages(prev => [...prev, { id: Date.now().toString(), url: car.image, usedIn: `Xe ${car.id}` }]);
-    }
-
-    // Map ownerPhone to owner_id in database
+  const addCar = async (car: Car): Promise<boolean> => {
     const ownerObj = owners.find(o => o.phone === car.ownerPhone);
     const ownerId = ownerObj ? ownerObj.id : null;
 
-    apiFetch('/vehicles', {
-      method: 'POST',
-      body: JSON.stringify({
-        plate_number: car.id,
-        brand: car.brand,
-        model: car.name.replace(car.brand, '').trim() || car.name,
-        year: Number(car.year) || 2024,
-        color: car.color,
-        seats: car.seats,
-        daily_rate: car.pricePerDay,
-        hourly_rate: car.pricePerHour,
-        weekly_rate: car.pricePerWeek,
-        status: car.status === 'rented' ? 'Rented' : car.status === 'maintenance' ? 'Maintenance' : car.status === 'suspended' ? 'Reserved' : 'Available',
-        current_mileage: car.km,
-        registration_expiry: car.expiryRegistration || null,
-        insurance_expiry: car.expiryInsurance || null,
-        license_expiry: car.expiryLicense || null,
-        image_url: car.image,
-        gallery_urls: car.images || [],
-        owner_id: ownerId,
-        notes: ''
-      }),
-    }).then(res => {
+    try {
+      const res = await apiFetch('/vehicles', {
+        method: 'POST',
+        body: JSON.stringify({
+          plate_number: car.id,
+          brand: car.brand,
+          model: car.name.replace(car.brand, '').trim() || car.name,
+          year: Number(car.year) || 2024,
+          color: car.color,
+          seats: car.seats,
+          daily_rate: car.pricePerDay,
+          hourly_rate: car.pricePerHour,
+          weekly_rate: car.pricePerWeek,
+          status: car.status === 'rented' ? 'Rented' : car.status === 'maintenance' ? 'Maintenance' : car.status === 'suspended' ? 'Reserved' : 'Available',
+          current_mileage: car.km,
+          registration_expiry: car.expiryRegistration || null,
+          insurance_expiry: car.expiryInsurance || null,
+          license_expiry: car.expiryLicense || null,
+          image_url: car.image,
+          gallery_urls: car.images || [],
+          owner_id: ownerId,
+          notes: ''
+        }),
+      });
       if (res.success && res.data) {
-        setCars(prev => prev.map(c => c.id === car.id ? mapCarFromDB(res.data) : c));
+        setCars(prev => [mapCarFromDB(res.data), ...prev]);
+        if (car.image && !images.some(img => img.url === car.image)) {
+          setImages(prev => [{ id: Date.now().toString(), url: car.image, usedIn: `Xe ${car.id}` }, ...prev]);
+        }
         showToast(`Đã thêm xe ${car.id} và đồng bộ CSDL thành công!`, 'success');
+        return true;
       } else {
         showToast(`Không thể lưu xe vào CSDL: ${res.error || 'Lỗi không xác định'}`, 'error');
-        // Rollback optimistic update
-        setCars(prev => prev.filter(c => c.id !== car.id));
+        return false;
       }
-    }).catch(err => {
+    } catch (err: any) {
       showToast(`Lỗi kết nối máy chủ khi lưu xe: ${err.message || err}`, 'error');
-      setCars(prev => prev.filter(c => c.id !== car.id));
-    });
+      return false;
+    }
   };
 
   const updateCar = (id: string, updatedFields: Partial<Car>) => {
@@ -970,27 +970,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   // OWNER ACTIONS
   // ============================================================
-  const addOwner = (owner: Owner) => {
-    setOwners(prev => [owner, ...prev]);
-    apiFetch('/owners', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: owner.name, phone: owner.phone, address: owner.address,
-        notes: owner.notes, commission_rate: owner.commissionRate || 0,
-        image_url: owner.image
-      }),
-    }).then(res => {
+  const addOwner = async (owner: Owner): Promise<boolean> => {
+    try {
+      const res = await apiFetch('/owners', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: owner.name, phone: owner.phone, address: owner.address,
+          notes: owner.notes, commission_rate: owner.commissionRate || 0,
+          image_url: owner.image
+        }),
+      });
       if (res.success && res.data) {
-        setOwners(prev => prev.map(o => o.id === owner.id ? mapOwnerFromDB(res.data) : o));
+        setOwners(prev => [mapOwnerFromDB(res.data), ...prev]);
         showToast('Đã thêm chủ xe vào CSDL!', 'success');
+        return true;
       } else {
         showToast(`Lỗi thêm chủ xe: ${res.error}`, 'error');
-        setOwners(prev => prev.filter(o => o.id !== owner.id));
+        return false;
       }
-    }).catch(err => {
+    } catch (err: any) {
       showToast(`Lỗi mạng khi lưu chủ xe: ${err.message || err}`, 'error');
-      setOwners(prev => prev.filter(o => o.id !== owner.id));
-    });
+      return false;
+    }
   };
 
   const updateOwner = (id: string, updatedFields: Partial<Owner>) => {
@@ -1023,16 +1024,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   // EXPENSE ACTIONS
   // ============================================================
-  const addExpense = (expense: Expense) => {
-    setExpenses(prev => [expense, ...prev]);
-    apiFetch('/expenses', {
-      method: 'POST',
-      body: JSON.stringify({
-        id: expense.id, title: expense.title, category: expense.category,
-        amount: expense.amount, expense_date: expense.date,
-        ref: expense.ref, location: expense.location || ''
-      }),
-    }).catch(() => {});
+  const addExpense = async (expense: Expense): Promise<boolean> => {
+    try {
+      const res = await apiFetch('/expenses', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: expense.id, title: expense.title, category: expense.category,
+          amount: expense.amount, expense_date: expense.date,
+          ref: expense.ref, location: expense.location || ''
+        }),
+      });
+      if (res.success && res.data) {
+        setExpenses(prev => [mapExpenseFromDB(res.data), ...prev]);
+        showToast('Đã thêm chi phí thành công!', 'success');
+        return true;
+      } else {
+        showToast(`Lỗi thêm chi phí: ${res.error}`, 'error');
+        return false;
+      }
+    } catch (err: any) {
+      showToast(`Lỗi mạng khi lưu chi phí: ${err.message || err}`, 'error');
+      return false;
+    }
   };
 
   const updateExpense = (id: string, updatedFields: Partial<Expense>) => {
@@ -1053,34 +1066,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   // RENTAL ACTIONS – dữ liệu quan trọng nhất, lưu ngay vào DB
   // ============================================================
-  const addRental = (rental: Rental) => {
-    setRentals(prev => [rental, ...prev]);
-    // Save to PostgreSQL immediately
-    apiFetch('/rentals', { method: 'POST', body: JSON.stringify(rental) }).catch(() => {});
-
-    // Update car status
-    if (rental.status === 'active' || rental.status === 'pending') {
-      setCars(prev => prev.map(c => c.id === rental.carId ? {
-        ...c, status: 'rented', customer: rental.customerName, timeRemaining: '48:00:00'
-      } : c));
-      updateCarStatus(rental.carId, 'rented');
-      setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? {
-        ...cust, activeRentals: cust.activeRentals + 1, totalRentals: cust.totalRentals + 1
-      } : cust));
-    } else if (rental.status === 'completed') {
-      const selectedCar = cars.find(c => c.id === rental.carId);
-      const newKm = Math.max(selectedCar ? selectedCar.km : 0, rental.endKm || 0);
-      setCars(prev => prev.map(c => c.id === rental.carId ? {
-        ...c, km: newKm
-      } : c));
-      updateCar(rental.carId, { km: newKm });
-      setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? {
-        ...cust, totalRentals: cust.totalRentals + 1
-      } : cust));
-    } else {
-      setCustomers(prev => prev.map(cust => (cust.phone === rental.customerPhone || cust.name === rental.customerName) ? {
-        ...cust, totalRentals: cust.totalRentals + 1
-      } : cust));
+  const addRental = async (rental: Rental): Promise<boolean> => {
+    try {
+      const res = await apiFetch('/rentals', { method: 'POST', body: JSON.stringify(rental) });
+      if (res.success && res.data) {
+        const finalRental = mapRentalFromDB(res.data);
+        setRentals(prev => [finalRental, ...prev]);
+        
+        // Update car status
+        if (finalRental.status === 'active' || finalRental.status === 'pending') {
+          setCars(prev => prev.map(c => c.id === finalRental.carId ? {
+            ...c, status: 'rented', customer: finalRental.customerName, timeRemaining: '48:00:00'
+          } : c));
+          updateCarStatus(finalRental.carId, 'rented');
+          setCustomers(prev => prev.map(cust => (cust.phone === finalRental.customerPhone || cust.name === finalRental.customerName) ? {
+            ...cust, activeRentals: cust.activeRentals + 1, totalRentals: cust.totalRentals + 1
+          } : cust));
+        } else if (finalRental.status === 'completed') {
+          const selectedCar = cars.find(c => c.id === finalRental.carId);
+          const newKm = Math.max(selectedCar ? selectedCar.km : 0, finalRental.endKm || 0);
+          setCars(prev => prev.map(c => c.id === finalRental.carId ? {
+            ...c, km: newKm
+          } : c));
+          updateCar(finalRental.carId, { km: newKm });
+          setCustomers(prev => prev.map(cust => (cust.phone === finalRental.customerPhone || cust.name === finalRental.customerName) ? {
+            ...cust, totalRentals: cust.totalRentals + 1
+          } : cust));
+        } else {
+          setCustomers(prev => prev.map(cust => (cust.phone === finalRental.customerPhone || cust.name === finalRental.customerName) ? {
+            ...cust, totalRentals: cust.totalRentals + 1
+          } : cust));
+        }
+        showToast('Tạo đơn thuê xe thành công!', 'success');
+        return true;
+      } else {
+        showToast(`Lỗi tạo đơn thuê: ${res.error}`, 'error');
+        return false;
+      }
+    } catch (err: any) {
+      showToast(`Lỗi mạng khi lưu đơn thuê: ${err.message || err}`, 'error');
+      return false;
     }
   };
   const updateRental = (id: string, updatedFields: Partial<Rental>) => {
@@ -1178,16 +1203,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [rentals]);
 
-  const addDriver = (driver: Driver) => {
-    setDrivers(prev => [...prev, driver]);
-    apiFetch('/drivers', { method: 'POST', body: JSON.stringify(driver) }).then(res => {
+  const addDriver = async (driver: Driver): Promise<boolean> => {
+    try {
+      const res = await apiFetch('/drivers', { method: 'POST', body: JSON.stringify(driver) });
       if (res.success && res.data) {
-        setDrivers(prev => prev.map(d => d.id === driver.id ? mapDriverFromDB(res.data) : d));
+        setDrivers(prev => [mapDriverFromDB(res.data), ...prev]);
         showToast('Đã thêm tài xế mới vào hệ thống!', 'success');
+        return true;
+      } else {
+        showToast(`Không thể đồng bộ tài xế lên CSDL: ${res.error}`, 'error');
+        return false;
       }
-    }).catch(err => {
+    } catch (err: any) {
       showToast(`Không thể đồng bộ tài xế lên CSDL: ${err.message || err}`, 'error');
-    });
+      return false;
+    }
   };
 
   const updateDriver = (id: string, updatedFields: Partial<Driver>) => {
@@ -1204,15 +1234,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(() => {});
   };
 
-  const addServiceOrder = (order: ServiceOrder) => {
-    setServiceOrders(prev => [order, ...prev]);
-    apiFetch('/service-orders', { method: 'POST', body: JSON.stringify(order) }).catch(() => {});
-    if (order.carId && order.endKm) {
-      setCars(prev => prev.map(c => c.id === order.carId ? { ...c, km: Math.max(c.km, order.endKm) } : c));
-      apiFetch(`/vehicles/${order.carId}`, { method: 'PUT', body: JSON.stringify({ current_mileage: order.endKm }) }).catch(() => {});
-    }
-    if (order.driverId) {
-      setDrivers(prev => prev.map(d => d.id === order.driverId ? { ...d, totalTrips: d.totalTrips + 1 } : d));
+  const addServiceOrder = async (order: ServiceOrder): Promise<boolean> => {
+    try {
+      const res = await apiFetch('/service-orders', { method: 'POST', body: JSON.stringify(order) });
+      if (res.success && res.data) {
+        setServiceOrders(prev => [mapServiceOrderFromDB(res.data), ...prev]);
+        if (order.carId && order.endKm) {
+          setCars(prev => prev.map(c => c.id === order.carId ? { ...c, km: Math.max(c.km, order.endKm!) } : c));
+          apiFetch(`/vehicles/${order.carId}`, { method: 'PUT', body: JSON.stringify({ current_mileage: order.endKm }) }).catch(() => {});
+        }
+        if (order.driverId) {
+          setDrivers(prev => prev.map(d => d.id === order.driverId ? { ...d, totalTrips: d.totalTrips + 1 } : d));
+        }
+        showToast('Tạo đơn dịch vụ tài xế thành công!', 'success');
+        return true;
+      } else {
+        showToast(`Lỗi tạo đơn dịch vụ: ${res.error}`, 'error');
+        return false;
+      }
+    } catch (err: any) {
+      showToast(`Lỗi tạo đơn dịch vụ: ${err.message || err}`, 'error');
+      return false;
     }
   };
 

@@ -326,12 +326,13 @@ const CreateRental = () => {
       returnedAt: initialRentalStatus === 'completed' ? new Date().toISOString() : undefined
     };
 
-    addRental(rentalToAdd);
-    showToast('Tạo đơn thuê xe thành công!', 'success');
-    setCreatedReceiptRental(rentalToAdd);
+    const success = await addRental(rentalToAdd);
+    if (success) {
+      setCreatedReceiptRental(rentalToAdd);
+    }
   };
 
-  const handleQuickAddCarSubmit = (e: React.FormEvent) => {
+  const handleQuickAddCarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickPlate || !quickName || !quickColor || !quickKm || !quickPhone) {
       showToast('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'error');
@@ -356,27 +357,6 @@ const CreateRental = () => {
       pricePerHour: parseInt(quickPriceHour) || 100000,
       pricePerWeek: parseInt(quickPriceWeek) || 5000000
     };
-
-    addCar(carToAdd);
-    setSelectedCarId(carToAdd.id);
-    setShowQuickAddCarModal(false);
-
-    // Reset fields
-    setQuickPlate('');
-    setQuickBrand('');
-    setQuickName('');
-    setQuickYear('2022');
-    setQuickSeats(5);
-    setQuickColor('');
-    setQuickKm('');
-    setQuickPhone('');
-    setQuickImage('');
-    setQuickPriceDay('800000');
-    setQuickPriceHour('100000');
-    setQuickPriceWeek('5000000');
-
-    showToast('Đã thêm xe mới thành công và tự động chọn xe cho đơn thuê!', 'success');
-  };
 
   const readyCars = cars.filter(c => c.status === 'ready');
 
@@ -1070,6 +1050,22 @@ const CreateRental = () => {
 
           {/* 3. CHI TIẾT TẠM TÍNH */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
+            {startDate && endDate && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#F8FAFC', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid #E2E8F0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Nhận xe:</span>
+                  <strong style={{ fontSize: '13px', color: '#0F172A' }}>
+                    {new Date(startDate).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Trả xe:</span>
+                  <strong style={{ fontSize: '13px', color: '#0F172A' }}>
+                    {new Date(endDate).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </strong>
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Đơn giá thuê xe:</span>
               <strong>{baseRate.toLocaleString()} ₫ / {pricingType === 'hourly' ? 'giờ' : pricingType === 'weekly' ? 'tuần' : 'ngày'}</strong>
@@ -1223,8 +1219,20 @@ const CreateRental = () => {
                 <input type="number" placeholder="VD: 15000" value={quickKm} onChange={e => setQuickKm(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>SĐT Chủ xe góp *</label>
-                <input type="tel" placeholder="VD: 0901234567" value={quickPhone} onChange={e => setQuickPhone(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Chọn Chủ xe gốc *</label>
+                <select 
+                  value={quickPhone} 
+                  onChange={e => setQuickPhone(e.target.value)} 
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', background: '#FFF' }} 
+                  required
+                >
+                  <option value="">-- Chọn Chủ xe --</option>
+                  {owners.map(o => (
+                    <option key={o.id} value={o.phone}>
+                      {o.name} - {o.phone}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

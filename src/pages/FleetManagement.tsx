@@ -89,28 +89,30 @@ const FleetManagement = () => {
   const [expenseDate, setExpenseDate] = useState('');
   const [expenseLocation, setExpenseLocation] = useState('');
 
-  const handleAddExpenseSubmit = (e: React.FormEvent) => {
+  const handleAddExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId || !expenseTitle || !expenseAmount) return;
 
-    addExpense({
+    const success = await addExpense({
       id: Date.now().toString(),
       title: expenseTitle,
       amount: parseInt(expenseAmount) || 0,
       category: expenseCategory,
-      date: expenseDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }),
+      date: expenseDate,
       ref: selectedCarId,
       location: expenseLocation || 'Chưa cập nhật'
     });
 
-    setShowAddExpenseModal(false);
-    showToast('Đã thêm khoản chi phí mới cho xe này!', 'success');
-    
-    // Reset form
-    setExpenseTitle('');
-    setExpenseAmount('');
-    setExpenseCategory('Bảo dưỡng');
-    setExpenseLocation('');
+    if (success) {
+      setShowAddExpenseModal(false);
+      
+      // Reset form
+      setExpenseTitle('');
+      setExpenseAmount('');
+      setExpenseCategory('Bảo dưỡng');
+      setExpenseDate('');
+      setExpenseLocation('');
+    }
   };
   
   // Modals visibility
@@ -213,7 +215,7 @@ const FleetManagement = () => {
     return matchesSearch && matchesStatus && matchesCustomer && matchesPrice && matchesOwner && matchesColor;
   });
 
-  const handleCreateCar = (e: React.FormEvent) => {
+  const handleCreateCar = async (e: React.FormEvent) => {
     e.preventDefault();
 
     let finalOwnerPhone = '';
@@ -223,7 +225,7 @@ const FleetManagement = () => {
         showToast('Vui lòng nhập Tên và Số điện thoại chủ xe mới!', 'error');
         return;
       }
-      addOwner({
+      const success = await addOwner({
         id: Date.now().toString(),
         name: newOwnerName,
         phone: newOwnerPhone,
@@ -231,6 +233,7 @@ const FleetManagement = () => {
         notes: 'Chủ xe mới tạo từ Quản lý Đội xe',
         image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
       });
+      if (!success) return;
       finalOwnerPhone = newOwnerPhone;
     } else {
       finalOwnerPhone = selectedOwnerPhone || owners[0]?.phone || newPhone;
@@ -271,28 +274,30 @@ const FleetManagement = () => {
       images: newGalleryImages
     };
 
-    addCar(carToAdd);
-    setShowAddForm(false);
-    showToast('Thêm xe mới vào đội xe thành công!', 'success');
+    const success = await addCar(carToAdd);
+    if (success) {
+      setShowAddForm(false);
+      showToast('Thêm xe mới vào đội xe thành công!', 'success');
 
-    // Reset Form
-    setNewPlate('');
-    setNewName('');
-    setNewBrand('');
-    setNewYear('');
-    setNewSeats(5);
-    setNewColor('');
-    setNewKm('');
-    setSelectedOwnerPhone('');
-    setNewOwnerName('');
-    setNewGalleryImages([]);
-    setNewOwnerPhone('');
-    setNewOwnerAddress('');
-    setNewPhone('');
-    setNewImage('');
-    setNewPriceDay('800000');
-    setNewPriceHour('100000');
-    setNewPriceWeek('5000000');
+      // Reset Form
+      setNewPlate('');
+      setNewName('');
+      setNewBrand('');
+      setNewYear('');
+      setNewSeats(5);
+      setNewColor('');
+      setNewKm('');
+      setSelectedOwnerPhone('');
+      setNewOwnerName('');
+      setNewGalleryImages([]);
+      setNewOwnerPhone('');
+      setNewOwnerAddress('');
+      setNewPhone('');
+      setNewImage('');
+      setNewPriceDay('800000');
+      setNewPriceHour('100000');
+      setNewPriceWeek('5000000');
+    }
   };
 
   const handleOpenEdit = () => {

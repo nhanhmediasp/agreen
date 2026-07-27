@@ -319,7 +319,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
   };
 
   // Save Service Order
-  const handleSaveOrder = (e: React.FormEvent) => {
+  const handleSaveOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!orderForm.carId) {
@@ -349,11 +349,11 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         assignedCarId: orderForm.carId,
         commissionRate: Number(orderForm.driverCommissionRate)
       };
-      addDriver(newDriverObj);
-      selectedDriverId = newDriverId;
-      selectedDriverName = newDriverObj.name;
-      selectedDriverPhone = newDriverObj.phone;
-      showToast(`Đã thêm nhanh tài xế ${newDriverObj.name}`, 'success');
+        const success = await addDriver(newDriverObj);
+        if (!success) return;
+        selectedDriverId = newDriverId;
+        selectedDriverName = newDriverObj.name;
+        selectedDriverPhone = newDriverObj.phone;
     } else {
       const foundDriver = drivers.find(d => d.id === selectedDriverId);
       if (foundDriver) {
@@ -418,11 +418,9 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         notes: orderForm.notes,
         createdAt: new Date().toISOString()
       };
-      addServiceOrder(newOrder);
-      showToast(`Tạo thành công đơn dịch vụ mới ${newOrder.id}!`, 'success');
+      const success = await addServiceOrder(newOrder);
+      if (success) setShowOrderModal(false);
     }
-
-    setShowOrderModal(false);
   };
 
   // Open Driver Modal
@@ -460,7 +458,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
   };
 
   // Save Driver
-  const handleSaveDriver = (e: React.FormEvent) => {
+  const handleSaveDriver = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!driverForm.name || !driverForm.phone) {
       showToast('Vui lòng điền Họ tên và Số điện thoại tài xế!', 'error');
@@ -496,10 +494,9 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         commissionRate: Number(driverForm.commissionRate) || 80,
         avatar: driverForm.avatar
       };
-      addDriver(newDriver);
-      showToast(`Đã thêm tài xế mới ${newDriver.name}!`, 'success');
+      const success = await addDriver(newDriver);
+      if (success) setShowDriverModal(false);
     }
-    setShowDriverModal(false);
   };
 
   // Delete Order
@@ -1701,7 +1698,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                         onClick={() => setIsQuickCreateDriver(!isQuickCreateDriver)}
                         style={{ background: 'none', border: 'none', color: '#006837', fontSize: '11px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
                       >
-                        {isQuickCreateDriver ? '← Chọn sẵn' : '+ Tạo mới'}
+                        {isQuickCreateDriver ? '← Chọn sẵn' : '+ Thêm tài xế mới'}
                       </button>
                     </div>
 

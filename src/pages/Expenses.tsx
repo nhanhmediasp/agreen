@@ -57,7 +57,7 @@ const Expenses = () => {
 
   const totalIncidentalAmount = allIncidentalExpenses.reduce((sum, i) => sum + i.amount, 0);
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !amount) return;
 
@@ -70,12 +70,16 @@ const Expenses = () => {
       ref
     };
 
-    addExpense(newExpense);
-    setShowAddForm(false);
-    showToast('Đã ghi nhận khoản chi phí vận hành mới!', 'success');
-    setTitle('');
-    setAmount('');
-    setRef('');
+    const success = await addExpense(newExpense);
+    if (success) {
+      setShowAddForm(false);
+      showToast('Đã ghi nhận khoản chi phí vận hành mới!', 'success');
+      setTitle('');
+      setAmount('');
+      setCategory('Bảo dưỡng');
+      setDate(new Date().toISOString().split('T')[0]);
+      setRef('');
+    }
   };
 
   const handleOpenEdit = (expense: Expense) => {
@@ -659,12 +663,12 @@ const Expenses = () => {
                             </td>
                             <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                               <button 
-                                onClick={() => {
+                                onClick={async () => {
                                   if (payoutTotal <= 0) {
                                     showToast('Chủ xe này chưa có số tiền chi trả cần thanh toán!', 'error');
                                     return;
                                   }
-                                  addExpense({
+                                  const success = await addExpense({
                                     id: Date.now().toString(),
                                     title: `Thanh toán chi trả cho chủ xe ${owner.name}`,
                                     amount: payoutTotal,
@@ -672,7 +676,7 @@ const Expenses = () => {
                                     date: new Date().toISOString().split('T')[0],
                                     ref: ownerCars[0]?.id || ''
                                   });
-                                  showToast(`Đã tạo phiếu chi ${payoutTotal.toLocaleString()} ₫ cho chủ xe ${owner.name}!`, 'success');
+                                  if (success) showToast(`Đã tạo phiếu chi ${payoutTotal.toLocaleString()} ₫ cho chủ xe ${owner.name}!`, 'success');
                                 }}
                                 className="btn-primary"
                                 style={{ padding: '6px 12px', fontSize: '12px' }}
