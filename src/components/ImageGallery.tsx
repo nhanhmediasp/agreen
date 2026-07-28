@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, X, Check, Trash2, AlertCircle, FileText, Search } from 'lucide-react';
+import { uploadFile } from '../utils/upload';
+import { csrfHeaders } from '../auth/clientAuth';
 
 interface ImageGalleryProps {
   onSelect: (imageUrl: string | string[], fileName?: string) => void;
@@ -16,8 +18,9 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
 
   // Load uploaded files from the Express backend API on mount
   useEffect(() => {
-    fetch('/api/uploads')
+    fetch('/api/uploads', { credentials: 'include' })
       .then(res => {
+        if (res.status === 401) window.dispatchEvent(new Event('agreen:unauthorized'));
         const ct = res.headers.get('content-type') || '';
         if (!ct.includes('application/json')) {
           throw new Error('API không khả dụng – backend chưa chạy');
@@ -34,35 +37,26 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
       });
   }, []);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const files = Array.from(e.target.files);
 
-    files.forEach(async (file) => {
-      const id = Date.now().toString() + Math.random().toString(36).substring(2, 7);
-      const formData = new FormData();
-      formData.append('file', file);
-
-      try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
-        const ct = res.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) {
-          alert('Lỗi: Backend API chưa chạy. Kiểm tra Node.js server (pm2 status) trên aaPanel.');
-          return;
-        }
-        const json = await res.json();
-        if (json.success && json.data) {
-          const newItem = { id, url: json.data.url, name: json.data.filename || file.name, usedIn: null };
-          setImages(prev => [newItem, ...prev]);
-          if (!multiple) { setSelectedIds([id]); } else { setSelectedIds(prev => [id, ...prev]); }
-        } else {
-          alert(`Lỗi upload ảnh: ${json.error || 'Lỗi không xác định'}`);
-        }
-      } catch (err) {
-        alert(`Lỗi kết nối API: ${err instanceof Error ? err.message : err}`);
-      }
-    });
     e.target.value = '';
+    try {
+      const uploaded = await Promise.all(files.map(async (file) => {
+        const result = await uploadFile(file);
+        return {
+          id: result.filename,
+          url: result.url,
+          name: result.originalName || result.filename,
+          usedIn: null,
+        };
+      }));
+      setImages((previous) => [...uploaded, ...previous]);
+      setSelectedIds(multiple ? uploaded.map((item) => item.id) : [uploaded[0].id]);
+    } catch (error) {
+      alert(`Lỗi upload: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`);
+    }
   };
 
   const toggleSelect = (id: string) => {
@@ -84,23 +78,23 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
     onClose();
   };
 
-  const deleteFromServer = (imgUrl: string) => {
+  const deleteFromServer = async (imgUrl: string): Promise<boolean> => {
     const filename = imgUrl.split('/').pop();
-    if (!filename) return;
-    fetch(`/api/uploads/${filename}`, { method: 'DELETE' })
-      .then(res => {
-        const ct = res.headers.get('content-type') || '';
-        if (ct.includes('application/json')) return res.json();
-        return { success: false };
-      })
-      .then(res => {
-        if (!res.success) {
-          console.error('Không thể xóa file trên server:', res.error);
-        }
-      })
-      .catch(err => {
-        console.error('Lỗi mạng khi xóa file:', err);
+    if (!filename) return false;
+    try {
+      const response = await fetch(`/api/uploads/${encodeURIComponent(filename)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: csrfHeaders(),
       });
+      const result: { success?: boolean; error?: string } = await response.json();
+      if (response.status === 401) window.dispatchEvent(new Event('agreen:unauthorized'));
+      if (!response.ok || !result.success) throw new Error(result.error || 'Không thể xóa file');
+      return true;
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Không thể xóa file');
+      return false;
+    }
   };
 
   const removeImageAndPersist = (id: string) => {
@@ -108,22 +102,22 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
     setSelectedIds(prev => prev.filter(i => i !== id));
   };
 
-  const handleDeleteAttempt = (id: string) => {
+  const handleDeleteAttempt = async (id: string) => {
     const img = images.find(i => i.id === id);
     if (img?.usedIn) {
       setDeleteWarning(img.id);
     } else {
       if (img && img.url.startsWith('/uploads/')) {
-        deleteFromServer(img.url);
+        if (!await deleteFromServer(img.url)) return;
       }
       removeImageAndPersist(id);
     }
   };
 
-  const confirmDelete = (id: string) => {
+  const confirmDelete = async (id: string) => {
     const img = images.find(i => i.id === id);
     if (img && img.url.startsWith('/uploads/')) {
-      deleteFromServer(img.url);
+      if (!await deleteFromServer(img.url)) return;
     }
     removeImageAndPersist(id);
     setDeleteWarning(null);
@@ -173,7 +167,7 @@ export const ImageGallery = ({ onSelect, onClose, multiple = false }: ImageGalle
               <input 
                 ref={fileInputRef}
                 type="file" 
-                accept="image/*,application/pdf" 
+                accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
                 multiple={true}
                 onChange={handleFileUpload}
                 style={{ display: 'none' }} 

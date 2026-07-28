@@ -16,15 +16,25 @@ const Dashboard: React.FC = () => {
   const totalCarsCount = cars.length;
   const rentedCount = cars.filter(c => c.status === 'rented').length;
   const readyCount = cars.filter(c => c.status === 'ready').length;
-  const todayRevenue = 24500000;
+  const todayInVietnam = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const todayRevenue = rentals
+    .filter((rental) => (
+      rental.status === 'completed'
+      && new Date(rental.returnedAt ?? rental.endDate)
+        .toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) === todayInVietnam
+    ))
+    .reduce((sum, rental) => sum + rental.totalAmount, 0);
 
   const extendedCars: ExtendedCar[] = cars.map(car => {
-    const isOverdueCar = car.id === '51F-999.88' || (car.status === 'rented' && car.timeRemaining?.includes('Trễ'));
     const activeRental = rentals.find(r => r.carId === car.id && r.status === 'active');
+    const isOverdueCar = Boolean(activeRental && new Date(activeRental.endDate).getTime() < Date.now());
+    const overdueHours = activeRental
+      ? Math.max(0, Math.floor((Date.now() - new Date(activeRental.endDate).getTime()) / 3_600_000))
+      : 0;
     return {
       ...car,
       isOverdue: isOverdueCar,
-      overdueText: isOverdueCar ? 'Quá hạn 02 giờ 45 phút - Cần gọi khách!' : undefined,
+      overdueText: isOverdueCar ? `Quá hạn ${overdueHours} giờ - Cần liên hệ khách!` : undefined,
       expectedReturn: activeRental
         ? new Date(activeRental.endDate).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' hôm nay'
         : car.timeRemaining,
@@ -32,12 +42,31 @@ const Dashboard: React.FC = () => {
     };
   });
 
-  const mockSchedules: ScheduleItem[] = [
-    { id: 'sch-1', type: 'return', plate: '51F-123.45', customerName: 'Nguyễn Văn A', customerPhone: '0901234567', time: '14:30 Hôm nay', carName: 'Mazda 3 2022' },
-    { id: 'sch-2', type: 'pickup', plate: '51H-777.89', customerName: 'Trần Thị B', customerPhone: '0988776655', time: '16:00 Hôm nay', carName: 'Kia Carnival 2023' },
-    { id: 'sch-3', type: 'return', plate: '51K-456.78', customerName: 'Lê Hoàng C', customerPhone: '0912345678', time: '17:30 Hôm nay', carName: 'Toyota Camry 2021' },
-    { id: 'sch-4', type: 'pickup', plate: '51G-555.12', customerName: 'Phạm Minh D', customerPhone: '0933445566', time: '08:00 Ngày mai', carName: 'Honda CR-V 2022' },
-  ];
+  const schedules: ScheduleItem[] = rentals
+    .filter((rental) => rental.status === 'pending' || rental.status === 'active')
+    .map((rental) => {
+      const eventAt = rental.status === 'pending' ? rental.startDate : rental.endDate;
+      const car = cars.find((item) => item.id === rental.carId);
+      return {
+        id: rental.id,
+        type: rental.status === 'pending' ? 'pickup' as const : 'return' as const,
+        plate: rental.carId,
+        customerName: rental.customerName,
+        customerPhone: rental.customerPhone,
+        time: new Date(eventAt).toLocaleString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          hour: '2-digit',
+          minute: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+        }),
+        carName: car?.name ?? rental.carId,
+        eventAt,
+      };
+    })
+    .sort((first, second) => Date.parse(first.eventAt) - Date.parse(second.eventAt))
+    .slice(0, 10)
+    .map(({ eventAt: _eventAt, ...schedule }) => schedule);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -74,8 +103,6 @@ const Dashboard: React.FC = () => {
         <KpiCard
           label="Tổng đội xe"
           value={totalCarsCount}
-          changePercent={4.8}
-          changeLabel="vs tháng trước"
           icon={<CarIcon size={20} color="#006837" />}
           iconBg="#ECFDF5"
           onClick={() => navigate('/fleet')}
@@ -83,8 +110,6 @@ const Dashboard: React.FC = () => {
         <KpiCard
           label="Đang cho thuê"
           value={rentedCount}
-          changePercent={12.5}
-          changeLabel="vs hôm qua"
           icon={<CarIcon size={20} color="#1D4ED8" />}
           iconBg="#EFF6FF"
           statusBorderColor="var(--status-rented-border)"
@@ -93,8 +118,6 @@ const Dashboard: React.FC = () => {
         <KpiCard
           label="Xe sẵn sàng"
           value={readyCount}
-          changePercent={-2.1}
-          changeLabel="vs hôm qua"
           icon={<CheckCircle2 size={20} color="#047857" />}
           iconBg="#ECFDF5"
           statusBorderColor="var(--status-available-border)"
@@ -103,8 +126,6 @@ const Dashboard: React.FC = () => {
         <KpiCard
           label="Doanh thu hôm nay"
           value={`${(todayRevenue / 1000000).toFixed(1)}M ₫`}
-          changePercent={8.4}
-          changeLabel="vs hôm qua"
           isMono={true}
           icon={<TrendingUp size={20} color="#B45309" />}
           iconBg="#FFFBEB"
@@ -118,7 +139,7 @@ const Dashboard: React.FC = () => {
       {/* Bottom 2 columns */}
       <div className="grid grid-auto-lg gap-lg">
         <UpcomingScheduleList
-          schedules={mockSchedules}
+          schedules={schedules}
           onSelectSchedule={(item) => showToast(`Chi tiết lịch: ${item.customerName} - ${item.plate}`, 'info')}
         />
         <RecentBookingsTable

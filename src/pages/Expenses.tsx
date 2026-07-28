@@ -4,6 +4,7 @@ import { Plus, Search, ShieldAlert, UserCheck, DollarSign, Receipt } from 'lucid
 import { useApp, type Expense } from '../context/AppContext';
 import { MoneyInputLeft } from '../components/MoneyInput';
 import { Pagination } from '../components/Pagination';
+import { confirmAction } from '../utils/confirmAction';
 
 const Expenses = () => {
   const { expenses, addExpense, updateExpense, deleteExpense, cars, rentals, owners, showToast } = useApp();
@@ -14,7 +15,7 @@ const Expenses = () => {
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Bảo dưỡng');
-  const [date, setDate] = useState('2026-07-15');
+  const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }));
   const [ref, setRef] = useState('');
 
   // Filtering & Pagination States
@@ -30,7 +31,7 @@ const Expenses = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editCategory, setEditCategory] = useState('Bảo dưỡng');
-  const [editDate, setEditDate] = useState('2026-07-15');
+  const [editDate, setEditDate] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }));
   const [editRef, setEditRef] = useState('');
 
   const totalAmount = expenses.reduce((sum, item) => sum + item.amount, 0);
@@ -92,10 +93,10 @@ const Expenses = () => {
     setShowEditForm(true);
   };
 
-  const handleUpdateExpense = () => {
+  const handleUpdateExpense = async () => {
     if (!editingExpenseId || !editTitle || !editAmount) return;
 
-    updateExpense(editingExpenseId, {
+    const success = await updateExpense(editingExpenseId, {
       title: editTitle,
       amount: parseInt(editAmount) || 0,
       category: editCategory,
@@ -103,14 +104,19 @@ const Expenses = () => {
       ref: editRef
     });
 
-    setShowEditForm(false);
-    showToast('Đã cập nhật chi phí vận hành!', 'success');
+    if (success) {
+      setShowEditForm(false);
+      showToast('Đã cập nhật chi phí vận hành!', 'success');
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa khoản chi phí vận hành này?')) {
-      deleteExpense(id);
-      showToast('Đã xóa khoản chi phí!', 'success');
+  const handleDelete = async (id: string) => {
+    if (await confirmAction({
+      title: 'Xoá khoản chi phí?',
+      content: 'Khoản chi phí này sẽ bị xoá khỏi sổ vận hành.',
+      danger: true,
+    })) {
+      if (await deleteExpense(id)) showToast('Đã xóa khoản chi phí!', 'success');
     }
   };
 
@@ -635,8 +641,9 @@ const Expenses = () => {
                         const ownerCars = cars.filter(c => c.ownerPhone === owner.phone);
                         const ownerCarIds = ownerCars.map(c => c.id);
                         const ownerRentals = rentals.filter(r => ownerCarIds.includes(r.carId));
-                        const grossRevenue = ownerRentals.reduce((s, r) => s + r.totalAmount, 0);
-                        const payoutTotal = ownerRentals.reduce((s, r) => s + (r.ownerCommissionAmount ?? Math.round(r.totalAmount * 0.7)), 0);
+                        const completedRentals = ownerRentals.filter((rental) => rental.status === 'completed');
+                        const grossRevenue = completedRentals.reduce((s, r) => s + r.totalAmount, 0);
+                        const payoutTotal = completedRentals.reduce((s, r) => s + (r.ownerCommissionAmount ?? 0), 0);
 
                         return (
                           <tr key={owner.id} style={{ borderBottom: '1px solid var(--border)' }}>

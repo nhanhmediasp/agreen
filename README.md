@@ -58,7 +58,7 @@ npm run build
    ```bash
    cd /www/wwwroot/agreen
    psql -U vpanel_car_user -d vpanel_car_rental -f database/schema.sql
-   psql -U vpanel_car_user -d vpanel_car_rental -f database/seed.sql
+   npm run migrate
    ```
 
 ---
@@ -69,7 +69,7 @@ npm run build
    ```bash
    cd /www/wwwroot/agreen
    cp .env.example .env
-   # Sửa mật khẩu DB_PASSWORD trong file .env
+   # Điền DB_*, JWT_SECRET, CORS_ORIGIN và mật khẩu bootstrap một lần
    nano .env
    ```
 2. Khởi chạy Backend bằng PM2:
@@ -77,6 +77,9 @@ npm run build
    pm2 start server/server.js --name "agreen-api"
    pm2 save
    ```
+
+Không có tài khoản/mật khẩu admin mặc định. Xem `UPDATE_GUIDE.md` để bootstrap
+admin, backup/migration, rotate secret và chạy kiểm tra trước khi phát hành.
 
 ---
 

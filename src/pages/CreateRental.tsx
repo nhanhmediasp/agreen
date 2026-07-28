@@ -5,6 +5,8 @@ import { Image as ImageIcon, Receipt, CheckCircle, Search, User, Plus, X, Upload
 import { useApp, type Rental, type Car } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { MoneyInput, MoneyInputLeft } from '../components/MoneyInput';
+import { uploadFile, uploadFiles } from '../utils/upload';
+import { hasBookingConflict, isVehicleSelectableForPeriod } from '../utils/rentalAvailability';
 
 const CreateRental = () => {
   const navigate = useNavigate();
@@ -73,7 +75,10 @@ const CreateRental = () => {
     return days;
   };
 
-  const getCarStatusForDay = (dayDateStr: string, carId: string) => {
+  const getCarStatusForDay = (
+    dayDateStr: string,
+    carId: string,
+  ): { status: 'ready' | 'rented' | 'partial'; customer: string | null; rentals: Rental[] } => {
     if (!carId) return { status: 'ready', customer: null, rentals: [] };
     const targetDateStart = new Date(`${dayDateStr}T00:00:00`).getTime();
     const targetDateEnd = new Date(`${dayDateStr}T23:59:59`).getTime();
@@ -122,14 +127,13 @@ const CreateRental = () => {
       }
     }
   };
-  const [pricingType, setPricingType] = useState<'hourly' | 'daily' | 'weekly'>('daily');
   const [customDuration, setCustomDuration] = useState('2'); // Default 2 units
   const [isWeekend, setIsWeekend] = useState(false);
   const [weekendSurchargePercent, setWeekendSurchargePercent] = useState('20'); // Editable weekend surcharge
   const [startKm, setStartKm] = useState('0');
   const [endKm, setEndKm] = useState('0');
-  const [startFuel, setStartFuel] = useState('8/8');
-  const [initialRentalStatus, setInitialRentalStatus] = useState<'pending' | 'active' | 'completed'>('pending');
+  const startFuel = '8/8';
+  const initialRentalStatus = 'pending' as const;
 
   // Form State - Customer Mode & Searching
   const [customerMode, setCustomerMode] = useState<'select' | 'create'>('select');
@@ -146,9 +150,8 @@ const CreateRental = () => {
   // Form State - Financials & Contract
   const [deposit, setDeposit] = useState('10000000');
   const [deliveryFee, setDeliveryFee] = useState('150000');
-  const [customRentalFeeInput, setCustomRentalFeeInput] = useState('');
-  const [customCommissionInput, setCustomCommissionInput] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<Rental['paymentStatus']>('deposit');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Contract Source Selection & Receipt View State
   const [contractSource, setContractSource] = useState<'system' | 'uploaded'>('system');
@@ -173,8 +176,9 @@ const CreateRental = () => {
       setStartDate(`${start}T${pickupTime}`);
       setEndDate(`${end}T${returnTime}`);
       
-      const diffMs = new Date(end).getTime() - new Date(start).getTime();
-      const diffDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1);
+      const diffMs = new Date(`${end}T${returnTime}`).getTime()
+        - new Date(`${start}T${pickupTime}`).getTime();
+      const diffDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
       setCustomDuration(diffDays.toString());
     } else {
       setStartDate('');
@@ -192,13 +196,7 @@ const CreateRental = () => {
         return;
       }
       
-      const hasConflict = rentals?.some(r => {
-        if (r.carId !== selectedCarId) return false;
-        if (!['pending', 'active'].includes(r.status)) return false;
-        const rS = new Date(r.startDate).getTime();
-        const rE = new Date(r.endDate).getTime();
-        return s < rE && e > rS;
-      });
+      const hasConflict = hasBookingConflict(selectedCarId, startDate, endDate, rentals);
 
       if (hasConflict) {
         setTimeConflictError('Khoảng thời gian bị trùng lịch thuê khác!');
@@ -231,18 +229,15 @@ const CreateRental = () => {
 
   const getRate = () => {
     if (!selectedCarObj) return 800000; // default
-    if (pricingType === 'hourly') return selectedCarObj.pricePerHour;
-    if (pricingType === 'weekly') return selectedCarObj.pricePerWeek;
     return selectedCarObj.pricePerDay; // daily
   };
 
   const baseRate = getRate();
   const durNum = parseFloat(customDuration) || 0;
-  const surchargeFactor = isWeekend ? (1 + (parseFloat(weekendSurchargePercent) || 0) / 100) : 1.0;
-  const computedRentalFee = Math.round(durNum * baseRate * surchargeFactor);
+  const computedRentalFee = Math.round(durNum * baseRate);
 
   // Allow user custom rental fee override
-  const rentalFee = customRentalFeeInput !== '' ? (parseInt(customRentalFeeInput) || 0) : computedRentalFee;
+  const rentalFee = computedRentalFee;
   const delFeeNum = parseInt(deliveryFee) || 0;
   const totalAmount = rentalFee + delFeeNum;
 
@@ -250,34 +245,24 @@ const CreateRental = () => {
   const carOwnerObj = selectedCarObj ? owners.find(o => o.phone === selectedCarObj.ownerPhone) : null;
   const ownerCommissionRate = carOwnerObj?.commissionRate ?? 75;
   const computedOwnerCommission = Math.round((rentalFee * ownerCommissionRate) / 100);
-  const ownerCommissionAmount = customCommissionInput !== '' ? (parseInt(customCommissionInput) || 0) : computedOwnerCommission;
+  const ownerCommissionAmount = computedOwnerCommission;
 
   const getOwnerNameByPhone = (phone: string) => {
     const match = owners.find(o => o.phone === phone);
     return match ? match.name : phone;
   };
 
-  const handleUploadCarImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadCarImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const files = Array.from(e.target.files);
-    const newUrls: string[] = [];
-    let processed = 0;
-
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        if (evt.target?.result) {
-          newUrls.push(evt.target.result as string);
-        }
-        processed++;
-        if (processed === files.length) {
-          setCarImages(prev => [...prev, ...newUrls]);
-          showToast(`Đã tải lên thành công ${files.length} ảnh bàn giao xe!`, 'success');
-        }
-      };
-      reader.readAsDataURL(file);
-    });
     e.target.value = '';
+    try {
+      const uploaded = await uploadFiles(files);
+      setCarImages((previous) => [...previous, ...uploaded.map((item) => item.url)]);
+      showToast(`Đã tải lên thành công ${files.length} ảnh bàn giao xe!`, 'success');
+    } catch (error) {
+      showToast(`Không thể tải ảnh: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`, 'error');
+    }
   };
 
   const handleDeleteCarImage = (index: number) => {
@@ -286,6 +271,7 @@ const CreateRental = () => {
   };
 
   const handleFinishRental = async () => {
+    if (isSubmitting) return;
     const finalPhone = customerMode === 'select' ? selectedCustomerPhone : customerPhone;
     
     if (!selectedCarId || !customerName || !finalPhone || !startDate || !endDate) {
@@ -305,7 +291,7 @@ const CreateRental = () => {
         showToast('Số điện thoại khách hàng đã tồn tại! Vui lòng chọn khách hàng có sẵn.', 'error');
         return;
       }
-      
+      setIsSubmitting(true);
       const success = await addCustomer({
         id: Date.now().toString(),
         name: customerName,
@@ -323,6 +309,7 @@ const CreateRental = () => {
       });
       
       if (!success) {
+        setIsSubmitting(false);
         return;
       }
     }
@@ -340,7 +327,7 @@ const CreateRental = () => {
       extraFee: 0,
       totalAmount,
       paymentStatus,
-      status: initialRentalStatus || 'pending',
+      status: 'pending',
       startKm: parseInt(startKm) || 0,
       endKm: (endKm !== '' && endKm !== undefined && endKm !== null && !isNaN(parseInt(endKm))) ? parseInt(endKm) : undefined,
       startFuel,
@@ -349,14 +336,15 @@ const CreateRental = () => {
       fileName: contractSource === 'uploaded' ? (uploadedFileName || 'Hop_Dong_Luu_Tru.pdf') : undefined,
       ownerCommissionAmount,
       conditionImages: carImages,
-      createdAt: new Date().toISOString(),
-      deliveredAt: (initialRentalStatus === 'active' || initialRentalStatus === 'completed') ? new Date().toISOString() : undefined,
-      returnedAt: initialRentalStatus === 'completed' ? new Date().toISOString() : undefined
+      createdAt: new Date().toISOString()
     };
 
-    const success = await addRental(rentalToAdd);
-    if (success) {
-      setCreatedReceiptRental(rentalToAdd);
+    setIsSubmitting(true);
+    try {
+      const success = await addRental(rentalToAdd);
+      if (success) setCreatedReceiptRental(rentalToAdd);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -378,9 +366,9 @@ const CreateRental = () => {
       km: parseInt(quickKm) || 0,
       ownerPhone: quickPhone,
       image: quickImage || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
-      expiryRegistration: '2027-01-01',
-      expiryInsurance: '2026-12-01',
-      expiryLicense: '2027-06-01',
+      expiryRegistration: '',
+      expiryInsurance: '',
+      expiryLicense: '',
       pricePerDay: parseInt(quickPriceDay) || 800000,
       pricePerHour: parseInt(quickPriceHour) || 100000,
       pricePerWeek: parseInt(quickPriceWeek) || 5000000
@@ -407,11 +395,17 @@ const CreateRental = () => {
     }
   };
 
-  const readyCars = cars.filter(c => c.status === 'ready');
+  const selectableCars = cars.filter((car) => isVehicleSelectableForPeriod(
+    car.status,
+    car.id,
+    startDate,
+    endDate,
+    rentals,
+  ));
 
   // Car search results
   const matchingCars = carSearchInput.trim()
-    ? readyCars.filter(c => 
+    ? selectableCars.filter(c =>
         c.id.toLowerCase().includes(carSearchInput.toLowerCase()) || 
         c.name.toLowerCase().includes(carSearchInput.toLowerCase())
       ).slice(0, 5)
@@ -617,7 +611,7 @@ const CreateRental = () => {
                               )}
                               {st.status === 'partial' && (
                                 <div style={{ display: 'flex', flexDirection: 'column', marginTop: '2px', gap: '1px' }}>
-                                  {st.rentals?.map((r: any, i: number) => {
+                                  {st.rentals.map((r, i) => {
                                     const rStart = new Date(r.startDate);
                                     const rEnd = new Date(r.endDate);
                                     const fmtTime = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
@@ -668,7 +662,7 @@ const CreateRental = () => {
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Phụ phí Cuối tuần / Lễ tết (%)</label>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                    <input type="checkbox" checked={isWeekend} onChange={e => { setIsWeekend(e.target.checked); setCustomRentalFeeInput(''); }} style={{ width: '18px', height: '18px' }} />
+                    <input type="checkbox" checked={isWeekend} onChange={e => setIsWeekend(e.target.checked)} disabled style={{ width: '18px', height: '18px' }} />
                     Áp dụng phụ phí
                   </label>
                   {isWeekend && (
@@ -676,7 +670,7 @@ const CreateRental = () => {
                       <input 
                         type="number" 
                         value={weekendSurchargePercent} 
-                        onChange={e => { setWeekendSurchargePercent(e.target.value); setCustomRentalFeeInput(''); }}
+                        onChange={e => setWeekendSurchargePercent(e.target.value)}
                         style={{ width: '80px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontSize: '14px', textAlign: 'center' }} 
                       />
                       <span>%</span>
@@ -1008,20 +1002,20 @@ const CreateRental = () => {
                       <Upload size={16} /> Chọn tệp từ máy / ĐT
                       <input 
                         type="file" 
-                        accept="image/*,application/pdf" 
-                        onChange={(e) => {
+                        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                        onChange={async (e) => {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onload = (evt) => {
-                              if (evt.target?.result) {
-                                setUploadedFileUrl(evt.target.result as string);
-                                setUploadedFileName(file.name);
-                                showToast(`Đã chọn tệp: ${file.name}`, 'success');
-                              }
-                            };
-                            reader.readAsDataURL(file);
+                            try {
+                              const uploaded = await uploadFile(file);
+                              setUploadedFileUrl(uploaded.url);
+                              setUploadedFileName(uploaded.originalName || file.name);
+                              showToast(`Đã tải tệp: ${file.name}`, 'success');
+                            } catch (error) {
+                              showToast(`Không thể tải tệp: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`, 'error');
+                            }
                           }
+                          e.target.value = '';
                         }}
                         style={{ display: 'none' }} 
                       />
@@ -1054,7 +1048,7 @@ const CreateRental = () => {
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Tình trạng thanh toán</label>
                   <select 
                     value={paymentStatus}
-                    onChange={e => setPaymentStatus(e.target.value as any)}
+                    onChange={e => setPaymentStatus(e.target.value as Rental['paymentStatus'])}
                     style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '16px', fontFamily: 'inherit' }}
                   >
                     <option value="deposit">Đã đặt cọc (Thanh toán sau)</option>
@@ -1073,8 +1067,8 @@ const CreateRental = () => {
                 >
                   Quay lại bước 2
                 </button>
-                <button className="btn-primary" onClick={handleFinishRental} style={{ padding: '12px 32px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle size={18} /> Tạo đơn thuê & Giao xe
+                <button disabled={isSubmitting} className="btn-primary" onClick={handleFinishRental} style={{ padding: '12px 32px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={18} /> {isSubmitting ? 'Đang tạo…' : 'Tạo booking chờ bàn giao'}
                 </button>
               </div>
             </div>
@@ -1139,11 +1133,11 @@ const CreateRental = () => {
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Đơn giá thuê xe:</span>
-              <strong>{baseRate.toLocaleString()} ₫ / {pricingType === 'hourly' ? 'giờ' : pricingType === 'weekly' ? 'tuần' : 'ngày'}</strong>
+              <strong>{baseRate.toLocaleString()} ₫ / ngày</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Thời lượng:</span>
-              <strong>{durNum} {pricingType === 'hourly' ? 'giờ' : pricingType === 'weekly' ? 'tuần' : 'ngày'}</strong>
+              <strong>{durNum} ngày</strong>
             </div>
 
             {isWeekend && (
@@ -1160,8 +1154,9 @@ const CreateRental = () => {
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Tự động: {computedRentalFee.toLocaleString('vi-VN')}₫</span>
               </div>
               <MoneyInput
-                value={customRentalFeeInput}
-                onChange={setCustomRentalFeeInput}
+                value={computedRentalFee}
+                onChange={() => undefined}
+                disabled
                 style={{ width: '110px', padding: '6px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '13px', fontFamily: 'inherit', textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }} 
               />
             </div>
@@ -1175,8 +1170,9 @@ const CreateRental = () => {
                 </span>
               </div>
               <MoneyInput
-                value={customCommissionInput}
-                onChange={setCustomCommissionInput}
+                value={computedOwnerCommission}
+                onChange={() => undefined}
+                disabled
                 placeholder={computedOwnerCommission ? computedOwnerCommission.toString() : '0'}
                 style={{ width: '120px', padding: '5px 8px', fontSize: '12px', fontWeight: 700, color: 'var(--status-available-text)', border: '1px solid var(--status-available-border)', background: 'white' }}
               />
@@ -1197,7 +1193,7 @@ const CreateRental = () => {
               <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>Trạng thái đơn thuê khi tạo:</label>
               <select 
                 value={initialRentalStatus}
-                onChange={e => setInitialRentalStatus(e.target.value as any)}
+                disabled
                 style={{ padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontSize: '12.5px', fontWeight: 700, fontFamily: 'inherit', background: 'white' }}
               >
                 <option value="pending">🟡 Chờ bàn giao xe cho khách</option>

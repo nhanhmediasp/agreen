@@ -4,9 +4,19 @@ import { Search, Plus, Phone, MapPin, X, ArrowLeft, Edit, Image as ImageIcon, Re
 import { useApp, type Owner } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { Pagination } from '../components/Pagination';
+import { confirmAction } from '../utils/confirmAction';
 
 const Owners = () => {
-  const { owners, addOwner, updateOwner, deleteOwner, cars, rentals, addExpense, showToast } = useApp();
+  const {
+    owners,
+    addOwner,
+    updateOwner,
+    deleteOwner,
+    createOwnerPayout,
+    cars,
+    rentals,
+    showToast,
+  } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
@@ -70,8 +80,9 @@ const Owners = () => {
   useEffect(() => { setOwnerRentalPage(1); }, [selectedOwnerId]);
 
   // Financial direct payout calculations
-  const totalGrossRevenue = ownerRentals.reduce((sum, r) => sum + r.totalAmount, 0);
-  const ownerPayoutAmount = ownerRentals.reduce((sum, r) => sum + (r.ownerCommissionAmount ?? Math.round(r.totalAmount * 0.7)), 0);
+  const completedOwnerRentals = ownerRentals.filter((rental) => rental.status === 'completed');
+  const totalGrossRevenue = completedOwnerRentals.reduce((sum, r) => sum + r.totalAmount, 0);
+  const ownerPayoutAmount = completedOwnerRentals.reduce((sum, r) => sum + (r.ownerCommissionAmount ?? 0), 0);
   const companyNetRevenue = totalGrossRevenue - ownerPayoutAmount;
 
   const filteredOwners = owners.filter(o => 
@@ -121,11 +132,11 @@ const Owners = () => {
     setShowEditForm(true);
   };
 
-  const handleUpdateOwner = (e: React.FormEvent) => {
+  const handleUpdateOwner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOwnerId) return;
 
-    updateOwner(selectedOwnerId, {
+    const success = await updateOwner(selectedOwnerId, {
       name: editName,
       phone: editPhone,
       address: editAddress,
@@ -134,42 +145,52 @@ const Owners = () => {
       commissionRate: parseInt(editCommissionRate) || 75
     });
 
-    setShowEditForm(false);
-    showToast('Đã cập nhật thông tin chủ xe thành công!', 'success');
+    if (success) {
+      setShowEditForm(false);
+      showToast('Đã cập nhật thông tin chủ xe thành công!', 'success');
+    }
   };
 
   const handleCreateCommissionExpense = async () => {
     if (!activeOwner) return;
-    if (ownerPayoutAmount <= 0) {
-      showToast('Chủ xe chưa có doanh số phát sinh để thanh toán chiết khấu!', 'error');
+    const now = new Date();
+    const vietnamParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: 'numeric',
+    }).formatToParts(now);
+    const year = Number(vietnamParts.find((part) => part.type === 'year')?.value);
+    const month = Number(vietnamParts.find((part) => part.type === 'month')?.value);
+    const periodStart = new Date(Date.UTC(year, month - 1, 1) - 7 * 3_600_000);
+    const periodEnd = new Date(Date.UTC(year, month, 1) - 7 * 3_600_000);
+    const eligibleRentals = completedOwnerRentals.filter((rental) => {
+      const completedAt = new Date(rental.returnedAt ?? rental.endDate);
+      return completedAt >= periodStart && completedAt < periodEnd;
+    });
+    if (eligibleRentals.length === 0) {
+      showToast('Không có hợp đồng hoàn thành trong tháng hiện tại để tạo payout.', 'error');
       return;
     }
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    const success = await addExpense({
-      id: Date.now().toString(),
-      title: `Chiết khấu doanh thu cho chủ xe ${activeOwner.name}`,
-      amount: ownerPayoutAmount,
-      category: 'Chiết khấu chủ xe',
-      date: todayStr,
-      ref: `Chủ xe #${activeOwner.id}`,
-      location: 'Chuyển khoản / Tiền mặt'
-    });
-
-    if (success) {
-      showToast(`Đã tạo phiếu chi thanh toán chiết khấu ${ownerPayoutAmount.toLocaleString()} ₫ cho chủ xe ${activeOwner.name}!`, 'success');
-    }
+    await createOwnerPayout(
+      activeOwner.id,
+      periodStart.toISOString(),
+      periodEnd.toISOString(),
+      eligibleRentals.map((rental) => rental.id),
+    );
   };
 
-  const handleDeleteOwner = () => {
+  const handleDeleteOwner = async () => {
     if (!selectedOwnerId) return;
     if (ownerCars.length > 0) {
       showToast('Không thể xóa chủ xe đang sở hữu xe hoạt động trong hệ thống!', 'error');
       return;
     }
-    if (confirm('Bạn có chắc chắn muốn xóa chủ xe này khỏi hệ thống?')) {
-      deleteOwner(selectedOwnerId);
-      setSelectedOwnerId(null);
+    if (await confirmAction({
+      title: 'Xoá chủ xe?',
+      content: 'Chủ xe không có xe liên kết sẽ bị xoá khỏi hệ thống.',
+      danger: true,
+    })) {
+      if (await deleteOwner(selectedOwnerId)) setSelectedOwnerId(null);
     }
   };
 
@@ -215,7 +236,7 @@ const Owners = () => {
                   style={{ padding: '3px 8px', fontSize: '11px', background: 'var(--primary)' }}
                   title="Tạo phiếu chi thanh toán cho chủ xe"
                 >
-                  <Receipt size={12} /> Tạo phiếu chi
+                  <Receipt size={12} /> Tạo payout nháp tháng này
                 </button>
               </div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--status-maintenance-text)', marginTop: '4px' }}>
@@ -456,12 +477,14 @@ const Owners = () => {
               </span>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     const rate = window.prompt("Nhập tỷ lệ chia hoa hồng (%) mới cho các chủ xe đã chọn (từ 0 đến 100):");
                     if (rate !== null && !isNaN(Number(rate))) {
-                      selectedOwnerIds.forEach(id => updateOwner(id, { commissionRate: Number(rate) }));
-                      setSelectedOwnerIds([]);
-                      showToast('Đã cập nhật tỷ lệ chia hoa hồng hàng loạt!', 'success');
+                      const results = await Promise.all(selectedOwnerIds.map(id => updateOwner(id, { commissionRate: Number(rate) })));
+                      if (results.every(Boolean)) {
+                        setSelectedOwnerIds([]);
+                        showToast('Đã cập nhật tỷ lệ chia hoa hồng hàng loạt!', 'success');
+                      }
                     }
                   }}
                   className="btn-secondary"
@@ -470,11 +493,17 @@ const Owners = () => {
                   Sửa hoa hồng hàng loạt
                 </button>
                 <button 
-                  onClick={() => {
-                    if (window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${selectedOwnerIds.length} chủ xe đã chọn?`)) {
-                      selectedOwnerIds.forEach(id => deleteOwner(id));
-                      setSelectedOwnerIds([]);
-                      showToast('Đã xóa hàng loạt chủ xe thành công!', 'success');
+                  onClick={async () => {
+                    if (await confirmAction({
+                      title: `Xoá ${selectedOwnerIds.length} chủ xe?`,
+                      content: 'Chỉ các chủ xe không còn dữ liệu liên kết mới có thể xoá.',
+                      danger: true,
+                    })) {
+                      const results = await Promise.all(selectedOwnerIds.map(id => deleteOwner(id)));
+                      if (results.every(Boolean)) {
+                        setSelectedOwnerIds([]);
+                        showToast('Đã xóa hàng loạt chủ xe thành công!', 'success');
+                      }
                     }
                   }}
                   className="btn-secondary" 
@@ -544,8 +573,13 @@ const Owners = () => {
                     return paginatedOwners.map((o, idx) => {
                       const oCars = cars.filter(c => c.ownerPhone === o.phone);
                       const oCarIds = oCars.map(c => c.id);
-                      const oRentals = rentals.filter(r => oCarIds.includes(r.carId));
-                      const oPayoutTotal = oRentals.reduce((s, r) => s + (r.ownerCommissionAmount ?? Math.round(r.totalAmount * 0.7)), 0);
+                      const oRentals = rentals.filter(
+                        (rental) => oCarIds.includes(rental.carId) && rental.status === 'completed',
+                      );
+                      const oPayoutTotal = oRentals.reduce(
+                        (sum, rental) => sum + (rental.ownerCommissionAmount ?? 0),
+                        0,
+                      );
 
                       return (
                         <tr 
@@ -594,9 +628,13 @@ const Owners = () => {
                           <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontSize: '13px' }}>{o.notes}</td>
                           <td style={{ padding: '16px 24px' }} onClick={e => e.stopPropagation()}>
                             <button 
-                              onClick={() => {
-                                if (window.confirm(`Bạn có chắc chắn muốn xóa đối tác chủ xe "${o.name}" khỏi hệ thống?`)) {
-                                  deleteOwner(o.id);
+                              onClick={async () => {
+                                if (await confirmAction({
+                                  title: `Xoá chủ xe ${o.name}?`,
+                                  content: 'Hành động chỉ thành công khi chủ xe không còn xe liên kết.',
+                                  danger: true,
+                                })) {
+                                  await deleteOwner(o.id);
                                 }
                               }}
                               style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}

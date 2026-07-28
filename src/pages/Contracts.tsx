@@ -5,6 +5,8 @@ import { Plus, X, Search, ArrowLeft, ShieldAlert, FileText, Edit, Trash, FileChe
 import { useApp, type Rental, type Violation } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { Pagination } from '../components/Pagination';
+import { uploadFile, uploadFiles } from '../utils/upload';
+import { confirmAction } from '../utils/confirmAction';
 
 const calculateDuration = (startStr: string, endStr: string) => {
   if (!startStr || !endStr) return '1 ngày';
@@ -50,8 +52,18 @@ const LiveCountdown = ({ endDateStr }: { endDateStr: string }) => {
 };
 
 const Contracts = () => {
-  const { rentals, updateRental, deleteRental, showToast, cars, owners } = useApp();
+  const {
+    rentals,
+    updateRental,
+    handoverRental,
+    cancelRental,
+    recordRentalPayment,
+    showToast,
+    cars,
+    owners,
+  } = useApp();
   const [selectedRentalIds, setSelectedRentalIds] = useState<string[]>([]);
+  const bulkMutationsEnabled: boolean = false;
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
@@ -71,7 +83,7 @@ const Contracts = () => {
   };
   // Search & Filter & Pagination State
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | Rental['status']>('all');
   const [timeRangeFilter, setTimeRangeFilter] = useState<'all' | '7d' | '30d' | 'custom'>('all');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
@@ -80,7 +92,9 @@ const Contracts = () => {
 
   // KPI Statistics for Contracts
   const totalContractsCount = rentals.length;
-  const totalContractRevenue = rentals.reduce((sum, r) => sum + (r.totalAmount || 0), 0);
+  const totalContractRevenue = rentals
+    .filter((r) => r.status === 'completed')
+    .reduce((sum, r) => sum + (r.totalAmount || 0), 0);
   const activeContractsCount = rentals.filter(r => r.status === 'active').length;
   const paidContractsCount = rentals.filter(r => r.paymentStatus === 'paid').length;
 
@@ -91,7 +105,6 @@ const Contracts = () => {
   const [editPhone, setEditPhone] = useState('');
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
-  const [editAmount, setEditAmount] = useState('');
   const [editFile, setEditFile] = useState('');
   const [editPaymentStatus, setEditPaymentStatus] = useState<Rental['paymentStatus']>('paid');
   const [editStatus, setEditStatus] = useState<Rental['status']>('completed');
@@ -108,50 +121,49 @@ const Contracts = () => {
   const [isEditingFinancials, setIsEditingFinancials] = useState(false);
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
 
-  const handleUploadConditionFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadConditionFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !selectedDetailRental) return;
     const files = Array.from(e.target.files);
-    const newUrls: string[] = [];
-
-    let processed = 0;
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        if (evt.target?.result) {
-          newUrls.push(evt.target.result as string);
-        }
-        processed++;
-        if (processed === files.length) {
-          const updatedImages = [...(selectedDetailRental.conditionImages || []), ...newUrls];
-          updateRental(selectedDetailRental.id, { conditionImages: updatedImages });
-          showToast(`Đã tải lên thành công ${files.length} hình ảnh trạng thái xe thực tế!`, 'success');
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    e.target.value = '';
+    try {
+      const uploaded = await uploadFiles(files);
+      const updatedImages = [
+        ...(selectedDetailRental.conditionImages || []),
+        ...uploaded.map((item) => item.url),
+      ];
+      if (await updateRental(selectedDetailRental.id, { conditionImages: updatedImages })) {
+        showToast(`Đã tải lên thành công ${files.length} hình ảnh trạng thái xe thực tế!`, 'success');
+      }
+    } catch (error) {
+      showToast(`Không thể tải ảnh: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`, 'error');
+    }
   };
 
-  const handleDeleteConditionImage = (imgUrl: string) => {
+  const handleDeleteConditionImage = async (imgUrl: string) => {
     if (!selectedDetailRental) return;
     const updatedImages = (selectedDetailRental.conditionImages || []).filter(img => img !== imgUrl);
-    updateRental(selectedDetailRental.id, { conditionImages: updatedImages });
-    showToast('Đã xóa hình ảnh trạng thái xe!', 'info');
+    if (await updateRental(selectedDetailRental.id, { conditionImages: updatedImages })) {
+      showToast('Đã xóa hình ảnh trạng thái xe!', 'info');
+    }
   };
 
-  const handleUploadContractFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadContractFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0] || !selectedDetailRental) return;
     const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        updateRental(selectedDetailRental.id, { 
-          source: 'uploaded', 
-          fileUrl: evt.target.result as string 
-        });
+    e.target.value = '';
+    try {
+      const uploaded = await uploadFile(file);
+      const success = await updateRental(selectedDetailRental.id, {
+        source: 'uploaded',
+        fileUrl: uploaded.url,
+        fileName: uploaded.originalName || file.name,
+      });
+      if (success) {
         showToast('Đã tải lên tệp hợp đồng thủ công thành công!', 'success');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      showToast(`Không thể tải hợp đồng: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`, 'error');
+    }
   };
 
   const normalizePlate = (str: string) => str ? str.toUpperCase().replace(/[-. ]/g, '') : '';
@@ -172,7 +184,7 @@ const Contracts = () => {
 
     let matchesTimeRange = true;
     const rentalDate = new Date(r.startDate.split('T')[0]);
-    const refDate = new Date('2026-07-15');
+    const refDate = new Date();
 
     if (timeRangeFilter === '7d') {
       const daysDiff = (refDate.getTime() - rentalDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -205,7 +217,6 @@ const Contracts = () => {
     setEditPhone(rental.customerPhone);
     setEditStart(rental.startDate);
     setEditEnd(rental.endDate);
-    setEditAmount(rental.totalAmount.toString());
     setEditFile(rental.fileUrl || '');
     setEditPaymentStatus(rental.paymentStatus);
     setEditStatus(rental.status);
@@ -215,26 +226,25 @@ const Contracts = () => {
     setShowEditModal(true);
   };
 
-  const handleUpdateContractSubmit = (e: React.FormEvent) => {
+  const handleUpdateContractSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRental) return;
 
-    updateRental(selectedRental.id, {
-      customerName: editName,
-      customerPhone: editPhone,
-      startDate: editStart,
-      endDate: editEnd,
-      totalAmount: parseInt(editAmount) || 0,
-      paymentStatus: editPaymentStatus,
-      status: editStatus,
-      fileUrl: editFile,
-      startKm: parseInt(editStartKm) || 0,
-      endKm: (editEndKm !== '' && editEndKm !== undefined && editEndKm !== null && !isNaN(parseInt(editEndKm))) ? parseInt(editEndKm) : undefined,
-      ownerCommissionAmount: parseInt(editOwnerCommission) || 0
-    });
+    const updates: Partial<Rental> = selectedRental.status === 'pending'
+      ? {
+          customerName: editName,
+          customerPhone: editPhone,
+          startDate: editStart,
+          endDate: editEnd,
+          fileUrl: editFile,
+        }
+      : { fileUrl: editFile };
+    const success = await updateRental(selectedRental.id, updates);
 
-    setShowEditModal(false);
-    showToast('Đã cập nhật thông tin đơn thuê/hợp đồng thành công!', 'success');
+    if (success) {
+      setShowEditModal(false);
+      showToast('Đã cập nhật thông tin đơn thuê/hợp đồng thành công!', 'success');
+    }
   };
 
   const handleViewContract = (rental: Rental) => {
@@ -267,7 +277,7 @@ const Contracts = () => {
     setShowViolationModal(true);
   };
 
-  const handleUpdateFinancials = (fields: Partial<Rental>) => {
+  const handleUpdateFinancials = async (fields: Partial<Rental>) => {
     if (!selectedDetailRentalId || !selectedDetailRental) return;
 
     const rentalFee = fields.rentalFee !== undefined ? fields.rentalFee : selectedDetailRental.rentalFee;
@@ -279,13 +289,13 @@ const Contracts = () => {
 
     const totalAmount = rentalFee + deliveryFee + extraFee + violationTotal;
 
-    updateRental(selectedDetailRentalId, {
+    await updateRental(selectedDetailRentalId, {
       ...fields,
       totalAmount
     });
   };
 
-  const handleViolationSubmit = (e?: React.FormEvent) => {
+  const handleViolationSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!selectedDetailRentalId || !selectedDetailRental) return;
 
@@ -302,7 +312,6 @@ const Contracts = () => {
         evidenceUrl: violationEvidence,
         status: violationStatus
       } : v);
-      showToast('Đã cập nhật vi phạm giao thông!', 'success');
     } else {
       const newV: Violation = {
         id: Date.now().toString(),
@@ -313,32 +322,42 @@ const Contracts = () => {
         status: violationStatus
       };
       updated = [...currentViolations, newV];
-      showToast('Đã ghi nhận vi phạm giao thông mới!', 'success');
     }
 
     const violationTotal = updated.reduce((sum, v) => sum + v.amount, 0);
     const newTotalAmount = selectedDetailRental.rentalFee + selectedDetailRental.deliveryFee + selectedDetailRental.extraFee + violationTotal;
 
-    updateRental(selectedDetailRentalId, { 
+    const success = await updateRental(selectedDetailRentalId, {
       violations: updated,
       totalAmount: newTotalAmount
     });
-    setShowViolationModal(false);
+    if (success) {
+      showToast(
+        violationEditId ? 'Đã cập nhật vi phạm giao thông!' : 'Đã ghi nhận vi phạm giao thông mới!',
+        'success'
+      );
+      setShowViolationModal(false);
+    }
   };
 
-  const handleDeleteViolation = (violationId: string) => {
+  const handleDeleteViolation = async (violationId: string) => {
     if (!selectedDetailRentalId || !selectedDetailRental) return;
-    if (confirm('Bạn có chắc chắn muốn xóa lịch sử vi phạm này?')) {
+    if (await confirmAction({
+      title: 'Xoá vi phạm?',
+      content: 'Khoản vi phạm sẽ bị loại khỏi chi tiết hợp đồng.',
+      danger: true,
+    })) {
       const currentViolations = selectedDetailRental.violations || [];
       const updated = currentViolations.filter(v => v.id !== violationId);
       const violationTotal = updated.reduce((sum, v) => sum + v.amount, 0);
       const newTotalAmount = selectedDetailRental.rentalFee + selectedDetailRental.deliveryFee + selectedDetailRental.extraFee + violationTotal;
 
-      updateRental(selectedDetailRentalId, { 
+      if (await updateRental(selectedDetailRentalId, {
         violations: updated,
         totalAmount: newTotalAmount
-      });
-      showToast('Đã xóa vi phạm giao thông!', 'info');
+      })) {
+        showToast('Đã xóa vi phạm giao thông!', 'info');
+      }
     }
   };
 
@@ -424,6 +443,33 @@ const Contracts = () => {
                 </div>
 
                 {/* Đếm ngược nếu xe đang thuê */}
+                {selectedDetailRental.status === 'pending' && (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ marginTop: '14px' }}
+                    onClick={() => handoverRental(
+                      selectedDetailRental.id,
+                      selectedDetailRental.startKm,
+                      selectedDetailRental.startFuel,
+                    )}
+                  >
+                    Bàn giao xe
+                  </button>
+                )}
+                {['pending', 'active'].includes(selectedDetailRental.status) && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ marginTop: '14px', marginLeft: '8px' }}
+                    onClick={async () => {
+                      const reason = window.prompt('Nhập lý do huỷ hợp đồng:')?.trim();
+                      if (reason) await cancelRental(selectedDetailRental.id, reason);
+                    }}
+                  >
+                    Huỷ hợp đồng
+                  </button>
+                )}
                 {selectedDetailRental.status === 'active' && (
                   <div style={{ marginTop: '14px', background: '#0284c7', color: 'white', padding: '10px 16px', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, fontSize: '14px' }}>
                     <span>⏳ THỜI GIAN CÒN LẠI DÙNG XE:</span>
@@ -830,8 +876,9 @@ const Contracts = () => {
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--primary)' }}>Trạng thái Đơn thuê (Bàn giao & Trả xe)</label>
                 <select 
                   value={selectedDetailRental.status}
-                  onChange={e => {
-                    const newStatus = e.target.value as any;
+                  disabled
+                  onChange={async e => {
+                    const newStatus = e.target.value as Rental['status'];
                     const updates: Partial<Rental> = { status: newStatus };
                     if (newStatus === 'active' && !selectedDetailRental.deliveredAt) {
                       updates.deliveredAt = new Date().toISOString();
@@ -839,8 +886,7 @@ const Contracts = () => {
                     if (newStatus === 'completed' && !selectedDetailRental.returnedAt) {
                       updates.returnedAt = new Date().toISOString();
                     }
-                    updateRental(selectedDetailRental.id, updates);
-                    showToast(`Đã cập nhật trạng thái đơn thành: ${
+                    if (await updateRental(selectedDetailRental.id, updates)) showToast(`Đã cập nhật trạng thái đơn thành: ${
                       newStatus === 'pending' ? 'Chờ bàn giao xe' :
                       newStatus === 'active' ? 'Đang thuê' :
                       newStatus === 'completed' ? 'Đã trả xe' : 'Đã hủy'
@@ -860,16 +906,45 @@ const Contracts = () => {
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-main)' }}>Trạng thái thanh toán</label>
                 <select 
                   value={selectedDetailRental.paymentStatus}
-                  onChange={e => {
-                    updateRental(selectedDetailRental.id, { paymentStatus: e.target.value as any });
-                    showToast('Đã cập nhật trạng thái thanh toán đơn thuê!', 'success');
-                  }}
+                  disabled
                   style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '14px', fontFamily: 'inherit', fontWeight: 600 }}
                 >
                   <option value="deposit">Đã đặt cọc (Chưa thanh toán hết)</option>
                   <option value="paid">Đã thanh toán toàn bộ</option>
                   <option value="debt">Còn nợ (Chờ thanh toán sau)</option>
                 </select>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ marginTop: '10px' }}
+                  onClick={async () => {
+                    const type = window.prompt(
+                      'Loại giao dịch: deposit, deposit_application, balance, deposit_refund, surcharge hoặc refund',
+                      'balance',
+                    )?.trim();
+                    const amountText = window.prompt('Số tiền giao dịch:')?.trim();
+                    const amount = Number(amountText);
+                    const allowed = new Set([
+                      'deposit',
+                      'deposit_application',
+                      'balance',
+                      'deposit_refund',
+                      'surcharge',
+                      'refund',
+                    ]);
+                    if (!type || !allowed.has(type) || !Number.isFinite(amount) || amount <= 0) {
+                      showToast('Loại giao dịch hoặc số tiền không hợp lệ.', 'error');
+                      return;
+                    }
+                    await recordRentalPayment(
+                      selectedDetailRental.id,
+                      type as 'deposit' | 'deposit_application' | 'balance' | 'deposit_refund' | 'surcharge' | 'refund',
+                      amount,
+                    );
+                  }}
+                >
+                  Ghi nhận giao dịch
+                </button>
               </div>
 
               {/* Loại Hợp đồng thuê & Đính kèm */}
@@ -883,9 +958,10 @@ const Contracts = () => {
                       type="radio" 
                       name="contractSourceType" 
                       checked={(selectedDetailRental.source || 'system') === 'system'} 
-                      onChange={() => {
-                        updateRental(selectedDetailRental.id, { source: 'system' });
-                        showToast('Đã chuyển sang Hợp đồng tự động từ hệ thống!', 'info');
+                      onChange={async () => {
+                        if (await updateRental(selectedDetailRental.id, { source: 'system' })) {
+                          showToast('Đã chuyển sang Hợp đồng tự động từ hệ thống!', 'info');
+                        }
                       }} 
                     />
                     <span>Hệ thống tự tạo mẫu hợp đồng (Báo cáo đơn hàng)</span>
@@ -896,9 +972,10 @@ const Contracts = () => {
                       type="radio" 
                       name="contractSourceType" 
                       checked={selectedDetailRental.source === 'uploaded'} 
-                      onChange={() => {
-                        updateRental(selectedDetailRental.id, { source: 'uploaded' });
-                        showToast('Đã chuyển sang Hợp đồng upload thủ công!', 'info');
+                      onChange={async () => {
+                        if (await updateRental(selectedDetailRental.id, { source: 'uploaded' })) {
+                          showToast('Đã chuyển sang Hợp đồng upload thủ công!', 'info');
+                        }
                       }} 
                     />
                     <span>Upload hợp đồng thủ công (Tệp PDF/Hình ảnh)</span>
@@ -1081,20 +1158,25 @@ const Contracts = () => {
             </div>
           </div>
 
-          {selectedRentalIds.length > 0 && (
+          {bulkMutationsEnabled && selectedRentalIds.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,104,55,0.08)', border: '1px solid var(--primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
               <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
                 Đã chọn {selectedRentalIds.length} đơn thuê/hợp đồng
               </span>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <select 
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const val = e.target.value;
                     if (!val) return;
-                    if (window.confirm(`Thay đổi trạng thái hàng loạt cho ${selectedRentalIds.length} đơn đã chọn?`)) {
-                      selectedRentalIds.forEach(id => updateRental(id, { status: val as any }));
-                      setSelectedRentalIds([]);
-                      showToast('Đã cập nhật trạng thái hàng loạt!', 'success');
+                    if (await confirmAction({
+                      title: 'Đổi trạng thái hàng loạt?',
+                      content: 'Thao tác trạng thái hàng loạt đã bị vô hiệu hoá bởi state machine.',
+                    })) {
+                      const results = selectedRentalIds.map(() => false);
+                      if (results.every(Boolean)) {
+                        setSelectedRentalIds([]);
+                        showToast('Đã cập nhật trạng thái hàng loạt!', 'success');
+                      }
                     }
                     e.target.value = '';
                   }}
@@ -1107,13 +1189,18 @@ const Contracts = () => {
                   <option value="cancelled">Đã hủy đơn</option>
                 </select>
                 <select 
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const val = e.target.value;
                     if (!val) return;
-                    if (window.confirm(`Thay đổi trạng thái thanh toán hàng loạt cho ${selectedRentalIds.length} đơn đã chọn?`)) {
-                      selectedRentalIds.forEach(id => updateRental(id, { paymentStatus: val as any }));
-                      setSelectedRentalIds([]);
-                      showToast('Đã cập nhật trạng thái thanh toán hàng loạt!', 'success');
+                    if (await confirmAction({
+                      title: 'Đổi thanh toán hàng loạt?',
+                      content: 'Thanh toán phải được ghi nhận thành từng giao dịch.',
+                    })) {
+                      const results = selectedRentalIds.map(() => false);
+                      if (results.every(Boolean)) {
+                        setSelectedRentalIds([]);
+                        showToast('Đã cập nhật trạng thái thanh toán hàng loạt!', 'success');
+                      }
                     }
                     e.target.value = '';
                   }}
@@ -1122,14 +1209,20 @@ const Contracts = () => {
                   <option value="">-- Sửa thanh toán hàng loạt --</option>
                   <option value="deposit">Đã đặt cọc</option>
                   <option value="paid">Đã thanh toán</option>
-                  <option value="unpaid">Chưa thanh toán</option>
+                  <option value="debt">Còn nợ (Chưa thanh toán)</option>
                 </select>
                 <button 
-                  onClick={() => {
-                    if (window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${selectedRentalIds.length} đơn thuê đã chọn?`)) {
-                      selectedRentalIds.forEach(id => deleteRental(id));
-                      setSelectedRentalIds([]);
-                      showToast('Đã xóa hàng loạt đơn thuê thành công!', 'success');
+                  onClick={async () => {
+                    if (await confirmAction({
+                      title: `Huỷ ${selectedRentalIds.length} hợp đồng?`,
+                      content: 'Hợp đồng phải chuyển trạng thái huỷ và giữ lại lịch sử.',
+                      danger: true,
+                    })) {
+                      const results = await Promise.all(selectedRentalIds.map(id => cancelRental(id, 'Huỷ hàng loạt từ danh sách hợp đồng')));
+                      if (results.every(Boolean)) {
+                        setSelectedRentalIds([]);
+                        showToast('Đã xóa hàng loạt đơn thuê thành công!', 'success');
+                      }
                     }
                   }}
                   className="btn-secondary" 
@@ -1164,7 +1257,7 @@ const Contracts = () => {
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Trạng thái:</span>
               <select 
                 value={statusFilter}
-                onChange={e => { setStatusFilter(e.target.value as any); setCurrentPage(1); }}
+                onChange={e => { setStatusFilter(e.target.value as 'all' | Rental['status']); setCurrentPage(1); }}
                 style={{ padding: '7px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit', fontSize: '13px', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
               >
                 <option value="all">Tất cả trạng thái</option>
@@ -1242,11 +1335,18 @@ const Contracts = () => {
               </span>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button 
-                  onClick={() => {
-                    if (confirm(`Bạn có chắc chắn muốn xóa ${selectedRentalIds.length} hợp đồng đã chọn? Hành động này không thể hoàn tác.`)) {
-                      selectedRentalIds.forEach(id => deleteRental(id));
-                      setSelectedRentalIds([]);
-                      showToast(`Đã xóa ${selectedRentalIds.length} hợp đồng!`, 'success');
+                  onClick={async () => {
+                    if (await confirmAction({
+                      title: `Huỷ ${selectedRentalIds.length} hợp đồng?`,
+                      content: 'Không xoá lịch sử hợp đồng; hãy sử dụng quy trình huỷ.',
+                      danger: true,
+                    })) {
+                      const selectedCount = selectedRentalIds.length;
+                      const results = await Promise.all(selectedRentalIds.map(id => cancelRental(id, 'Huỷ hàng loạt từ danh sách hợp đồng')));
+                      if (results.every(Boolean)) {
+                        setSelectedRentalIds([]);
+                        showToast(`Đã xóa ${selectedCount} hợp đồng!`, 'success');
+                      }
                     }
                   }}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#ef4444', color: 'white', borderRadius: 'var(--radius-sm)', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
@@ -1465,9 +1565,13 @@ const Contracts = () => {
                       </button>
                       <button 
                         type="button"
-                        onClick={() => {
-                          if (window.confirm(`Bạn có chắc chắn muốn XÓA vĩnh viễn đơn thuê #${rental.id}?`)) {
-                            deleteRental(rental.id);
+                        onClick={async () => {
+                          if (await confirmAction({
+                            title: `Huỷ hợp đồng ${rental.id}?`,
+                            content: 'Hợp đồng sẽ được huỷ và giữ lại lịch sử.',
+                            danger: true,
+                          })) {
+                            await cancelRental(rental.id, 'Huỷ từ danh sách hợp đồng');
                           }
                         }}
                         style={{ padding: '8px 12px', background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
@@ -1524,14 +1628,14 @@ const Contracts = () => {
 
           <div style={{ display: 'flex', gap: '16px' }}>
             <Form.Item label="Thanh toán" style={{ flex: 1 }}>
-              <select value={editPaymentStatus} onChange={e => setEditPaymentStatus(e.target.value as any)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+              <select value={editPaymentStatus} onChange={e => setEditPaymentStatus(e.target.value as Rental['paymentStatus'])} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
                 <option value="deposit">Đã cọc</option>
                 <option value="paid">Đã thanh toán</option>
                 <option value="debt">Còn nợ</option>
               </select>
             </Form.Item>
             <Form.Item label="Vận hành" style={{ flex: 1 }}>
-              <select value={editStatus} onChange={e => setEditStatus(e.target.value as any)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+              <select value={editStatus} onChange={e => setEditStatus(e.target.value as Rental['status'])} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
                 <option value="active">Đang chạy</option>
                 <option value="completed">Hoàn tất</option>
               </select>
@@ -1637,7 +1741,7 @@ const Contracts = () => {
           <Form.Item label="Trạng thái thu tiền">
             <select 
               value={violationStatus} 
-              onChange={e => setViolationStatus(e.target.value as any)} 
+              onChange={e => setViolationStatus(e.target.value as Violation['status'])}
               style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}
             >
               <option value="unpaid">Chưa thu tiền từ khách</option>
@@ -1861,25 +1965,25 @@ const Contracts = () => {
         <ImageGallery 
           onClose={() => setShowGallery(false)} 
           multiple={galleryMode === 'condition'}
-          onSelect={(urls, name) => {
+          onSelect={async (urls, name) => {
             const arr = Array.isArray(urls) ? urls : [urls];
             if (galleryMode === 'contract') {
               setEditFile(arr[0]);
               if (selectedDetailRentalId) {
-                updateRental(selectedDetailRentalId, { 
+                const success = await updateRental(selectedDetailRentalId, {
                   fileUrl: arr[0],
                   fileName: name || 'File_Hop_Dong_Thu_Cong.pdf',
                   source: 'uploaded'
                 });
-                showToast('Đã cập nhật tệp hợp đồng mới!', 'success');
+                if (success) showToast('Đã cập nhật tệp hợp đồng mới!', 'success');
               }
             } else if (galleryMode === 'evidence') {
               setViolationEvidence(arr[0]);
             } else if (galleryMode === 'condition') {
               if (selectedDetailRentalId) {
                 const existing = rentals.find(r => r.id === selectedDetailRentalId)?.conditionImages || [];
-                updateRental(selectedDetailRentalId, { conditionImages: [...existing, ...arr] });
-                showToast(`Đã đính kèm ${arr.length} hình ảnh trạng thái xe vào đơn thuê!`, 'success');
+                const success = await updateRental(selectedDetailRentalId, { conditionImages: [...existing, ...arr] });
+                if (success) showToast(`Đã đính kèm ${arr.length} hình ảnh trạng thái xe vào đơn thuê!`, 'success');
               }
             }
           }}

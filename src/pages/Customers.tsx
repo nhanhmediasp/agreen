@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Table, Tag, Modal, Form } from 'antd';
 import { Search, Plus, Phone, FileCheck, AlertCircle, MapPin, FileText, ArrowLeft, Trash2 } from 'lucide-react';
 import { useApp, type Customer } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
+import { confirmAction } from '../utils/confirmAction';
 
 const Customers = () => {
   const { customers, addCustomer, updateCustomer, deleteCustomer, rentals, showToast } = useApp();
@@ -47,6 +48,10 @@ const Customers = () => {
 
   // Selected customer details
   const activeCustomer = customers.find(c => c.id === selectedCustomerId);
+  const [noteDraft, setNoteDraft] = useState('');
+  useEffect(() => {
+    setNoteDraft(activeCustomer?.notes ?? '');
+  }, [activeCustomer?.id, activeCustomer?.notes]);
   // Get rental history for active customer
   const customerHistory = activeCustomer 
     ? rentals.filter(r => r.customerPhone === activeCustomer.phone)
@@ -63,7 +68,9 @@ const Customers = () => {
   });
 
   // Calculate customer metrics
-  const totalCustomerSpent = customerHistory.reduce((sum, r) => sum + r.totalAmount, 0);
+  const totalCustomerSpent = customerHistory
+    .filter((rental) => rental.status === 'completed')
+    .reduce((sum, rental) => sum + rental.totalAmount, 0);
   const activeRentalsCount = customerHistory.filter(r => r.status === 'active').length;
   const completedRentalsCount = customerHistory.filter(r => r.status === 'completed').length;
 
@@ -85,10 +92,10 @@ const Customers = () => {
     setShowEditForm(true);
   };
 
-  const handleUpdateCustomerSubmit = (e: React.FormEvent) => {
+  const handleUpdateCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomerId) return;
-    updateCustomer(selectedCustomerId, {
+    const success = await updateCustomer(selectedCustomerId, {
       name: editName,
       phone: editPhone,
       license: `GPLX: ${editLicense}`,
@@ -98,11 +105,13 @@ const Customers = () => {
       notes: editNotes,
       image: editImage
     });
-    setShowEditForm(false);
-    showToast('Đã cập nhật thông tin khách hàng thành công!', 'success');
+    if (success) {
+      setShowEditForm(false);
+      showToast('Đã cập nhật thông tin khách hàng thành công!', 'success');
+    }
   };
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
+  const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newPhone || !newLicense || !newCccd) {
       showToast('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'error');
@@ -131,7 +140,7 @@ const Customers = () => {
       image: newImage || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
     };
 
-    addCustomer(customerToAdd);
+    if (!await addCustomer(customerToAdd)) return;
     setShowAddForm(false);
     
     // Clear
@@ -145,9 +154,9 @@ const Customers = () => {
     setNewImage('');
   };
 
-  const handleUpdateNotes = (notesText: string) => {
+  const handleUpdateNotes = async () => {
     if (!selectedCustomerId) return;
-    updateCustomer(selectedCustomerId, { notes: notesText });
+    await updateCustomer(selectedCustomerId, { notes: noteDraft });
   };
 
   return (
@@ -269,10 +278,13 @@ const Customers = () => {
                   Ghi chú nội bộ (Chỉnh sửa trực tiếp)
                 </label>
                 <textarea 
-                  value={activeCustomer.notes}
-                  onChange={e => handleUpdateNotes(e.target.value)}
+                  value={noteDraft}
+                  onChange={e => setNoteDraft(e.target.value)}
                   style={{ width: '100%', height: '120px', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '14px', fontFamily: 'inherit', resize: 'none', lineHeight: '1.5' }}
                 />
+                <button type="button" className="btn-primary" onClick={handleUpdateNotes} style={{ marginTop: '8px' }}>
+                  Lưu ghi chú
+                </button>
               </div>
             </div>
 
@@ -298,7 +310,7 @@ const Customers = () => {
                   </div>
                   <select 
                     value={historyStatusFilter}
-                    onChange={e => setHistoryStatusFilter(e.target.value as any)}
+                    onChange={e => setHistoryStatusFilter(e.target.value as 'all' | 'active' | 'completed')}
                     style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '13px' }}
                   >
                     <option value="all">Tất cả trạng thái</option>
@@ -402,13 +414,18 @@ const Customers = () => {
               </span>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <select 
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const val = e.target.value;
                     if (!val) return;
-                    if (window.confirm(`Thay đổi phân loại hàng loạt cho ${selectedCustomerIds.length} khách hàng đã chọn?`)) {
-                      selectedCustomerIds.forEach(id => updateCustomer(id, { classification: val as any }));
-                      setSelectedCustomerIds([]);
-                      showToast('Đã cập nhật phân loại hàng loạt!', 'success');
+                    if (await confirmAction({
+                      title: 'Đổi phân loại hàng loạt?',
+                      content: `${selectedCustomerIds.length} khách hàng sẽ được cập nhật phân loại.`,
+                    })) {
+                      const results = await Promise.all(selectedCustomerIds.map(id => updateCustomer(id, { classification: val as Customer['classification'] })));
+                      if (results.every(Boolean)) {
+                        setSelectedCustomerIds([]);
+                        showToast('Đã cập nhật phân loại hàng loạt!', 'success');
+                      }
                     }
                     e.target.value = '';
                   }}
@@ -420,11 +437,17 @@ const Customers = () => {
                   <option value="warning">Khách Cần Chú Ý ⚠️</option>
                 </select>
                 <button 
-                  onClick={() => {
-                    if (window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${selectedCustomerIds.length} khách hàng đã chọn?`)) {
-                      selectedCustomerIds.forEach(id => deleteCustomer(id));
-                      setSelectedCustomerIds([]);
-                      showToast('Đã xóa hàng loạt thành công!', 'success');
+                  onClick={async () => {
+                    if (await confirmAction({
+                      title: `Xoá ${selectedCustomerIds.length} khách hàng?`,
+                      content: 'Khách hàng có hợp đồng liên kết sẽ không thể xoá.',
+                      danger: true,
+                    })) {
+                      const results = await Promise.all(selectedCustomerIds.map(id => deleteCustomer(id)));
+                      if (results.every(Boolean)) {
+                        setSelectedCustomerIds([]);
+                        showToast('Đã xóa hàng loạt thành công!', 'success');
+                      }
                     }
                   }}
                   className="btn-secondary" 
@@ -539,10 +562,14 @@ const Customers = () => {
                   key: 'actions',
                   render: (_: unknown, record: Customer) => (
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        if (window.confirm(`Xóa khách hàng "${record.name}"?`)) {
-                          deleteCustomer(record.id);
+                        if (await confirmAction({
+                          title: `Xoá khách hàng ${record.name}?`,
+                          content: 'Khách hàng có hợp đồng liên kết sẽ không thể xoá.',
+                          danger: true,
+                        })) {
+                          await deleteCustomer(record.id);
                         }
                       }}
                       style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px' }}
@@ -572,7 +599,7 @@ const Customers = () => {
               <input type="text" placeholder="VD: Nguyễn Văn A" value={newName} onChange={e => setNewName(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
             </Form.Item>
             <Form.Item label="Phân loại" style={{ flex: 1 }}>
-              <select value={newClass} onChange={e => setNewClass(e.target.value as any)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+              <select value={newClass} onChange={e => setNewClass(e.target.value as Customer['classification'])} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
                 <option value="normal">Bình thường</option>
                 <option value="vip">Khách VIP ⭐</option>
                 <option value="warning">Khách Cần Chú Ý ⚠️</option>
@@ -622,7 +649,7 @@ const Customers = () => {
               <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
             </Form.Item>
             <Form.Item label="Phân loại" style={{ flex: 1 }}>
-              <select value={editClass} onChange={e => setEditClass(e.target.value as any)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+              <select value={editClass} onChange={e => setEditClass(e.target.value as Customer['classification'])} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
                 <option value="normal">Bình thường</option>
                 <option value="vip">Khách VIP ⭐</option>
                 <option value="warning">Khách Cần Chú Ý ⚠️</option>

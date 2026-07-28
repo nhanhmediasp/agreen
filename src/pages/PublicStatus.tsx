@@ -1,43 +1,74 @@
 import { useState } from 'react';
-import { MapPin, Calendar, Clock, AlertCircle } from 'lucide-react';
-import { useApp, type Car } from '../context/AppContext';
+import { AlertCircle } from 'lucide-react';
+
+interface PublicCar {
+  id: string;
+  name: string;
+  status: 'ready' | 'reserved' | 'rented' | 'maintenance' | 'suspended';
+  image: string;
+}
+
+interface PublicVehicleRow {
+  plate_number: string;
+  brand: string;
+  model: string;
+  status: string;
+  image_url?: string;
+}
 
 const PublicStatus = () => {
-  const { cars } = useApp();
   const [plate, setPlate] = useState('');
-  const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   
   // Search result states
-  const [matchedCar, setMatchedCar] = useState<Car | null>(null);
-  const [matchedCarList, setMatchedCarList] = useState<Car[]>([]);
+  const [matchedCar, setMatchedCar] = useState<PublicCar | null>(null);
+  const [matchedCarList, setMatchedCarList] = useState<PublicCar[]>([]);
   const [showResults, setShowResults] = useState(false);
 
-  const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setMatchedCar(null);
     setMatchedCarList([]);
 
-    if (!plate.trim() && !phone.trim()) {
-      setError('Vui lòng nhập Biển số xe HOẶC Số điện thoại để tra cứu xe.');
+    if (!plate.trim()) {
+      setError('Vui lòng nhập đầy đủ biển số xe để tra cứu.');
       return;
     }
 
-    const cleanPlate = cleanString(plate);
-    const cleanPhone = cleanString(phone);
-
-    let matchingCars: Car[] = [];
-
-    if (cleanPlate && cleanPhone) {
-      matchingCars = cars.filter(c => cleanString(c.id).includes(cleanPlate) && cleanString(c.ownerPhone).includes(cleanPhone));
-    } else if (cleanPlate) {
-      matchingCars = cars.filter(c => cleanString(c.id).includes(cleanPlate));
-    } else if (cleanPhone) {
-      matchingCars = cars.filter(c => cleanString(c.ownerPhone).includes(cleanPhone));
+    let response: Response;
+    try {
+      response = await fetch('/api/public/vehicles/search', {
+        method: 'POST',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plate }),
+      });
+    } catch {
+      setError('Không thể kết nối máy chủ tra cứu. Vui lòng thử lại.');
+      return;
     }
+
+    const result: { success: boolean; data?: PublicVehicleRow[]; error?: string } = await response.json();
+    if (!response.ok || !result.success) {
+      setError(result.error || 'Không thể tra cứu thông tin xe.');
+      return;
+    }
+
+    const matchingCars: PublicCar[] = (result.data || []).map((row) => ({
+      id: row.plate_number,
+      name: `${row.brand || ''} ${row.model || ''}`.trim(),
+      status: row.status === 'Rented'
+        ? 'rented'
+        : row.status === 'Maintenance'
+          ? 'maintenance'
+          : row.status === 'Reserved'
+            ? 'reserved'
+            : row.status === 'Suspended'
+              ? 'suspended'
+              : 'ready',
+      image: row.image_url || '/favicon.svg',
+    }));
 
     if (matchingCars.length === 0) {
       setError('Không tìm thấy thông tin xe nào phù hợp với dữ liệu nhập của bạn.');
@@ -54,7 +85,6 @@ const PublicStatus = () => {
     setMatchedCar(null);
     setMatchedCarList([]);
     setPlate('');
-    setPhone('');
     setError(null);
   };
 
@@ -81,7 +111,7 @@ const PublicStatus = () => {
             )}
 
             <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Biển số xe (Tùy chọn)</label>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Biển số xe đầy đủ</label>
               <input 
                 type="text" 
                 placeholder="VD: 51F-123.45" 
@@ -91,19 +121,8 @@ const PublicStatus = () => {
               />
             </div>
             
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Số điện thoại đối tác (Tùy chọn)</label>
-              <input 
-                type="tel" 
-                placeholder="VD: 0901234567" 
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                style={{ width: '100%', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: '16px', fontFamily: 'inherit' }}
-              />
-            </div>
-
             <div style={{ background: 'var(--bg-page)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '12px', color: 'var(--text-secondary)' }}>
-              💡 <strong>Tra cứu nhanh:</strong> Chỉ cần nhập <strong>Biển số xe</strong> hoặc <strong>Số điện thoại</strong> để xem tình trạng xe hoạt động.
+              💡 Tra cứu công khai chỉ hỗ trợ <strong>biển số chính xác</strong> để bảo vệ dữ liệu đối tác.
             </div>
 
             <button 
@@ -174,42 +193,17 @@ const PublicStatus = () => {
                     <span style={{ display: 'inline-block', padding: '6px 16px', borderRadius: '100px', background: 'var(--status-maintenance-bg)', color: 'var(--status-maintenance-text)', fontSize: '15px', fontWeight: 600 }}>
                       🛠️ Xe đang bảo trì/sửa chữa
                     </span>
+                  ) : matchedCar.status === 'reserved' ? (
+                    <span style={{ display: 'inline-block', padding: '6px 16px', borderRadius: '100px', background: 'var(--status-suspended-bg)', color: 'var(--status-suspended-text)', fontSize: '15px', fontWeight: 600 }}>
+                      Xe đã có lịch đặt trước
+                    </span>
                   ) : (
                     <span style={{ display: 'inline-block', padding: '6px 16px', borderRadius: '100px', background: 'var(--status-suspended-bg)', color: 'var(--status-suspended-text)', fontSize: '15px', fontWeight: 600 }}>
-                      ⚠️ Xe đang tạm ngưng hoạt động
+                      Xe đang tạm ngưng khai thác
                     </span>
                   )}
                 </div>
                 
-                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {matchedCar.status === 'rented' && matchedCar.timeRemaining && (
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                      <Clock color="var(--accent)" size={20} style={{ marginTop: '2px' }} />
-                      <div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Thời gian dự kiến trả xe</div>
-                        <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)' }}>{matchedCar.timeRemaining} (khoảng {Math.ceil(parseInt(matchedCar.timeRemaining.split(':')[0]) / 24)} ngày)</div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <MapPin color="var(--primary)" size={20} style={{ marginTop: '2px' }} />
-                    <div>
-                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Số KM hiện tại</div>
-                      <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)' }}>{matchedCar.km.toLocaleString()} km</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <Calendar color="var(--primary)" size={20} style={{ marginTop: '2px' }} />
-                    <div>
-                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Hạn đăng kiểm</div>
-                      <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)' }}>
-                        {new Date(matchedCar.expiryRegistration).toLocaleDateString('vi-VN')}
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 

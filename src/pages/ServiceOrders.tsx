@@ -10,11 +10,14 @@ import {
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useApp, type ServiceOrder, type Driver } from '../context/AppContext';
+import { uploadFile } from '../utils/upload';
+import { confirmAction } from '../utils/confirmAction';
 
 export default function ServiceOrders() {
   const { 
     serviceOrders, drivers, cars, 
-    addServiceOrder, updateServiceOrder, deleteServiceOrder, toggleServiceOrderPayment,
+    addServiceOrder, updateServiceOrder, startServiceOrder, completeServiceOrder,
+    deleteServiceOrder, toggleServiceOrderPayment,
     addDriver, updateDriver, deleteDriver, showToast 
   } = useApp();
 
@@ -27,6 +30,7 @@ export default function ServiceOrders() {
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [carFilter, setCarFilter] = useState<string>('all');
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const bulkServiceMutationsEnabled: boolean = false;
 
   // Page View state for Driver Detail (URL path /drivers/:id or URL query ?driverId=... or local state)
   const [selectedDriverIdPage, setSelectedDriverIdPage] = useState<string | null>(null);
@@ -104,9 +108,10 @@ export default function ServiceOrders() {
 
   // KPI Statistics
   const totalOrdersCount = serviceOrders.length;
-  const totalRevenue = serviceOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-  const totalDriverEarnings = serviceOrders.reduce((sum, o) => sum + (o.driverCommissionAmount || Math.round(o.totalAmount * 0.8)), 0);
-  const totalKmServed = serviceOrders.reduce((sum, o) => sum + Math.max(0, o.endKm - o.startKm), 0);
+  const completedOrders = serviceOrders.filter((order) => order.status === 'completed');
+  const totalRevenue = completedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const totalDriverEarnings = completedOrders.reduce((sum, o) => sum + (o.driverCommissionAmount || Math.round(o.totalAmount * 0.8)), 0);
+  const totalKmServed = completedOrders.reduce((sum, o) => sum + Math.max(0, o.endKm - o.startKm), 0);
 
   // Filtering Service Orders
   const filteredOrders = serviceOrders.filter(order => {
@@ -257,7 +262,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                 new ClipboardItem({ 'image/png': blob })
               ]);
               showToast('📸 ĐÃ CHỤP & SAO CHÉP ÁNH BÁO GIÁ! Chỉ cần sang Zalo ấn Ctrl + V để dán gửi cho khách.', 'success');
-            } catch (_clipboardErr) {
+            } catch {
               // Fallback to auto download if clipboard image permission denied
               const imageUri = canvas.toDataURL('image/png');
               const link = document.createElement('a');
@@ -269,7 +274,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
           }
         });
       }
-    } catch (_err) {
+    } catch {
       showToast('Không thể tạo ảnh báo giá. Vui lòng thử lại!', 'error');
     } finally {
       setIsCapturingImage(false);
@@ -300,7 +305,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
   };
 
   // Handle Avatar Image File Upload for Driver
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -309,13 +314,14 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setDriverForm(prev => ({ ...prev, avatar: base64String }));
+    e.target.value = '';
+    try {
+      const uploaded = await uploadFile(file);
+      setDriverForm(prev => ({ ...prev, avatar: uploaded.url }));
       showToast('📷 Đã tải ảnh đại diện tài xế!', 'success');
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      showToast(`Không thể tải ảnh đại diện: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`, 'error');
+    }
   };
 
   // Save Service Order
@@ -371,7 +377,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
     const commAmount = Math.round(calculatedFare * (commRate / 100));
 
     if (editingOrder) {
-      updateServiceOrder(editingOrder.id, {
+      const success = await updateServiceOrder(editingOrder.id, {
         carId: orderForm.carId,
         driverId: selectedDriverId,
         driverName: selectedDriverName,
@@ -381,18 +387,18 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         pickupLocation: orderForm.pickupLocation,
         dropoffLocation: orderForm.dropoffLocation,
         serviceDate: orderForm.serviceDate,
-        startKm: Number(orderForm.startKm),
-        endKm: Number(orderForm.endKm),
-        distanceKm: distance,
+        scheduledEndAt: new Date(
+          new Date(orderForm.serviceDate).getTime() + 3_600_000,
+        ).toISOString(),
         pricePerKm: Number(orderForm.pricePerKm),
         extraFee: Number(orderForm.extraFee),
-        totalAmount: calculatedFare,
         driverCommissionRate: commRate,
-        driverCommissionAmount: commAmount,
-        paymentStatus: orderForm.paymentStatus,
         notes: orderForm.notes
       });
-      showToast(`Đã cập nhật đơn dịch vụ ${editingOrder.id}`, 'success');
+      if (success) {
+        setShowOrderModal(false);
+        showToast(`Đã cập nhật đơn dịch vụ ${editingOrder.id}`, 'success');
+      }
     } else {
       const newOrder: ServiceOrder = {
         id: `SRV-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
@@ -405,6 +411,9 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         pickupLocation: orderForm.pickupLocation,
         dropoffLocation: orderForm.dropoffLocation,
         serviceDate: orderForm.serviceDate,
+        scheduledEndAt: new Date(
+          new Date(orderForm.serviceDate).getTime() + 3_600_000,
+        ).toISOString(),
         startKm: Number(orderForm.startKm),
         endKm: Number(orderForm.endKm),
         distanceKm: distance,
@@ -414,7 +423,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         driverCommissionRate: commRate,
         driverCommissionAmount: commAmount,
         paymentStatus: orderForm.paymentStatus,
-        status: 'completed',
+        status: 'scheduled',
         notes: orderForm.notes,
         createdAt: new Date().toISOString()
       };
@@ -466,7 +475,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
     }
 
     if (editingDriver) {
-      updateDriver(editingDriver.id, {
+      const success = await updateDriver(editingDriver.id, {
         name: driverForm.name,
         phone: driverForm.phone,
         licenseNumber: driverForm.licenseNumber,
@@ -478,7 +487,10 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
         commissionRate: Number(driverForm.commissionRate) || 80,
         avatar: driverForm.avatar
       });
-      showToast(`Đã cập nhật thông tin tài xế ${driverForm.name}`, 'success');
+      if (success) {
+        setShowDriverModal(false);
+        showToast(`Đã cập nhật thông tin tài xế ${driverForm.name}`, 'success');
+      }
     } else {
       const newDriver: Driver = {
         id: `DRV-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
@@ -500,18 +512,21 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
   };
 
   // Delete Order
-  const handleDeleteOrder = (id: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa đơn dịch vụ ${id}?`)) {
-      deleteServiceOrder(id);
-      showToast(`Đã xóa đơn dịch vụ ${id}`, 'info');
+  const handleDeleteOrder = async (id: string) => {
+    const reason = window.prompt(`Nhập lý do huỷ đơn dịch vụ ${id}:`)?.trim();
+    if (reason && await deleteServiceOrder(id, reason)) {
+      showToast(`Đã huỷ đơn dịch vụ ${id}`, 'info');
     }
   };
 
   // Delete Driver
-  const handleDeleteDriver = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa tài xế ${name}?`)) {
-      deleteDriver(id);
-      showToast(`Đã xóa tài xế ${name}`, 'info');
+  const handleDeleteDriver = async (id: string, name: string) => {
+    if (await confirmAction({
+      title: `Xoá tài xế ${name}?`,
+      content: 'Tài xế có chuyến liên kết sẽ không thể xoá.',
+      danger: true,
+    })) {
+      if (await deleteDriver(id)) showToast(`Đã xóa tài xế ${name}`, 'info');
     }
   };
 
@@ -543,8 +558,9 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
           });
 
           const totalKm = driverOrders.reduce((sum, o) => sum + Math.max(0, o.endKm - o.startKm), 0);
-          const totalFareRevenue = driverOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-          const totalDriverEarnings = driverOrders.reduce((sum, o) => sum + (o.driverCommissionAmount || Math.round(o.totalAmount * ((selectedDriver.commissionRate || 80)/100))), 0);
+          const completedDriverOrders = driverOrders.filter((order) => order.status === 'completed');
+          const totalFareRevenue = completedDriverOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+          const totalDriverEarnings = completedDriverOrders.reduce((sum, o) => sum + (o.driverCommissionAmount || Math.round(o.totalAmount * ((selectedDriver.commissionRate || 80)/100))), 0);
           const totalCompanyRevenue = totalFareRevenue - totalDriverEarnings;
           const paidOrdersCount = driverOrders.filter(o => o.paymentStatus === 'paid').length;
 
@@ -822,7 +838,8 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
 
                               <td style={{ padding: '12px 14px' }}>
                                 <button
-                                  onClick={() => toggleServiceOrderPayment(order.id)}
+                                  onClick={async () => { await toggleServiceOrderPayment(order.id); }}
+                                  disabled={order.status !== 'completed' || isPaid}
                                   style={{
                                     padding: '4px 10px',
                                     borderRadius: '12px',
@@ -1020,18 +1037,23 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
       {/* TAB 1: SERVICE ORDERS LIST */}
       {activeTab === 'orders' && (
         <>
-          {selectedOrderIds.length > 0 && (
+          {bulkServiceMutationsEnabled && selectedOrderIds.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,104,55,0.08)', border: '1px solid var(--primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
               <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
                 Đã chọn {selectedOrderIds.length} đơn dịch vụ tài xế
               </span>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <button 
-                  onClick={() => {
-                    if (window.confirm(`Đánh dấu ĐÃ THANH TOÁN hàng loạt cho ${selectedOrderIds.length} đơn đã chọn?`)) {
-                      selectedOrderIds.forEach(id => updateServiceOrder(id, { paymentStatus: 'paid' }));
-                      setSelectedOrderIds([]);
-                      showToast('Đã cập nhật trạng thái thanh toán hàng loạt!', 'success');
+                  onClick={async () => {
+                    if (await confirmAction({
+                      title: 'Ghi nhận thanh toán hàng loạt?',
+                      content: `${selectedOrderIds.length} đơn đã chọn sẽ được xử lý.`,
+                    })) {
+                      const results = await Promise.all(selectedOrderIds.map(id => updateServiceOrder(id, { paymentStatus: 'paid' })));
+                      if (results.every(Boolean)) {
+                        setSelectedOrderIds([]);
+                        showToast('Đã cập nhật trạng thái thanh toán hàng loạt!', 'success');
+                      }
                     }
                   }}
                   className="btn btn-secondary"
@@ -1040,23 +1062,27 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                   Đánh dấu Đã thanh toán
                 </button>
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     const pct = window.prompt("Nhập tỷ lệ chiết khấu (%) mới cho các đơn đã chọn (từ 0 đến 100):");
                     if (pct !== null && !isNaN(Number(pct))) {
-                      selectedOrderIds.forEach(id => {
+                      const updates = selectedOrderIds.map(id => {
                         const order = serviceOrders.find(o => o.id === id);
                         if (order) {
                           const distance = Math.max(0, order.endKm - order.startKm);
                           const calculatedFare = Math.round(distance * order.pricePerKm + (order.extraFee || 0));
                           const newCommAmount = Math.round(calculatedFare * (Number(pct) / 100));
-                          updateServiceOrder(id, { 
+                          return updateServiceOrder(id, {
                             driverCommissionRate: Number(pct),
                             driverCommissionAmount: newCommAmount
                           });
                         }
+                        return Promise.resolve(false);
                       });
-                      setSelectedOrderIds([]);
-                      showToast('Đã sửa chiết khấu hàng loạt!', 'success');
+                      const results = await Promise.all(updates);
+                      if (results.every(Boolean)) {
+                        setSelectedOrderIds([]);
+                        showToast('Đã sửa chiết khấu hàng loạt!', 'success');
+                      }
                     }
                   }}
                   className="btn btn-secondary"
@@ -1065,11 +1091,17 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                   Sửa chiết khấu hàng loạt
                 </button>
                 <button 
-                  onClick={() => {
-                    if (window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${selectedOrderIds.length} đơn dịch vụ đã chọn?`)) {
-                      selectedOrderIds.forEach(id => deleteServiceOrder(id));
-                      setSelectedOrderIds([]);
-                      showToast('Đã xóa hàng loạt đơn dịch vụ thành công!', 'success');
+                  onClick={async () => {
+                    if (await confirmAction({
+                      title: `Huỷ ${selectedOrderIds.length} đơn dịch vụ?`,
+                      content: 'Các đơn sẽ chuyển sang trạng thái huỷ và giữ lại lịch sử.',
+                      danger: true,
+                    })) {
+                      const results = await Promise.all(selectedOrderIds.map(id => deleteServiceOrder(id)));
+                      if (results.every(Boolean)) {
+                        setSelectedOrderIds([]);
+                        showToast('Đã xóa hàng loạt đơn dịch vụ thành công!', 'success');
+                      }
                     }
                   }}
                   className="btn btn-secondary" 
@@ -1124,7 +1156,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                 <Filter size={15} style={{ color: '#64748B' }} />
                 <select
                   value={paymentFilter}
-                  onChange={e => setPaymentFilter(e.target.value as any)}
+                  onChange={e => setPaymentFilter(e.target.value as 'all' | ServiceOrder['paymentStatus'])}
                   style={{
                     padding: '8px 12px',
                     borderRadius: '8px',
@@ -1330,7 +1362,8 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                           {/* Payment status badge & toggle */}
                           <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
                             <button
-                              onClick={() => toggleServiceOrderPayment(order.id)}
+                              onClick={async () => { await toggleServiceOrderPayment(order.id); }}
+                              disabled={order.status !== 'completed' || isPaid}
                               title="Bấm để đổi trạng thái thanh toán"
                               style={{
                                 display: 'inline-flex',
@@ -1363,8 +1396,38 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                                 <Eye size={16} />
                               </button>
 
+                              {order.status === 'scheduled' && (
+                                <button
+                                  onClick={() => startServiceOrder(order.id)}
+                                  className="btn-primary"
+                                  style={{ padding: '6px', borderRadius: '6px' }}
+                                  title="Bắt đầu chuyến"
+                                >
+                                  <Navigation size={16} />
+                                </button>
+                              )}
+                              {order.status === 'ongoing' && (
+                                <button
+                                  onClick={async () => {
+                                    const value = window.prompt(
+                                      `Nhập km kết thúc (km bắt đầu ${order.startKm.toLocaleString()}):`,
+                                      order.startKm.toString(),
+                                    );
+                                    if (value && Number.isInteger(Number(value))) {
+                                      await completeServiceOrder(order.id, Number(value));
+                                    }
+                                  }}
+                                  className="btn-primary"
+                                  style={{ padding: '6px', borderRadius: '6px' }}
+                                  title="Hoàn thành chuyến"
+                                >
+                                  <Check size={16} />
+                                </button>
+                              )}
+
                               <button
                                 onClick={() => handleOpenOrderModal(order)}
+                                disabled={order.status !== 'scheduled'}
                                 style={{ background: '#F1F5F9', border: 'none', borderRadius: '6px', padding: '6px', cursor: 'pointer', color: '#475569' }}
                                 title="Chỉnh sửa đơn"
                               >
@@ -1423,7 +1486,8 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                       </div>
 
                       <button
-                        onClick={() => toggleServiceOrderPayment(order.id)}
+                        onClick={async () => { await toggleServiceOrderPayment(order.id); }}
+                        disabled={order.status !== 'completed' || isPaid}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -1531,7 +1595,9 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
 
               // Calculated driver metrics
               const driverOrders = serviceOrders.filter(o => o.driverId === driver.id || o.driverName === driver.name);
-              const driverEarnings = driverOrders.reduce((s, o) => s + (o.driverCommissionAmount || Math.round(o.totalAmount * 0.8)), 0);
+              const driverEarnings = driverOrders
+                .filter((order) => order.status === 'completed')
+                .reduce((s, o) => s + (o.driverCommissionAmount || Math.round(o.totalAmount * 0.8)), 0);
               const driverKm = driverOrders.reduce((s, o) => s + Math.max(0, o.endKm - o.startKm), 0);
 
               return (
@@ -1882,7 +1948,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: '#334155' }}>Trạng thái Thanh toán *</label>
                     <select
                       value={orderForm.paymentStatus}
-                      onChange={e => setOrderForm({ ...orderForm, paymentStatus: e.target.value as any })}
+                      onChange={e => setOrderForm({ ...orderForm, paymentStatus: e.target.value as ServiceOrder['paymentStatus'] })}
                       style={{ 
                         width: '100%', padding: '9px', borderRadius: '8px', 
                         border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 700,
@@ -2116,7 +2182,7 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: '#334155' }}>Trạng thái hoạt động</label>
                   <select
                     value={driverForm.status}
-                    onChange={e => setDriverForm({ ...driverForm, status: e.target.value as any })}
+                    onChange={e => setDriverForm({ ...driverForm, status: e.target.value as Driver['status'] })}
                     style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
                   >
                     <option value="available">🟢 Sẵn sàng</option>

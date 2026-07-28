@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, Statistic, Table } from 'antd';
 import { useApp } from '../context/AppContext';
 import { BarChart, Award, Car, Calendar } from 'lucide-react';
@@ -7,87 +7,117 @@ const Reports = () => {
   const { cars, expenses, rentals, customers } = useApp();
 
   const [timeRange, setTimeRange] = useState<'1d' | '7d' | '30d' | 'quarter' | 'custom'>('1d');
-  const [startDate, setStartDate] = useState('2026-06-15');
-  const [endDate, setEndDate] = useState('2026-07-15');
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  });
+  const [endDate, setEndDate] = useState(
+    () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }),
+  );
+  const [financeSummary, setFinanceSummary] = useState<{
+    completed_revenue: number;
+    cash_collected: number;
+    receivables: number;
+    deposits_held: number;
+    expenses: number;
+  } | null>(null);
+  const [financeError, setFinanceError] = useState<string | null>(null);
 
-  // Filter rentals and expenses based on time range
-  const filteredRentals = rentals.filter(r => {
-    const rentalDate = new Date(r.startDate.split('T')[0]);
-    const refDate = new Date(); // Current system reference date
-
-    if (timeRange === '1d') {
-      const daysDiff = (refDate.getTime() - rentalDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff >= 0 && daysDiff <= 1;
-    }
-    if (timeRange === '7d') {
-      const daysDiff = (refDate.getTime() - rentalDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff >= 0 && daysDiff <= 7;
-    }
-    if (timeRange === '30d') {
-      const daysDiff = (refDate.getTime() - rentalDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff >= 0 && daysDiff <= 30;
-    }
+  const { periodStart, periodEnd } = useMemo(() => {
+    const now = new Date();
+    let rangeEnd = now;
+    let rangeStart = new Date(now.getTime() - 86_400_000);
+    if (timeRange === '7d') rangeStart = new Date(now.getTime() - 7 * 86_400_000);
+    if (timeRange === '30d') rangeStart = new Date(now.getTime() - 30 * 86_400_000);
     if (timeRange === 'quarter') {
-      const qStart = new Date('2026-07-01');
-      const qEnd = new Date('2026-09-30');
-      return rentalDate >= qStart && rentalDate <= qEnd;
+      const vietnamParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: 'numeric',
+      }).formatToParts(now);
+      const year = Number(vietnamParts.find((part) => part.type === 'year')?.value);
+      const month = Number(vietnamParts.find((part) => part.type === 'month')?.value);
+      const quarterStartMonth = Math.floor((month - 1) / 3) * 3;
+      rangeStart = new Date(Date.UTC(year, quarterStartMonth, 1) - 7 * 3_600_000);
+      rangeEnd = new Date(Date.UTC(year, quarterStartMonth + 3, 1) - 7 * 3_600_000);
     }
     if (timeRange === 'custom') {
-      const s = new Date(startDate);
-      const e = new Date(endDate);
-      return rentalDate >= s && rentalDate <= e;
+      rangeStart = new Date(`${startDate}T00:00:00+07:00`);
+      rangeEnd = new Date(`${endDate}T00:00:00+07:00`);
+      rangeEnd.setDate(rangeEnd.getDate() + 1);
     }
-    return true;
+    return { periodStart: rangeStart, periodEnd: rangeEnd };
+  }, [timeRange, startDate, endDate]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      start: periodStart.toISOString(),
+      end: periodEnd.toISOString(),
+    });
+    void fetch(`/api/finance/summary?${params.toString()}`, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error || 'Không thể tải sổ tài chính');
+        }
+        setFinanceSummary({
+          completed_revenue: Number(payload.data.completed_revenue) || 0,
+          cash_collected: Number(payload.data.cash_collected) || 0,
+          receivables: Number(payload.data.receivables) || 0,
+          deposits_held: Number(payload.data.deposits_held) || 0,
+          expenses: Number(payload.data.expenses) || 0,
+        });
+        setFinanceError(null);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setFinanceSummary(null);
+        setFinanceError(error instanceof Error ? error.message : 'Không thể tải sổ tài chính');
+      });
+    return () => controller.abort();
+  }, [periodStart, periodEnd]);
+
+  const filteredRentals = rentals.filter((rental) => {
+    if (rental.status !== 'completed') return false;
+    const recognizedAt = new Date(rental.returnedAt ?? rental.endDate);
+    return recognizedAt >= periodStart && recognizedAt < periodEnd;
   });
 
-  const filteredExpenses = expenses.filter(exp => {
-    const expDate = new Date(exp.date);
-    const refDate = new Date();
-
-    if (timeRange === '1d') {
-      const daysDiff = (refDate.getTime() - expDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff >= 0 && daysDiff <= 1;
-    }
-    if (timeRange === '7d') {
-      const daysDiff = (refDate.getTime() - expDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff >= 0 && daysDiff <= 7;
-    }
-    if (timeRange === '30d') {
-      const daysDiff = (refDate.getTime() - expDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff >= 0 && daysDiff <= 30;
-    }
-    if (timeRange === 'quarter') {
-      const qStart = new Date('2026-07-01');
-      const qEnd = new Date('2026-09-30');
-      return expDate >= qStart && expDate <= qEnd;
-    }
-    if (timeRange === 'custom') {
-      const s = new Date(startDate);
-      const e = new Date(endDate);
-      return expDate >= s && expDate <= e;
-    }
-    return true;
+  const filteredExpenses = expenses.filter((expense) => {
+    const expenseDate = new Date(`${expense.date}T00:00:00+07:00`);
+    return expenseDate >= periodStart && expenseDate < periodEnd;
   });
 
   // Calculate financial summary
-  const totalRevenue = filteredRentals.reduce((sum, r) => sum + r.totalAmount, 0);
-  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalRevenue = financeSummary?.completed_revenue
+    ?? filteredRentals.reduce((sum, r) => sum + r.totalAmount, 0);
+  const totalExpenses = financeSummary?.expenses
+    ?? filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const profit = totalRevenue - totalExpenses;
 
   // Utilization rates
   const sortedUtilization = [...cars].map(c => {
-    const carRentals = filteredRentals.filter(r => r.carId === c.id);
-    const totalDaysUsed = carRentals.reduce((sum, r) => {
-      const start = new Date(r.startDate);
-      const end = new Date(r.endDate);
-      const diff = end.getTime() - start.getTime();
-      return sum + Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    const carRentals = rentals.filter((rental) => (
+      rental.carId === c.id
+      && rental.status !== 'cancelled'
+      && new Date(rental.startDate) < periodEnd
+      && new Date(rental.endDate) > periodStart
+    ));
+    const totalHoursUsed = carRentals.reduce((sum, rental) => {
+      const overlapStart = Math.max(new Date(rental.startDate).getTime(), periodStart.getTime());
+      const overlapEnd = Math.min(new Date(rental.endDate).getTime(), periodEnd.getTime());
+      return sum + Math.max(0, overlapEnd - overlapStart) / 3_600_000;
     }, 0);
-    const periodDays = timeRange === '1d' ? 1 : timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
-    const utilizationRate = Math.min(100, Math.round((totalDaysUsed / periodDays) * 100));
+    const periodHours = Math.max(1, (periodEnd.getTime() - periodStart.getTime()) / 3_600_000);
+    const utilizationRate = Math.min(100, Math.round((totalHoursUsed / periodHours) * 100));
     return {
       ...c,
-      daysUsed: totalDaysUsed,
+      daysUsed: Math.round((totalHoursUsed / 24) * 10) / 10,
       rate: utilizationRate
     };
   }).sort((a, b) => b.rate - a.rate);
@@ -98,10 +128,10 @@ const Reports = () => {
     .slice(0, 3);
 
   // CSS charts percentages
-  const maxRevenue = Math.max(totalRevenue, totalExpenses, profit, 1000000);
-  const revenuePercent = Math.min(100, Math.max(10, (totalRevenue / maxRevenue) * 100));
-  const expensesPercent = Math.min(100, Math.max(10, (totalExpenses / maxRevenue) * 100));
-  const profitPercent = Math.min(100, Math.max(10, (profit / maxRevenue) * 100));
+  const maxRevenue = Math.max(Math.abs(totalRevenue), Math.abs(totalExpenses), Math.abs(profit), 1);
+  const revenuePercent = Math.min(100, (totalRevenue / maxRevenue) * 100);
+  const expensesPercent = Math.min(100, (totalExpenses / maxRevenue) * 100);
+  const profitPercent = Math.max(-100, Math.min(100, (profit / maxRevenue) * 100));
 
   const avgUtilization = cars.length > 0 ? Math.round(sortedUtilization.reduce((sum, u) => sum + u.rate, 0) / cars.length) : 0;
 
@@ -163,10 +193,27 @@ const Reports = () => {
       </div>
 
       {/* KPI Summary Cards with antd Card & Statistic */}
+      {financeError && (
+        <div className="alert alert-warning">
+          Không tải được sổ thực thu/công nợ: {financeError}
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
         <Card style={{ borderLeft: '4px solid #047857', borderRadius: 8 }}>
           <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Doanh thu (Tổng)</div>
           <Statistic value={totalRevenue} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#047857' }} />
+        </Card>
+        <Card style={{ borderLeft: '4px solid #0F766E', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Tiền thực thu</div>
+          <Statistic value={financeSummary?.cash_collected ?? 0} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#0F766E' }} />
+        </Card>
+        <Card style={{ borderLeft: '4px solid #DC2626', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Công nợ</div>
+          <Statistic value={financeSummary?.receivables ?? 0} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#DC2626' }} />
+        </Card>
+        <Card style={{ borderLeft: '4px solid #7C3AED', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Tiền cọc đang giữ</div>
+          <Statistic value={financeSummary?.deposits_held ?? 0} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#7C3AED' }} />
         </Card>
         <Card style={{ borderLeft: '4px solid #C2410C', borderRadius: 8 }}>
           <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Chi phí hoạt động</div>
@@ -214,7 +261,7 @@ const Reports = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', width: '80px', alignItems: 'center', zIndex: 1 }}>
-              <div style={{ height: `${profitPercent * 1.8}px`, width: '44px', backgroundColor: 'var(--status-rented-border)', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '11px', transition: 'height 0.5s' }} className="font-mono">
+              <div style={{ height: `${Math.abs(profitPercent) * 1.8}px`, width: '44px', backgroundColor: profit < 0 ? '#dc2626' : 'var(--status-rented-border)', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '11px', transition: 'height 0.5s' }} className="font-mono">
                 {Math.round(profitPercent)}%
               </div>
               <span style={{ fontSize: '13px', fontWeight: 600, marginTop: '8px', color: 'var(--text-primary)' }}>Lợi nhuận</span>

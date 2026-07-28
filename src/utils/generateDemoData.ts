@@ -59,6 +59,17 @@ function getRandomPlate(): string {
 }
 
 export function generate500DemoDataset() {
+  const currentYear = Number(
+    new Intl.DateTimeFormat('en', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+    }).format(new Date()),
+  );
+  const relativeDate = (offsetDays: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offsetDays);
+    return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  };
   // 1. Generate 30 Owners
   const owners: Owner[] = [];
   for (let i = 1; i <= 30; i++) {
@@ -100,9 +111,9 @@ export function generate500DemoDataset() {
       image: carImages[i % carImages.length],
       km: getRandomInt(8000, 95000),
       ownerPhone: owner.phone,
-      expiryRegistration: `2026-${getRandomInt(8, 12).toString().padStart(2, '0')}-${getRandomInt(10, 28).toString().padStart(2, '0')}`,
-      expiryInsurance: `2026-${getRandomInt(8, 12).toString().padStart(2, '0')}-${getRandomInt(10, 28).toString().padStart(2, '0')}`,
-      expiryLicense: `2027-${getRandomInt(1, 12).toString().padStart(2, '0')}-${getRandomInt(10, 28).toString().padStart(2, '0')}`,
+      expiryRegistration: `${currentYear + 1}-${getRandomInt(1, 12).toString().padStart(2, '0')}-${getRandomInt(10, 28).toString().padStart(2, '0')}`,
+      expiryInsurance: `${currentYear + 1}-${getRandomInt(1, 12).toString().padStart(2, '0')}-${getRandomInt(10, 28).toString().padStart(2, '0')}`,
+      expiryLicense: `${currentYear + 2}-${getRandomInt(1, 12).toString().padStart(2, '0')}-${getRandomInt(10, 28).toString().padStart(2, '0')}`,
       pricePerHour: model.priceHour,
       pricePerDay: model.priceDay,
       pricePerWeek: model.priceWeek
@@ -131,13 +142,13 @@ export function generate500DemoDataset() {
     });
   }
 
-  // 4. Generate 500 Rentals (spanning Jan 2026 to July 2026)
+  // 4. Generate 500 Rentals across the current year.
   const rentals: Rental[] = [];
   const violationsList: Violation[] = [
-    { id: 'v1', description: 'Chạy quá tốc độ 10-20km/h (Phạt nguội cao tốc)', date: '2026-06-12', amount: 4000000, status: 'unpaid' },
-    { id: 'v2', description: 'Đỗ xe nơi có biển cấm đỗ', date: '2026-05-20', amount: 900000, status: 'paid' },
-    { id: 'v3', description: 'Hỏng trầy xước cản trước', date: '2026-06-01', amount: 1500000, status: 'paid' },
-    { id: 'v4', description: 'Đi vào làn đường xe buýt BRT', date: '2026-04-15', amount: 2500000, status: 'unpaid' }
+    { id: 'v1', description: 'Chạy quá tốc độ 10-20km/h (Phạt nguội cao tốc)', date: relativeDate(-15), amount: 4000000, status: 'unpaid' },
+    { id: 'v2', description: 'Đỗ xe nơi có biển cấm đỗ', date: relativeDate(-30), amount: 900000, status: 'paid' },
+    { id: 'v3', description: 'Hỏng trầy xước cản trước', date: relativeDate(-45), amount: 1500000, status: 'paid' },
+    { id: 'v4', description: 'Đi vào làn đường xe buýt BRT', date: relativeDate(-60), amount: 2500000, status: 'unpaid' }
   ];
 
   for (let i = 1; i <= 500; i++) {
@@ -153,8 +164,8 @@ export function generate500DemoDataset() {
     const dayStr = day.toString().padStart(2, '0');
     const endDayStr = Math.min(day + getRandomInt(1, 5), 28).toString().padStart(2, '0');
 
-    const startDate = `2026-${monthStr}-${dayStr}T08:00`;
-    const endDate = `2026-${monthStr}-${endDayStr}T17:00`;
+    const startDate = `${currentYear}-${monthStr}-${dayStr}T08:00`;
+    const endDate = `${currentYear}-${monthStr}-${endDayStr}T17:00`;
 
     const durDays = Math.max(1, parseInt(endDayStr) - parseInt(dayStr));
     const rentalFee = durDays * car.pricePerDay;
@@ -171,7 +182,7 @@ export function generate500DemoDataset() {
     const status: Rental['status'] = i <= 15 ? 'pending' : i <= 40 ? 'active' : i === 41 ? 'cancelled' : 'completed';
     const paymentStatus: Rental['paymentStatus'] = status === 'pending' ? 'deposit' : status === 'active' ? (i % 2 === 0 ? 'deposit' : 'debt') : 'paid';
 
-    const createdAt = `2026-${monthStr}-${Math.max(1, day - 1).toString().padStart(2, '0')}T09:30`;
+    const createdAt = `${currentYear}-${monthStr}-${Math.max(1, day - 1).toString().padStart(2, '0')}T09:30`;
     const deliveredAt = (status === 'active' || status === 'completed') ? startDate : undefined;
     const returnedAt = status === 'completed' ? endDate : undefined;
 
@@ -227,7 +238,7 @@ export function generate500DemoDataset() {
       title: getRandomElement(expenseTitles),
       amount: getRandomElement([150000, 350000, 850000, 1500000, 2500000, 4800000, 8000000]),
       category,
-      date: `2026-${monthStr}-${dayStr}`,
+      date: `${currentYear}-${monthStr}-${dayStr}`,
       ref: category === 'Chiết khấu chủ xe' ? `Chủ xe #${getRandomInt(1, 30)}` : car.id,
       location: 'Gara Ô tô Quốc Tế'
     });

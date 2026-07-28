@@ -1,22 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Table, Tag, Card, Statistic, Descriptions, Space, Empty, Segmented, Button, Breadcrumb, Badge, Modal } from 'antd';
+import { Table, Tag, Card, Space, Empty, Button, Breadcrumb, Modal } from 'antd';
 import { 
   EditOutlined, 
   DeleteOutlined, 
   PlusOutlined, 
   CheckSquareOutlined, 
   CarOutlined, 
-  DashboardOutlined, 
   DollarOutlined, 
-  UserOutlined, 
-  HistoryOutlined, 
-  CalendarOutlined, 
   ArrowLeftOutlined 
 } from '@ant-design/icons';
 import { Search, Filter, Plus, Gauge, ShieldCheck, X, Image as ImageIcon, Trash2, Calendar as CalendarIcon, LayoutGrid, List, Receipt, Layers, Maximize2 } from 'lucide-react';
 import { useApp, type Car, type Rental, type Expense } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
+import { confirmAction } from '../utils/confirmAction';
 
 const LiveCountdown = ({ endDateStr }: { endDateStr: string }) => {
   const [timeLeft, setTimeLeft] = useState('');
@@ -120,7 +117,6 @@ const FleetManagement = () => {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
-  const [galleryTarget, setGalleryTarget] = useState<'add' | 'edit'>('add');
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -265,9 +261,9 @@ const FleetManagement = () => {
       km: parseInt(newKm) || 0,
       ownerPhone: finalOwnerPhone,
       image: newImage || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
-      expiryRegistration: '2027-01-01',
-      expiryInsurance: '2026-12-01',
-      expiryLicense: '2027-06-01',
+      expiryRegistration: '',
+      expiryInsurance: '',
+      expiryLicense: '',
       pricePerDay: parseInt(newPriceDay) || 800000,
       pricePerHour: parseInt(newPriceHour) || 100000,
       pricePerWeek: parseInt(newPriceWeek) || 5000000,
@@ -310,7 +306,11 @@ const FleetManagement = () => {
     setEditKm((activeCar.km || 0).toString());
     setEditPhone(activeCar.ownerPhone || '');
     setEditImage(activeCar.image || '');
-    setEditStatus(activeCar.status === 'rented' ? 'ready' : activeCar.status);
+    setEditStatus(
+      activeCar.status === 'rented' || activeCar.status === 'reserved'
+        ? 'ready'
+        : activeCar.status,
+    );
     setEditPriceDay((activeCar.pricePerDay || 800000).toString());
     setEditPriceHour((activeCar.pricePerHour || 100000).toString());
     setEditPriceWeek((activeCar.pricePerWeek || 5000000).toString());
@@ -318,11 +318,11 @@ const FleetManagement = () => {
     setShowEditForm(true);
   };
 
-  const handleUpdateCar = (e: React.FormEvent) => {
+  const handleUpdateCar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId) return;
 
-    updateCar(selectedCarId, {
+    const success = await updateCar(selectedCarId, {
       name: editName,
       brand: editBrand,
       year: editYear,
@@ -338,19 +338,24 @@ const FleetManagement = () => {
       images: editGalleryImages
     });
 
-    setShowEditForm(false);
+    if (success) setShowEditForm(false);
   };
 
-  const handleDeleteCar = () => {
+  const handleDeleteCar = async () => {
     if (!selectedCarId) return;
     if (activeCar?.status === 'rented') {
       showToast('Không thể xóa xe đang được thuê!', 'error');
       return;
     }
-    if (confirm(`Bạn có chắc chắn muốn xóa xe ${selectedCarId} khỏi đội xe?`)) {
-      deleteCar(selectedCarId);
-      setSelectedCarId(null);
-      setShowEditForm(false);
+    if (await confirmAction({
+      title: `Xoá xe ${selectedCarId}?`,
+      content: 'Xe chỉ có thể xoá khi không còn hợp đồng hoặc dữ liệu liên kết.',
+      danger: true,
+    })) {
+      if (await deleteCar(selectedCarId)) {
+        setSelectedCarId(null);
+        setShowEditForm(false);
+      }
     }
   };
 
@@ -363,7 +368,7 @@ const FleetManagement = () => {
     setShowReturnForm(true);
   };
 
-  const handleConfirmReturn = (e: React.FormEvent) => {
+  const handleConfirmReturn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeRental || !selectedCarId || !activeCar) return;
 
@@ -373,7 +378,7 @@ const FleetManagement = () => {
       return;
     }
 
-    completeRental(
+    const success = await completeRental(
       activeRental.id,
       kmNum,
       parseInt(surcharge) || 0,
@@ -381,8 +386,10 @@ const FleetManagement = () => {
       paymentStatus
     );
 
-    setShowReturnForm(false);
-    showToast('Đã hoàn tất quy trình trả xe và cập nhật trạng thái xe thành công!', 'success');
+    if (success) {
+      setShowReturnForm(false);
+      showToast('Đã hoàn tất quy trình trả xe và cập nhật trạng thái xe thành công!', 'success');
+    }
   };
 
   // === Lịch tuần này: Tính động theo giờ Việt Nam ===
@@ -539,12 +546,18 @@ const FleetManagement = () => {
               <Space size={10} wrap>
                 <Button icon={<EditOutlined />} onClick={handleOpenEdit} style={{ borderRadius: '8px' }}>Chỉnh sửa</Button>
                 <Button danger ghost icon={<DeleteOutlined />} style={{ borderRadius: '8px' }}
-                  onClick={() => {
+                  onClick={async () => {
                     if (activeCar.status === 'rented') { showToast('Không thể xóa xe đang cho thuê!', 'error'); return; }
-                    if (confirm(`Bạn có chắc chắn muốn xóa xe ${activeCar.name} (${activeCar.id})?`)) { deleteCar(activeCar.id); setSelectedCarId(null); }
+                    if (await confirmAction({
+                      title: `Xoá xe ${activeCar.name}?`,
+                      content: `Biển số ${activeCar.id} chỉ được xoá khi không còn dữ liệu liên kết.`,
+                      danger: true,
+                    }) && await deleteCar(activeCar.id)) {
+                      setSelectedCarId(null);
+                    }
                   }}
                 >Xóa xe</Button>
-                {activeCar.status === 'ready' && (
+                {(activeCar.status === 'ready' || activeCar.status === 'suspended') && (
                   <Link to={`/rental/new?car=${activeCar.id}`} style={{ textDecoration: 'none' }}>
                     <Button type="primary" icon={<PlusOutlined />} style={{ borderRadius: '8px', background: '#006837', boxShadow: '0 2px 6px rgba(0,104,55,0.25)' }}>Tạo đơn thuê mới</Button>
                   </Link>
@@ -643,7 +656,7 @@ const FleetManagement = () => {
                   </div>
                 )}
 
-                {activeCar.status === 'ready' && (
+                {(activeCar.status === 'ready' || activeCar.status === 'suspended') && (
                   <Link to={`/rental/new?car=${activeCar.id}`} style={{ textDecoration: 'none', display: 'block' }}>
                     <Button type="primary" size="large" block icon={<CarOutlined />} style={{ height: '42px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, background: '#006837', boxShadow: '0 2px 8px rgba(0,104,55,0.25)' }}>Tạo đơn cho thuê ngay</Button>
                   </Link>
@@ -1169,7 +1182,7 @@ const FleetManagement = () => {
                       )}
                       {car.status === 'suspended' && (
                         <div style={{ position: 'absolute', inset: 0, background: 'rgba(100, 116, 139, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                          <span style={{ fontSize: '16px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>TẠM NGƯNG ⚠️</span>
+                          <span style={{ fontSize: '16px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>ĐÃ ĐẶT TRƯỚC</span>
                         </div>
                       )}
                     </div>
@@ -1285,7 +1298,7 @@ const FleetManagement = () => {
                         { text: 'Sẵn sàng', value: 'ready' },
                         { text: 'Đang thuê', value: 'rented' },
                         { text: 'Bảo trì', value: 'maintenance' },
-                        { text: 'Tạm ngưng', value: 'suspended' },
+                        { text: 'Đã đặt trước', value: 'suspended' },
                       ],
                       onFilter: (value: boolean | React.Key, record: Car) => record.status === value,
                       render: (_: unknown, record: Car) => {
@@ -1296,7 +1309,7 @@ const FleetManagement = () => {
                         } else if (record.status === 'maintenance') {
                           return <Tag color="warning" style={{ borderRadius: 12, fontWeight: 600 }}>🟠 Bảo trì</Tag>;
                         }
-                        return <Tag color="default" style={{ borderRadius: 12, fontWeight: 600 }}>⚪ Tạm ngưng</Tag>;
+                        return <Tag color="default" style={{ borderRadius: 12, fontWeight: 600 }}>⚪ Đã đặt trước</Tag>;
                       }
                     },
                     {
@@ -1875,7 +1888,7 @@ const FleetManagement = () => {
                 <select 
                   value={editStatus} 
                   disabled={activeCar.status === 'rented'}
-                  onChange={e => setEditStatus(e.target.value as any)} 
+                  onChange={e => setEditStatus(e.target.value as 'ready' | 'maintenance' | 'suspended')}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', background: activeCar.status === 'rented' ? '#f3f4f6' : 'white' }}
                 >
                   <option value="ready">Sẵn sàng</option>
@@ -1975,7 +1988,7 @@ const FleetManagement = () => {
 
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Tình trạng thanh toán cuối</label>
-              <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value as any)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', fontWeight: 600, color: paymentStatus === 'paid' ? 'var(--status-ready-text)' : 'var(--status-maintenance-text)' }}>
+              <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value as 'paid' | 'debt')} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', fontWeight: 600, color: paymentStatus === 'paid' ? 'var(--status-ready-text)' : 'var(--status-maintenance-text)' }}>
                 <option value="paid">Đã thanh toán đủ (Đóng đơn)</option>
                 <option value="debt">Ghi nhận công nợ (Khách còn nợ)</option>
               </select>

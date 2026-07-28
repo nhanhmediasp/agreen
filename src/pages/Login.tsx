@@ -1,76 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Eye, EyeOff, Car, Lock, User, ShieldAlert, Clock } from 'lucide-react';
+import { logSecurityEvent } from '../auth/clientAuth';
 
 const FAILED_LOGINS_KEY = 'agreen_failed_logins';
 const LOCKOUT_UNTIL_KEY = 'agreen_lockout_until';
-const SECURITY_LOGS_KEY = 'agreen_security_logs';
-
-export interface SecurityLog {
-  id: string;
-  type: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOCKOUT' | 'PASSWORD_CHANGE';
-  message: string;
-  timestamp: string;
-  username: string;
-}
-
-export function logSecurityEvent(type: SecurityLog['type'], message: string, username: string) {
-  try {
-    const existing: SecurityLog[] = JSON.parse(localStorage.getItem(SECURITY_LOGS_KEY) || '[]');
-    const newLog: SecurityLog = {
-      id: `SEC-${Date.now()}`,
-      type,
-      message,
-      timestamp: new Date().toLocaleString('vi-VN'),
-      username: username || 'khách'
-    };
-    // Keep last 50 logs
-    const updated = [newLog, ...existing].slice(0, 50);
-    localStorage.setItem(SECURITY_LOGS_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.error('Failed to log security event', err);
-  }
-}
-
-export function getSecurityLogs(): SecurityLog[] {
-  try {
-    return JSON.parse(localStorage.getItem(SECURITY_LOGS_KEY) || '[]');
-  } catch (_err) {
-    return [];
-  }
-}
-
-export function clearSecurityLogs() {
-  localStorage.removeItem(SECURITY_LOGS_KEY);
-}
-
-export function checkLogin(): boolean {
-  return localStorage.getItem('agreen_auth') === 'true';
-}
-
-export function doLogout() {
-  localStorage.removeItem('agreen_auth');
-  localStorage.removeItem('agreen_admin_username');
-}
-
-export async function updateAdminCredentials(username: string, oldPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const res = await fetch('/api/auth/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, oldPassword, newPassword })
-    });
-    const data = await res.json();
-    if (data.success) {
-      logSecurityEvent('PASSWORD_CHANGE', `Tài khoản '${username}' đã đổi mật khẩu thành công.`, username);
-      return { success: true };
-    } else {
-      return { success: false, error: data.error || 'Đổi mật khẩu thất bại' };
-    }
-  } catch (err) {
-    console.error('Failed to sync credentials to server', err);
-    return { success: false, error: 'Lỗi kết nối máy chủ' };
-  }
-}
 
 export default function Login({ onLogin }: { onLogin: () => void }) {
   const [username, setUsername] = useState('');
@@ -154,6 +87,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
@@ -161,8 +95,6 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
 
       if (data.success) {
         // SUCCESSFUL LOGIN
-        localStorage.setItem('agreen_auth', 'true');
-        localStorage.setItem('agreen_auth_time', Date.now().toString());
         localStorage.setItem('agreen_admin_username', data.data.username);
         localStorage.removeItem(FAILED_LOGINS_KEY);
         localStorage.removeItem(LOCKOUT_UNTIL_KEY);
@@ -190,7 +122,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
           setError(data.error + ` (Sai ${newFailed}/5 lần). Vui lòng thử lại.`);
         }
       }
-    } catch (err) {
+    } catch {
       setError('Lỗi kết nối đến máy chủ xác thực.');
     } finally {
       setLoading(false);

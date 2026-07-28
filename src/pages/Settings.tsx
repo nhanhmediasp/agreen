@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Upload, Save, RefreshCw, ShieldCheck, ShieldAlert, Lock, Trash2, Key, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getSecurityLogs, clearSecurityLogs, type SecurityLog } from './Login';
+import { getSecurityLogs, clearSecurityLogs, type SecurityLog } from '../auth/clientAuth';
 import { ImageGallery } from '../components/ImageGallery';
+import { confirmAction } from '../utils/confirmAction';
 
 const isImageUrl = (url: string) => {
   if (!url || url === 'Auto') return false;
@@ -70,8 +71,12 @@ const SettingsPage = () => {
     }, 100);
   };
 
-  const handleClearLogs = () => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa tất cả lịch sử nhật ký bảo mật?')) {
+  const handleClearLogs = async () => {
+    if (await confirmAction({
+      title: 'Xoá nhật ký cục bộ?',
+      content: 'Nhật ký trên thiết bị này sẽ bị xoá và không thể khôi phục.',
+      danger: true,
+    })) {
       clearSecurityLogs();
       setSecurityLogs([]);
       showToast('Đã xóa nhật ký bảo mật!', 'info');
@@ -278,7 +283,10 @@ const SettingsPage = () => {
             <div style={{ height: '1px', backgroundColor: 'var(--border-light)' }}></div>
 
             {/* SAVE ACTION */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Cấu hình này chỉ lưu trên thiết bị và trình duyệt hiện tại.
+              </span>
               <button className="btn-primary" style={{ gap: '8px' }} onClick={handleSave}>
                 <Save size={16} />
                 Lưu cấu hình hệ thống
@@ -357,8 +365,13 @@ const SettingsPage = () => {
             {/* Audit Logs Table */}
             <div style={{ background: '#FFFFFF', borderRadius: '14px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>
-                  📋 Lịch Sử Nhật Ký Bảo Mật & Cảnh Báo Hệ Thống
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>
+                    📋 Lịch Sử Nhật Ký Bảo Mật & Cảnh Báo Hệ Thống
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                    Chỉ lưu trên thiết bị này; không phải audit log phía server.
+                  </div>
                 </div>
                 {securityLogs.length > 0 && (
                   <button

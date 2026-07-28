@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { lazy, Suspense, useState, useRef, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -17,22 +17,29 @@ import {
   Menu,
   Search,
   Plus,
-  Compass
+  Compass,
+  AlertCircle,
 } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext';
-import Dashboard from './pages/Dashboard';
-import PublicStatus from './pages/PublicStatus';
-import SettingsPage from './pages/Settings';
-import FleetManagement from './pages/FleetManagement';
-import CreateRental from './pages/CreateRental';
-import Customers from './pages/Customers';
-import Expenses from './pages/Expenses';
-import Reports from './pages/Reports';
-import Contracts from './pages/Contracts';
-import Owners from './pages/Owners';
-import ServiceOrders from './pages/ServiceOrders';
-import Login, { checkLogin, doLogout, updateAdminCredentials } from './pages/Login';
+import Login from './pages/Login';
+import { checkLogin, doLogout, updateAdminCredentials, type AuthUser } from './auth/clientAuth';
 import { ImageGallery } from './components/ImageGallery';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const PublicStatus = lazy(() => import('./pages/PublicStatus'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const FleetManagement = lazy(() => import('./pages/FleetManagement'));
+const CreateRental = lazy(() => import('./pages/CreateRental'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Expenses = lazy(() => import('./pages/Expenses'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Contracts = lazy(() => import('./pages/Contracts'));
+const Owners = lazy(() => import('./pages/Owners'));
+const ServiceOrders = lazy(() => import('./pages/ServiceOrders'));
+
+const RouteFallback = () => (
+  <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>Đang tải…</div>
+);
 
 const isImageUrl = (url: string) => {
   if (!url || url === 'Auto') return false;
@@ -148,7 +155,7 @@ function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
         {/* Footer logout */}
         <div className="sidebar-footer">
           <button
-            onClick={() => { doLogout(); window.location.reload(); }}
+            onClick={() => { void doLogout().finally(() => window.location.reload()); }}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: '9px',
               padding: '10px 13px', borderRadius: '9px',
@@ -277,7 +284,7 @@ function AccountDropdown() {
           >
             <User size={15} color="var(--text-muted)" /> Chỉnh sửa tài khoản
           </button>
-          <button onClick={() => { setOpen(false); doLogout(); window.location.reload(); }} style={{
+          <button onClick={() => { setOpen(false); void doLogout().finally(() => window.location.reload()); }} style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: '9px',
             padding: '9px 12px', borderRadius: '7px', background: 'none', border: 'none',
             cursor: 'pointer', fontSize: '13.5px', color: '#dc2626', fontFamily: 'inherit',
@@ -410,6 +417,7 @@ function VNDatetimeClock() {
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { isLoading, loadError } = useApp();
   const location = useLocation();
   const pageTitle = PAGE_TITLES[location.pathname] || 'Dashboard';
 
@@ -450,7 +458,17 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         <div className="page-content">
-          {children}
+          {loadError && (
+            <div className="alert alert-danger" role="alert" style={{ marginBottom: '16px' }}>
+              <AlertCircle size={16} />
+              <span>{loadError}</span>
+            </div>
+          )}
+          {isLoading ? (
+            <div style={{ minHeight: '240px', display: 'grid', placeItems: 'center' }}>
+              Đang tải dữ liệu vận hành…
+            </div>
+          ) : children}
         </div>
       </main>
     </div>
@@ -474,33 +492,76 @@ function ToastContainer() {
 }
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(checkLogin);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const isPublicPath = ['/thong-tin-xe', '/public'].includes(window.location.pathname);
 
-  if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />;
+  useEffect(() => {
+    if (isPublicPath) {
+      setCheckingAuth(false);
+      return;
+    }
+    void checkLogin().then((user) => {
+      setAuthUser(user);
+      if (user) localStorage.setItem('agreen_admin_username', user.username);
+      setCheckingAuth(false);
+    });
+  }, [isPublicPath]);
+
+  useEffect(() => {
+    const handleUnauthorized = () => setAuthUser(null);
+    window.addEventListener('agreen:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('agreen:unauthorized', handleUnauthorized);
+  }, []);
+
+  if (isPublicPath) {
+    return (
+      <Router>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/thong-tin-xe" element={<PublicStatus />} />
+            <Route path="/public" element={<PublicStatus />} />
+          </Routes>
+        </Suspense>
+      </Router>
+    );
+  }
+
+  if (checkingAuth) {
+    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>Đang kiểm tra phiên đăng nhập…</div>;
+  }
+
+  if (!authUser) {
+    return <Login onLogin={() => {
+      setCheckingAuth(true);
+      void checkLogin().then((user) => {
+        setAuthUser(user);
+        setCheckingAuth(false);
+      });
+    }} />;
   }
 
   return (
     <AppProvider>
       <Router>
-        <Routes>
-          <Route path="/thong-tin-xe" element={<PublicStatus />} />
-          <Route path="/public" element={<PublicStatus />} />
-          <Route path="/" element={<AdminLayout><Dashboard /></AdminLayout>} />
-          <Route path="/fleet" element={<AdminLayout><FleetManagement /></AdminLayout>} />
-          <Route path="/rental/new" element={<AdminLayout><CreateRental /></AdminLayout>} />
-          <Route path="/contracts" element={<AdminLayout><Contracts /></AdminLayout>} />
-          <Route path="/services" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
-          <Route path="/drivers" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
-          <Route path="/drivers/:id" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
-          <Route path="/tai-xe" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
-          <Route path="/tai-xe/:id" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
-          <Route path="/customers" element={<AdminLayout><Customers /></AdminLayout>} />
-          <Route path="/owners" element={<AdminLayout><Owners /></AdminLayout>} />
-          <Route path="/expenses" element={<AdminLayout><Expenses /></AdminLayout>} />
-          <Route path="/reports" element={<AdminLayout><Reports /></AdminLayout>} />
-          <Route path="/settings" element={<AdminLayout><SettingsPage /></AdminLayout>} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<AdminLayout><Dashboard /></AdminLayout>} />
+            <Route path="/fleet" element={<AdminLayout><FleetManagement /></AdminLayout>} />
+            <Route path="/rental/new" element={<AdminLayout><CreateRental /></AdminLayout>} />
+            <Route path="/contracts" element={<AdminLayout><Contracts /></AdminLayout>} />
+            <Route path="/services" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+            <Route path="/drivers" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+            <Route path="/drivers/:id" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+            <Route path="/tai-xe" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+            <Route path="/tai-xe/:id" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
+            <Route path="/customers" element={<AdminLayout><Customers /></AdminLayout>} />
+            <Route path="/owners" element={<AdminLayout><Owners /></AdminLayout>} />
+            <Route path="/expenses" element={<AdminLayout><Expenses /></AdminLayout>} />
+            <Route path="/reports" element={<AdminLayout><Reports /></AdminLayout>} />
+            <Route path="/settings" element={<AdminLayout><SettingsPage /></AdminLayout>} />
+          </Routes>
+        </Suspense>
         <ToastContainer />
       </Router>
     </AppProvider>

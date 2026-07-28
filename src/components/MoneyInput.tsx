@@ -71,7 +71,7 @@ export const MoneyInput: React.FC<MoneyInputProps> = ({
     letterSpacing: '-0.01em',
     textAlign: 'right' as const,
     // No spinner
-    MozAppearance: 'textfield' as any,
+    MozAppearance: 'textfield',
     ...style,
   };
 

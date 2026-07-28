@@ -19,46 +19,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================
--- SAFE DATABASE MIGRATIONS (Updates existing tables with new columns)
--- ============================================================
-DO $$
-BEGIN
-    -- Update vehicles table if exists
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'vehicles') THEN
-        ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC(12, 2) DEFAULT 0.00;
-        ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS weekly_rate NUMERIC(12, 2) DEFAULT 0.00;
-        ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS license_expiry DATE;
-        ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS gallery_urls TEXT DEFAULT '[]';
-    END IF;
-
-    -- Update owners table if exists
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'owners') THEN
-        ALTER TABLE owners ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,2) DEFAULT 0.00;
-        ALTER TABLE owners ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
-    END IF;
-
-    -- Update customers table if exists
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'customers') THEN
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS classification VARCHAR(20) DEFAULT 'normal';
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS active_rentals INT DEFAULT 0;
-        ALTER TABLE customers ADD COLUMN IF NOT EXISTS total_rentals INT DEFAULT 0;
-    END IF;
-
-    -- Update expenses table if exists
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'expenses') THEN
-        ALTER TABLE expenses ALTER COLUMN id TYPE VARCHAR(50);
-        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS title VARCHAR(200) DEFAULT '';
-        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS ref VARCHAR(100) DEFAULT '';
-        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS location VARCHAR(200) DEFAULT '';
-    END IF;
-EXCEPTION WHEN OTHERS THEN
-    NULL;
-END $$;
-
--- ============================================================
 -- 1. USERS / ACCOUNTS TABLE
 -- ============================================================
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    filename TEXT PRIMARY KEY,
+    checksum CHAR(64) NOT NULL,
+    applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT generate_uuid_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -146,9 +114,9 @@ CREATE TABLE IF NOT EXISTS customers (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS rentals (
     id VARCHAR(50) PRIMARY KEY,
-    car_id VARCHAR(20) NOT NULL,
+    car_id VARCHAR(20) NOT NULL REFERENCES vehicles(plate_number) ON UPDATE CASCADE ON DELETE RESTRICT,
     customer_name VARCHAR(100) NOT NULL,
-    customer_phone VARCHAR(20) NOT NULL,
+    customer_phone VARCHAR(20) NOT NULL REFERENCES customers(phone) ON UPDATE CASCADE ON DELETE RESTRICT,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_date TIMESTAMP WITH TIME ZONE NOT NULL,
     rental_fee NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -167,11 +135,13 @@ CREATE TABLE IF NOT EXISTS rentals (
     file_name VARCHAR(255) DEFAULT '',
     owner_commission_amount NUMERIC(12,2) DEFAULT 0,
     condition_images TEXT DEFAULT '[]',
+    violations JSONB NOT NULL DEFAULT '[]'::jsonb,
     notes TEXT DEFAULT '',
     delivered_at TIMESTAMP WITH TIME ZONE,
     returned_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT rentals_valid_dates CHECK (end_date > start_date)
 );
 
 -- ============================================================
@@ -220,14 +190,33 @@ CREATE TABLE IF NOT EXISTS contracts (
 -- ============================================================
 -- 8. SERVICE ORDERS TABLE (Đơn dịch vụ / Tài xế)
 -- ============================================================
+CREATE TABLE IF NOT EXISTS drivers (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    license_number VARCHAR(50) DEFAULT '',
+    license_class VARCHAR(20) DEFAULT 'B2',
+    status VARCHAR(20) NOT NULL DEFAULT 'available',
+    address TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    total_trips INT NOT NULL DEFAULT 0,
+    assigned_car_id VARCHAR(20) REFERENCES vehicles(plate_number) ON UPDATE CASCADE ON DELETE SET NULL,
+    avatar TEXT DEFAULT '',
+    commission_rate NUMERIC(5,2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS service_orders (
     id VARCHAR(50) PRIMARY KEY,
-    car_id VARCHAR(20) NOT NULL,
-    driver_id VARCHAR(50) DEFAULT '',
+    car_id VARCHAR(20) NOT NULL REFERENCES vehicles(plate_number) ON UPDATE CASCADE ON DELETE RESTRICT,
+    driver_id VARCHAR(50) REFERENCES drivers(id) ON UPDATE CASCADE ON DELETE SET NULL,
     driver_name VARCHAR(100) DEFAULT '',
     driver_phone VARCHAR(20) DEFAULT '',
     customer_name VARCHAR(100) DEFAULT '',
     customer_phone VARCHAR(20) DEFAULT '',
+    pickup_location TEXT DEFAULT '',
+    dropoff_location TEXT DEFAULT '',
     service_date TIMESTAMP WITH TIME ZONE NOT NULL,
     start_km INT DEFAULT 0,
     end_km INT DEFAULT 0,
@@ -267,6 +256,9 @@ CREATE INDEX IF NOT EXISTS idx_contracts_dates ON contracts(start_date, end_date
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
 CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
 CREATE INDEX IF NOT EXISTS idx_service_orders_car ON service_orders(car_id);
+CREATE INDEX IF NOT EXISTS idx_service_orders_driver ON service_orders(driver_id);
+CREATE INDEX IF NOT EXISTS idx_drivers_phone ON drivers(phone);
+CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status);
 
 -- ============================================================
 -- AUTO UPDATED_AT TRIGGER
@@ -299,3 +291,33 @@ CREATE TRIGGER update_expenses_modtime BEFORE UPDATE ON expenses FOR EACH ROW EX
 
 DROP TRIGGER IF EXISTS update_service_orders_modtime ON service_orders;
 CREATE TRIGGER update_service_orders_modtime BEFORE UPDATE ON service_orders FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_drivers_modtime ON drivers;
+CREATE TRIGGER update_drivers_modtime BEFORE UPDATE ON drivers FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE OR REPLACE FUNCTION prevent_overlapping_rentals()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status IN ('pending', 'active') THEN
+        PERFORM pg_advisory_xact_lock(hashtext(NEW.car_id));
+        IF EXISTS (
+            SELECT 1
+            FROM rentals existing
+            WHERE existing.car_id = NEW.car_id
+              AND existing.id <> NEW.id
+              AND existing.status IN ('pending', 'active')
+              AND NEW.start_date < existing.end_date
+              AND NEW.end_date > existing.start_date
+        ) THEN
+            RAISE EXCEPTION 'Rental schedule overlaps an existing booking for vehicle %', NEW.car_id
+                USING ERRCODE = '23P01';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS prevent_rental_overlap ON rentals;
+CREATE TRIGGER prevent_rental_overlap
+BEFORE INSERT OR UPDATE OF car_id, start_date, end_date, status ON rentals
+FOR EACH ROW EXECUTE PROCEDURE prevent_overlapping_rentals();
