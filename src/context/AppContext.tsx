@@ -203,8 +203,9 @@ interface AppContextType {
     id: string,
     paymentType: 'deposit' | 'deposit_application' | 'balance' | 'deposit_refund' | 'surcharge' | 'refund',
     amount: number,
+    note?: string,
   ) => Promise<boolean>;
-  completeRental: (id: string, endKm: number, extraFee: number, endFuel: string, paymentStatus: Rental['paymentStatus']) => Promise<boolean>;
+  completeRental: (id: string, endKm: number, extraFee: number, endFuel: string) => Promise<boolean>;
   addDriver: (driver: Driver) => Promise<boolean>;
   updateDriver: (id: string, updatedFields: Partial<Driver>) => Promise<boolean>;
   deleteDriver: (id: string) => Promise<boolean>;
@@ -1240,10 +1241,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ startKm, startFuel }),
       });
       await refreshRentalDomain();
-      showToast('Đã xóa đơn thuê khỏi CSDL thành công!', 'success');
+      showToast('Đã bàn giao xe và chuyển hợp đồng sang trạng thái đang thuê!', 'success');
       return true;
     } catch (error) {
-      showToast(`Lỗi khi xóa đơn thuê: ${errorMessage(error)}`, 'error');
+      showToast(`Không thể bàn giao xe: ${errorMessage(error)}`, 'error');
       return false;
     }
   };
@@ -1268,6 +1269,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     id: string,
     paymentType: 'deposit' | 'deposit_application' | 'balance' | 'deposit_refund' | 'surcharge' | 'refund',
     amount: number,
+    note?: string,
   ): Promise<boolean> => {
     try {
       await apiFetch(`/rentals/${id}/payments`, {
@@ -1275,6 +1277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({
           paymentType,
           amount,
+          note: note?.trim() || undefined,
           idempotencyKey: `rental:${id}:${paymentType}:${crypto.randomUUID()}`,
         }),
       });
@@ -1292,7 +1295,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     endKm: number,
     extraFee: number,
     endFuel: string,
-    _paymentStatus: Rental['paymentStatus'],
   ): Promise<boolean> => {
     try {
       await apiFetch<Record<string, unknown>>(`/rentals/${id}/return`, {

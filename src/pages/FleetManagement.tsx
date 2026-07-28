@@ -168,7 +168,7 @@ const FleetManagement = () => {
   const [returnKm, setReturnKm] = useState('');
   const [returnFuel, setReturnFuel] = useState('8/8');
   const [surcharge, setSurcharge] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'debt'>('paid');
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
   // Gallery States
   const [newGalleryImages, setNewGalleryImages] = useState<string[]>([]);
@@ -361,34 +361,39 @@ const FleetManagement = () => {
 
   const handleOpenReturn = () => {
     if (!activeCar) return;
-    setReturnKm((activeCar.km + 150).toString());
+    setReturnKm(activeCar.km.toString());
     setReturnFuel('8/8');
     setSurcharge('0');
-    setPaymentStatus('paid');
     setShowReturnForm(true);
   };
 
   const handleConfirmReturn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeRental || !selectedCarId || !activeCar) return;
+    if (!activeRental || !selectedCarId || !activeCar || isSubmittingReturn) return;
 
-    const kmNum = parseInt(returnKm);
-    if (isNaN(kmNum) || kmNum < activeCar.km) {
+    const kmNum = Number(returnKm);
+    const surchargeAmount = Number(surcharge || 0);
+    if (!Number.isInteger(kmNum) || kmNum < activeCar.km) {
       showToast(`Số km trả xe phải lớn hơn hoặc bằng số km lúc nhận (${activeCar.km.toLocaleString()} km)!`, 'error');
       return;
     }
+    if (!Number.isFinite(surchargeAmount) || surchargeAmount < 0) {
+      showToast('Phụ phí phát sinh không được nhỏ hơn 0.', 'error');
+      return;
+    }
 
-    const success = await completeRental(
-      activeRental.id,
-      kmNum,
-      parseInt(surcharge) || 0,
-      returnFuel,
-      paymentStatus
-    );
+    setIsSubmittingReturn(true);
+    try {
+      const success = await completeRental(
+        activeRental.id,
+        kmNum,
+        surchargeAmount,
+        returnFuel,
+      );
 
-    if (success) {
-      setShowReturnForm(false);
-      showToast('Đã hoàn tất quy trình trả xe và cập nhật trạng thái xe thành công!', 'success');
+      if (success) setShowReturnForm(false);
+    } finally {
+      setIsSubmittingReturn(false);
     }
   };
 
@@ -1976,27 +1981,57 @@ const FleetManagement = () => {
                 value={returnKm} 
                 onChange={e => setReturnKm(e.target.value)} 
                 placeholder={`Phải >= ${activeCar.km}`} 
+                min={activeCar.km}
+                step="1"
+                disabled={isSubmittingReturn}
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', fontWeight: 600 }} 
                 required 
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Phụ phí phát sinh (nếu có)</label>
-              <input type="number" placeholder="Quá giờ, vệ sinh, hư hỏng..." value={surcharge} onChange={e => setSurcharge(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Tình trạng thanh toán cuối</label>
-              <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value as 'paid' | 'debt')} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', fontWeight: 600, color: paymentStatus === 'paid' ? 'var(--status-ready-text)' : 'var(--status-maintenance-text)' }}>
-                <option value="paid">Đã thanh toán đủ (Đóng đơn)</option>
-                <option value="debt">Ghi nhận công nợ (Khách còn nợ)</option>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Mức nhiên liệu lúc nhận lại</label>
+              <select
+                value={returnFuel}
+                onChange={e => setReturnFuel(e.target.value)}
+                disabled={isSubmittingReturn}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}
+              >
+                <option value="8/8">Đầy bình (8/8)</option>
+                <option value="6/8">Khoảng 3/4 bình (6/8)</option>
+                <option value="4/8">Khoảng 1/2 bình (4/8)</option>
+                <option value="2/8">Khoảng 1/4 bình (2/8)</option>
+                <option value="1/8">Gần hết (1/8)</option>
               </select>
             </div>
 
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Phụ phí phát sinh (nếu có)</label>
+              <input type="number" min="0" placeholder="Quá giờ, vệ sinh, hư hỏng..." value={surcharge} onChange={e => setSurcharge(e.target.value)} disabled={isSubmittingReturn} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
+            </div>
+
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '10px 12px', borderRadius: 'var(--radius-md)', fontSize: '12.5px', lineHeight: 1.5 }}>
+              Thanh toán hiện tại: <strong>{activeRental.paymentStatus === 'paid' ? 'Đã thanh toán' : activeRental.paymentStatus === 'deposit' ? 'Đã đặt cọc' : 'Còn nợ'}</strong>. Trạng thái này chỉ thay đổi khi ghi nhận giao dịch tại chi tiết hợp đồng.
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-              <button type="button" onClick={() => setShowReturnForm(false)} style={{ padding: '8px 16px', color: 'var(--text-secondary)' }}>Hủy</button>
-              <button type="submit" className="btn-primary" style={{ background: 'var(--status-ready-text)' }}>Xác nhận trả xe</button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowReturnForm(false)}
+                disabled={isSubmittingReturn}
+                style={{ padding: '9px 18px', opacity: isSubmittingReturn ? 0.6 : 1 }}
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isSubmittingReturn}
+                style={{ padding: '9px 18px', background: 'var(--status-ready-text)', opacity: isSubmittingReturn ? 0.7 : 1 }}
+              >
+                {isSubmittingReturn ? 'Đang chốt hợp đồng...' : 'Xác nhận trả xe'}
+              </button>
             </div>
           </form>
         </div>

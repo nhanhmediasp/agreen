@@ -24,6 +24,13 @@ const calculateDuration = (startStr: string, endStr: string) => {
   return `${days} ngày ${hours}h`;
 };
 
+const toDateTimeLocalValue = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
 const LiveCountdown = ({ endDateStr }: { endDateStr: string }) => {
   const [timeLeft, setTimeLeft] = useState('');
 
@@ -58,6 +65,7 @@ const Contracts = () => {
     handoverRental,
     cancelRental,
     recordRentalPayment,
+    completeRental,
     showToast,
     cars,
     owners,
@@ -69,6 +77,18 @@ const Contracts = () => {
   const [showDocModal, setShowDocModal] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [galleryMode, setGalleryMode] = useState<'contract' | 'evidence' | 'condition'>('contract');
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnKm, setReturnKm] = useState('');
+  const [returnFuel, setReturnFuel] = useState('8/8');
+  const [returnExtraFee, setReturnExtraFee] = useState('0');
+  const [isReturning, setIsReturning] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentType, setPaymentType] = useState<
+    'deposit' | 'deposit_application' | 'balance' | 'deposit_refund' | 'surcharge' | 'refund'
+  >('balance');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [isRecordingPayment, setIsRecordingPayment] = useState(false);
   
   // Selected Contract for viewing or editing
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
@@ -106,10 +126,6 @@ const Contracts = () => {
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [editFile, setEditFile] = useState('');
-  const [editPaymentStatus, setEditPaymentStatus] = useState<Rental['paymentStatus']>('paid');
-  const [editStatus, setEditStatus] = useState<Rental['status']>('completed');
-  const [editStartKm, setEditStartKm] = useState('0');
-  const [editEndKm, setEditEndKm] = useState('0');
 
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [violationEditId, setViolationEditId] = useState<string | null>(null);
@@ -207,33 +223,39 @@ const Contracts = () => {
   const totalPages = Math.ceil(filteredRentals.length / itemsPerPage);
   const paginatedRentals = filteredRentals.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const [editOwnerCommission, setEditOwnerCommission] = useState('');
-
   const handleOpenEdit = (rental: Rental) => {
     setSelectedRental(rental);
     setEditId(rental.id);
     setEditCarId(rental.carId);
     setEditName(rental.customerName);
     setEditPhone(rental.customerPhone);
-    setEditStart(rental.startDate);
-    setEditEnd(rental.endDate);
+    setEditStart(toDateTimeLocalValue(rental.startDate));
+    setEditEnd(toDateTimeLocalValue(rental.endDate));
     setEditFile(rental.fileUrl || '');
-    setEditPaymentStatus(rental.paymentStatus);
-    setEditStatus(rental.status);
-    setEditStartKm(rental.startKm.toString());
-    setEditEndKm((rental.endKm || rental.startKm || 0).toString());
-    setEditOwnerCommission((rental.ownerCommissionAmount ?? Math.round(rental.totalAmount * 0.7)).toString());
     setShowEditModal(true);
   };
 
-  const handleUpdateContractSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdateContractSubmit = async () => {
     if (!selectedRental) return;
+
+    const customerName = editName.trim();
+    const customerPhone = editPhone.replace(/\s/g, '').trim();
+    if (selectedRental.status === 'pending') {
+      if (!customerName || !customerPhone) {
+        showToast('Vui lòng nhập đầy đủ tên và số điện thoại khách hàng.', 'error');
+        return;
+      }
+      if (!editStart || !editEnd || new Date(editEnd) <= new Date(editStart)) {
+        showToast('Ngày trả xe phải sau ngày nhận xe.', 'error');
+        return;
+      }
+    }
 
     const updates: Partial<Rental> = selectedRental.status === 'pending'
       ? {
-          customerName: editName,
-          customerPhone: editPhone,
+          carId: editCarId,
+          customerName,
+          customerPhone,
           startDate: editStart,
           endDate: editEnd,
           fileUrl: editFile,
@@ -244,6 +266,72 @@ const Contracts = () => {
     if (success) {
       setShowEditModal(false);
       showToast('Đã cập nhật thông tin đơn thuê/hợp đồng thành công!', 'success');
+    }
+  };
+
+  const handleOpenReturn = () => {
+    if (!selectedDetailRental || selectedDetailRental.status !== 'active') return;
+    const currentMileage = carObj?.km ?? selectedDetailRental.startKm;
+    setReturnKm(Math.max(currentMileage, selectedDetailRental.startKm).toString());
+    setReturnFuel(selectedDetailRental.endFuel || '8/8');
+    setReturnExtraFee((selectedDetailRental.extraFee || 0).toString());
+    setShowReturnModal(true);
+  };
+
+  const handleConfirmReturn = async () => {
+    if (!selectedDetailRental || selectedDetailRental.status !== 'active' || isReturning) return;
+    const endKm = Number(returnKm);
+    const extraFee = Number(returnExtraFee || 0);
+    const minimumKm = Math.max(selectedDetailRental.startKm, carObj?.km ?? 0);
+    if (!Number.isInteger(endKm) || endKm < minimumKm) {
+      showToast(`Số KM lúc trả phải là số nguyên và không nhỏ hơn ${minimumKm.toLocaleString()} km.`, 'error');
+      return;
+    }
+    if (!Number.isFinite(extraFee) || extraFee < 0) {
+      showToast('Phụ phí phát sinh không được nhỏ hơn 0.', 'error');
+      return;
+    }
+
+    setIsReturning(true);
+    try {
+      const success = await completeRental(
+        selectedDetailRental.id,
+        endKm,
+        extraFee,
+        returnFuel,
+      );
+      if (success) setShowReturnModal(false);
+    } finally {
+      setIsReturning(false);
+    }
+  };
+
+  const handleOpenPayment = () => {
+    setPaymentType('balance');
+    setPaymentAmount('');
+    setPaymentNote('');
+    setShowPaymentModal(true);
+  };
+
+  const handleRecordPayment = async () => {
+    if (!selectedDetailRental || isRecordingPayment) return;
+    const amount = Number(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast('Số tiền giao dịch phải lớn hơn 0.', 'error');
+      return;
+    }
+
+    setIsRecordingPayment(true);
+    try {
+      const success = await recordRentalPayment(
+        selectedDetailRental.id,
+        paymentType,
+        amount,
+        paymentNote,
+      );
+      if (success) setShowPaymentModal(false);
+    } finally {
+      setIsRecordingPayment(false);
     }
   };
 
@@ -877,21 +965,6 @@ const Contracts = () => {
                 <select 
                   value={selectedDetailRental.status}
                   disabled
-                  onChange={async e => {
-                    const newStatus = e.target.value as Rental['status'];
-                    const updates: Partial<Rental> = { status: newStatus };
-                    if (newStatus === 'active' && !selectedDetailRental.deliveredAt) {
-                      updates.deliveredAt = new Date().toISOString();
-                    }
-                    if (newStatus === 'completed' && !selectedDetailRental.returnedAt) {
-                      updates.returnedAt = new Date().toISOString();
-                    }
-                    if (await updateRental(selectedDetailRental.id, updates)) showToast(`Đã cập nhật trạng thái đơn thành: ${
-                      newStatus === 'pending' ? 'Chờ bàn giao xe' :
-                      newStatus === 'active' ? 'Đang thuê' :
-                      newStatus === 'completed' ? 'Đã trả xe' : 'Đã hủy'
-                    }!`, 'success');
-                  }}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '13.5px', fontFamily: 'inherit', fontWeight: 700, background: 'white' }}
                 >
                   <option value="pending">🟡 Chờ bàn giao xe cho khách</option>
@@ -899,6 +972,19 @@ const Contracts = () => {
                   <option value="completed">🟢 Đã trả xe (Khách đã trả xe xong)</option>
                   <option value="cancelled">🔴 Đã hủy đơn thuê</option>
                 </select>
+                {selectedDetailRental.status === 'active' && (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleOpenReturn}
+                    style={{ width: '100%', justifyContent: 'center', marginTop: '10px', background: '#1d4ed8' }}
+                  >
+                    Nhận xe trả &amp; Chốt hợp đồng
+                  </button>
+                )}
+                <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Trạng thái được cập nhật theo quy trình bàn giao, nhận xe trả hoặc huỷ hợp đồng để giữ đúng số KM và lịch sử xe.
+                </div>
               </div>
 
               {/* Trạng thái thanh toán của Khách */}
@@ -916,32 +1002,8 @@ const Contracts = () => {
                 <button
                   type="button"
                   className="btn-primary"
-                  style={{ marginTop: '10px' }}
-                  onClick={async () => {
-                    const type = window.prompt(
-                      'Loại giao dịch: deposit, deposit_application, balance, deposit_refund, surcharge hoặc refund',
-                      'balance',
-                    )?.trim();
-                    const amountText = window.prompt('Số tiền giao dịch:')?.trim();
-                    const amount = Number(amountText);
-                    const allowed = new Set([
-                      'deposit',
-                      'deposit_application',
-                      'balance',
-                      'deposit_refund',
-                      'surcharge',
-                      'refund',
-                    ]);
-                    if (!type || !allowed.has(type) || !Number.isFinite(amount) || amount <= 0) {
-                      showToast('Loại giao dịch hoặc số tiền không hợp lệ.', 'error');
-                      return;
-                    }
-                    await recordRentalPayment(
-                      selectedDetailRental.id,
-                      type as 'deposit' | 'deposit_application' | 'balance' | 'deposit_refund' | 'surcharge' | 'refund',
-                      amount,
-                    );
-                  }}
+                  style={{ marginTop: '10px', width: '100%', justifyContent: 'center' }}
+                  onClick={handleOpenPayment}
                 >
                   Ghi nhận giao dịch
                 </button>
@@ -1596,86 +1658,296 @@ const Contracts = () => {
         </div>
       )}
 
+      <Modal
+        title="Nhận xe trả & Chốt hợp đồng"
+        open={showReturnModal && !!selectedDetailRental}
+        onCancel={() => {
+          if (!isReturning) setShowReturnModal(false);
+        }}
+        footer={null}
+        width={640}
+        maskClosable={!isReturning}
+        closable={!isReturning}
+      >
+        {selectedDetailRental && (
+          <Form layout="vertical" onFinish={handleConfirmReturn} style={{ marginTop: '16px' }}>
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '12px 14px', marginBottom: '18px', lineHeight: 1.6 }}>
+              <div>Hợp đồng: <strong>#{selectedDetailRental.id}</strong></div>
+              <div>Xe: <strong>{selectedDetailRental.carId}</strong> · Khách: <strong>{selectedDetailRental.customerName}</strong></div>
+              <div>KM lúc giao: <strong>{selectedDetailRental.startKm.toLocaleString()} km</strong></div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 16px' }}>
+              <Form.Item label="Số KM lúc nhận lại" required>
+                <input
+                  type="number"
+                  min={Math.max(selectedDetailRental.startKm, carObj?.km ?? 0)}
+                  step="1"
+                  value={returnKm}
+                  onChange={e => setReturnKm(e.target.value)}
+                  className="form-input"
+                  disabled={isReturning}
+                  required
+                />
+              </Form.Item>
+              <Form.Item label="Mức nhiên liệu lúc nhận lại" required>
+                <select
+                  value={returnFuel}
+                  onChange={e => setReturnFuel(e.target.value)}
+                  className="form-select"
+                  disabled={isReturning}
+                >
+                  <option value="8/8">Đầy bình (8/8)</option>
+                  <option value="6/8">Khoảng 3/4 bình (6/8)</option>
+                  <option value="4/8">Khoảng 1/2 bình (4/8)</option>
+                  <option value="2/8">Khoảng 1/4 bình (2/8)</option>
+                  <option value="1/8">Gần hết (1/8)</option>
+                </select>
+              </Form.Item>
+            </div>
+
+            <Form.Item
+              label="Phụ phí phát sinh"
+              extra="Nhập tổng phụ phí đã thống nhất khi nhận xe (quá giờ, vệ sinh, hư hỏng...)."
+            >
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={returnExtraFee}
+                onChange={e => setReturnExtraFee(e.target.value)}
+                className="form-input"
+                disabled={isReturning}
+              />
+            </Form.Item>
+
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 12px', color: '#92400e', fontSize: '12.5px', lineHeight: 1.5, marginBottom: '18px' }}>
+              Xác nhận sẽ chốt hợp đồng, lưu thời điểm trả xe, cập nhật KM xe và đưa xe về trạng thái vận hành phù hợp. Trạng thái thanh toán vẫn lấy theo các giao dịch đã ghi nhận.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowReturnModal(false)}
+                disabled={isReturning}
+                style={{ padding: '9px 18px', opacity: isReturning ? 0.6 : 1 }}
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isReturning}
+                style={{ padding: '9px 18px', background: '#1d4ed8', opacity: isReturning ? 0.7 : 1 }}
+              >
+                {isReturning ? 'Đang chốt hợp đồng...' : 'Xác nhận trả xe'}
+              </button>
+            </div>
+          </Form>
+        )}
+      </Modal>
+
+      <Modal
+        title={`Ghi nhận giao dịch${selectedDetailRental ? ` · #${selectedDetailRental.id}` : ''}`}
+        open={showPaymentModal && !!selectedDetailRental}
+        onCancel={() => {
+          if (!isRecordingPayment) setShowPaymentModal(false);
+        }}
+        footer={null}
+        width={620}
+        maskClosable={!isRecordingPayment}
+        closable={!isRecordingPayment}
+      >
+        {selectedDetailRental && (
+          <Form layout="vertical" onFinish={handleRecordPayment} style={{ marginTop: '16px' }}>
+            <Form.Item label="Loại giao dịch" required>
+              <select
+                value={paymentType}
+                onChange={e => setPaymentType(e.target.value as typeof paymentType)}
+                className="form-select"
+                disabled={isRecordingPayment}
+              >
+                <option value="balance">Thanh toán tiền thuê / số dư còn lại</option>
+                <option value="deposit">Nhận tiền đặt cọc</option>
+                <option value="deposit_application">Khấu trừ tiền cọc vào hóa đơn</option>
+                <option value="deposit_refund">Hoàn trả tiền cọc cho khách</option>
+                <option value="surcharge">Thu phụ phí phát sinh</option>
+                <option value="refund">Hoàn tiền thanh toán</option>
+              </select>
+            </Form.Item>
+
+            <Form.Item label="Số tiền" required extra="Nhập số tiền thực tế của giao dịch, lớn hơn 0.">
+              <input
+                type="number"
+                min="1"
+                step="1000"
+                value={paymentAmount}
+                onChange={e => setPaymentAmount(e.target.value)}
+                placeholder="Ví dụ: 1.500.000"
+                className="form-input"
+                disabled={isRecordingPayment}
+                required
+              />
+            </Form.Item>
+
+            <Form.Item label="Ghi chú">
+              <textarea
+                value={paymentNote}
+                onChange={e => setPaymentNote(e.target.value)}
+                placeholder="Ví dụ: Khách chuyển khoản ngân hàng, mã tham chiếu..."
+                rows={3}
+                className="form-input"
+                disabled={isRecordingPayment}
+                style={{ resize: 'vertical' }}
+              />
+            </Form.Item>
+
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px', fontSize: '12.5px', color: '#475569', lineHeight: 1.5, marginBottom: '18px' }}>
+              Trạng thái thanh toán sẽ tự tính lại từ sổ giao dịch; không chỉnh trực tiếp để tránh lệch công nợ.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowPaymentModal(false)}
+                disabled={isRecordingPayment}
+                style={{ padding: '9px 18px', opacity: isRecordingPayment ? 0.6 : 1 }}
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isRecordingPayment}
+                style={{ padding: '9px 18px', opacity: isRecordingPayment ? 0.7 : 1 }}
+              >
+                {isRecordingPayment ? 'Đang ghi nhận...' : 'Xác nhận giao dịch'}
+              </button>
+            </div>
+          </Form>
+        )}
+      </Modal>
+
       {/* Modal Chỉnh Sửa Đơn Thuê - Ant Design Modal & Form */}
       <Modal
         title={`Chỉnh sửa đơn thuê #${editId}`}
         open={showEditModal && !!selectedRental}
         onCancel={() => setShowEditModal(false)}
         footer={null}
-        width={520}
+        width={820}
       >
-        <Form layout="vertical" onFinish={handleUpdateContractSubmit} style={{ marginTop: '16px' }}>
-          <Form.Item label="Liên kết Xe">
-            <input type="text" value={editCarId} disabled style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', background: '#f5f5f5' }} />
-          </Form.Item>
-
-          <Form.Item label="Họ tên Khách hàng" required>
-            <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
-          </Form.Item>
-
-          <Form.Item label="SĐT Khách hàng" required>
-            <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} required />
-          </Form.Item>
-
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <Form.Item label="Ngày bắt đầu" style={{ flex: 1 }}>
-              <input type="datetime-local" value={editStart} onChange={e => setEditStart(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
-            </Form.Item>
-            <Form.Item label="Ngày dự kiến trả" style={{ flex: 1 }}>
-              <input type="datetime-local" value={editEnd} onChange={e => setEditEnd(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <Form.Item label="Thanh toán" style={{ flex: 1 }}>
-              <select value={editPaymentStatus} onChange={e => setEditPaymentStatus(e.target.value as Rental['paymentStatus'])} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
-                <option value="deposit">Đã cọc</option>
-                <option value="paid">Đã thanh toán</option>
-                <option value="debt">Còn nợ</option>
-              </select>
-            </Form.Item>
-            <Form.Item label="Vận hành" style={{ flex: 1 }}>
-              <select value={editStatus} onChange={e => setEditStatus(e.target.value as Rental['status'])} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
-                <option value="active">Đang chạy</option>
-                <option value="completed">Hoàn tất</option>
-              </select>
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <Form.Item label="Số KM lúc bàn giao" style={{ flex: 1 }}>
-              <input type="number" value={editStartKm} onChange={e => setEditStartKm(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
-            </Form.Item>
-            <Form.Item label="Số KM lúc trả xe (kết thúc)" style={{ flex: 1 }}>
-              <input type="number" value={editEndKm} onChange={e => setEditEndKm(e.target.value)} placeholder="VD: 50250" style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
-            </Form.Item>
-          </div>
-
-          <Form.Item label="Tệp đính kèm (URL hợp đồng scan)">
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input type="text" value={editFile} onChange={e => setEditFile(e.target.value)} style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9' }} />
-              <button type="button" style={{ padding: '8px 12px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }} onClick={() => { setGalleryMode('contract'); setShowGallery(true); }}>
-                Thư viện
-              </button>
+        {selectedRental && (
+          <Form layout="vertical" onFinish={handleUpdateContractSubmit} style={{ marginTop: '16px' }}>
+            <div style={{ background: selectedRental.status === 'pending' ? '#eff6ff' : '#f8fafc', border: `1px solid ${selectedRental.status === 'pending' ? '#bfdbfe' : '#e2e8f0'}`, padding: '11px 14px', borderRadius: '8px', marginBottom: '18px', color: '#475569', fontSize: '13px', lineHeight: 1.5 }}>
+              {selectedRental.status === 'pending'
+                ? 'Đơn đang chờ bàn giao: có thể sửa xe, khách hàng và lịch thuê. Giá thuê sẽ được hệ thống tính lại.'
+                : 'Đơn đã bàn giao: thông tin vận hành, KM, giá và thanh toán được khóa để bảo toàn lịch sử. Tại đây chỉ cập nhật được tệp hợp đồng.'}
             </div>
-          </Form.Item>
 
-          <div style={{ background: '#f6ffed', padding: '12px', borderRadius: '6px', border: '1px solid #b7eb8f', marginBottom: '16px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#389e0d' }}>🔒 Tiền chi trả cho chủ xe (Admin)</div>
-            <input 
-              type="number" 
-              value={editOwnerCommission} 
-              onChange={e => setEditOwnerCommission(e.target.value)}
-              placeholder="Nhập số tiền..."
-              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d9d9d9', marginTop: '6px', fontWeight: 700, color: '#389e0d' }} 
-            />
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0 18px' }}>
+              <Form.Item label="Liên kết xe" required>
+                <select
+                  value={editCarId}
+                  onChange={e => setEditCarId(e.target.value)}
+                  className="form-select"
+                  disabled={selectedRental.status !== 'pending'}
+                  required
+                >
+                  {cars.map(car => (
+                    <option key={car.id} value={car.id}>{car.id} · {car.name}</option>
+                  ))}
+                </select>
+              </Form.Item>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-            <button type="button" onClick={() => setShowEditModal(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
-            <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Lưu thay đổi</button>
-          </div>
-        </Form>
+              <Form.Item label="Họ tên khách hàng" required>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="form-input"
+                  disabled={selectedRental.status !== 'pending'}
+                  required
+                />
+              </Form.Item>
+
+              <Form.Item label="SĐT khách hàng" required>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={e => setEditPhone(e.target.value)}
+                  className="form-input"
+                  disabled={selectedRental.status !== 'pending'}
+                  required
+                />
+              </Form.Item>
+
+              <Form.Item label="Ngày bắt đầu" required>
+                <input
+                  type="datetime-local"
+                  value={editStart}
+                  onChange={e => setEditStart(e.target.value)}
+                  className="form-input"
+                  disabled={selectedRental.status !== 'pending'}
+                  required
+                />
+              </Form.Item>
+
+              <Form.Item label="Ngày dự kiến trả" required>
+                <input
+                  type="datetime-local"
+                  min={editStart || undefined}
+                  value={editEnd}
+                  onChange={e => setEditEnd(e.target.value)}
+                  className="form-input"
+                  disabled={selectedRental.status !== 'pending'}
+                  required
+                />
+              </Form.Item>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+              {[
+                {
+                  label: 'Trạng thái vận hành',
+                  value: selectedRental.status === 'pending' ? 'Chờ bàn giao' : selectedRental.status === 'active' ? 'Đang thuê' : selectedRental.status === 'completed' ? 'Đã trả xe' : 'Đã hủy',
+                },
+                {
+                  label: 'Thanh toán',
+                  value: selectedRental.paymentStatus === 'paid' ? 'Đã thanh toán' : selectedRental.paymentStatus === 'deposit' ? 'Đã đặt cọc' : 'Còn nợ',
+                },
+                {
+                  label: 'KM giao / trả',
+                  value: `${selectedRental.startKm.toLocaleString()} / ${selectedRental.endKm?.toLocaleString() ?? '—'} km`,
+                },
+                {
+                  label: 'Chi trả chủ xe',
+                  value: `${(selectedRental.ownerCommissionAmount || 0).toLocaleString()} ₫`,
+                },
+              ].map(item => (
+                <div key={item.label} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>{item.label}</div>
+                  <strong style={{ fontSize: '13px', color: '#0f172a' }}>{item.value}</strong>
+                </div>
+              ))}
+            </div>
+
+            <Form.Item label="Tệp đính kèm (URL hợp đồng scan)">
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" value={editFile} onChange={e => setEditFile(e.target.value)} className="form-input" style={{ flex: 1 }} />
+                <button type="button" className="btn-secondary" style={{ padding: '8px 14px' }} onClick={() => { setGalleryMode('contract'); setShowGallery(true); }}>
+                  Thư viện
+                </button>
+              </div>
+            </Form.Item>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="button" className="btn-secondary" onClick={() => setShowEditModal(false)} style={{ padding: '9px 18px' }}>Hủy</button>
+              <button type="submit" className="btn-primary" style={{ padding: '9px 18px' }}>Lưu thay đổi</button>
+            </div>
+          </Form>
+        )}
       </Modal>
 
       {/* Modal Thêm/Sửa Chi Phí Phát Sinh (Vi phạm GT, Hỏng hóc, Sửa xe) */}
