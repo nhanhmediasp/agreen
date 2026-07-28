@@ -46,6 +46,13 @@ const RENTAL_SAFE_DOCUMENT_FIELDS = new Set([
   'source',
   'notes',
 ]);
+const RENTAL_EDITABLE_FINANCIAL_FIELDS = new Set([
+  'rental_fee',
+  'delivery_fee',
+  'discount_amount',
+  'extra_fee',
+  'violations',
+]);
 
 class ApiError extends Error {
   constructor(status, message, code) {
@@ -861,9 +868,12 @@ const calculateRentalAmounts = ({
   discountAmount = 0,
   extraFee = 0,
   violations = [],
+  rentalFeeOverride,
 }) => {
   const pricingDays = calculatePricingDays(startDate, endDate);
-  const rentalFee = Math.round(pricingDays * Number(dailyRate));
+  const rentalFee = rentalFeeOverride === undefined
+    ? Math.round(pricingDays * Number(dailyRate))
+    : Math.round(Number(rentalFeeOverride));
   const totalAmount = Math.max(
     0,
     rentalFee
@@ -936,6 +946,7 @@ const syncVehicleFromRentals = async (client, carId, endKm) => {
 
 const createRental = async (body, userId) => withTransaction(async (client) => {
   const fields = rentalFields(body, { requireCore: true });
+  const requestedRentalFee = fields.rental_fee;
   const id = optionalString(body, ['id'], { max: 50 })?.trim() || `RNT-${crypto.randomUUID()}`;
   if (fields.status !== undefined && fields.status !== 'pending') {
     throw new ApiError(409, 'New rentals must start in pending status', 'INVALID_RENTAL_TRANSITION');
@@ -973,6 +984,7 @@ const createRental = async (body, userId) => withTransaction(async (client) => {
     dailyRate: vehicle.daily_rate,
     deliveryFee: fields.delivery_fee,
     discountAmount: fields.discount_amount,
+    rentalFeeOverride: requestedRentalFee,
   });
   fields.pricing_days = pricing.pricingDays;
   fields.rental_fee = pricing.rentalFee;
@@ -1038,7 +1050,13 @@ const updateRental = async (id, body) => withTransaction(async (client) => {
     .filter(([, value]) => value !== undefined)
     .map(([key]) => key);
   if (current.status !== 'pending') {
-    const unsafeKey = providedKeys.find((key) => !RENTAL_SAFE_DOCUMENT_FIELDS.has(key));
+    const unsafeKey = providedKeys.find((key) => (
+      !RENTAL_SAFE_DOCUMENT_FIELDS.has(key)
+      && !(
+        ['active', 'completed'].includes(current.status)
+        && RENTAL_EDITABLE_FINANCIAL_FIELDS.has(key)
+      )
+    ));
     if (unsafeKey) {
       throw new ApiError(
         409,
@@ -1053,8 +1071,11 @@ const updateRental = async (id, body) => withTransaction(async (client) => {
       'customer_phone',
       'start_date',
       'end_date',
+      'rental_fee',
       'delivery_fee',
       'discount_amount',
+      'extra_fee',
+      'violations',
       ...RENTAL_SAFE_DOCUMENT_FIELDS,
     ]);
     const unsafeKey = providedKeys.find((key) => !pendingAllowed.has(key));
@@ -1095,13 +1116,17 @@ const updateRental = async (id, body) => withTransaction(async (client) => {
   for (const phone of phones) await lockCustomer(client, phone);
   await assertNoRentalOverlap(client, { id, ...merged });
 
-  if (current.status === 'pending') {
+  const hasFinancialUpdate = providedKeys.some((key) => RENTAL_EDITABLE_FINANCIAL_FIELDS.has(key));
+  if (current.status === 'pending' || hasFinancialUpdate) {
     const pricing = calculateRentalAmounts({
       startDate: merged.startDate,
       endDate: merged.endDate,
       dailyRate: targetVehicle.daily_rate,
       deliveryFee: fields.delivery_fee ?? Number(current.delivery_fee),
       discountAmount: fields.discount_amount ?? Number(current.discount_amount),
+      extraFee: fields.extra_fee ?? Number(current.extra_fee),
+      violations: fields.violations ?? parseJsonArray(current.violations),
+      rentalFeeOverride: fields.rental_fee ?? Number(current.rental_fee),
     });
     fields.pricing_days = pricing.pricingDays;
     fields.rental_fee = pricing.rentalFee;
@@ -1180,6 +1205,7 @@ const returnRental = async (id, body) => withTransaction(async (client) => {
     discountAmount: current.discount_amount,
     extraFee,
     violations,
+    rentalFeeOverride: Number(current.rental_fee),
   });
   const result = await client.query(
     `UPDATE rentals
@@ -2276,6 +2302,7 @@ if (isServerEntrypoint()) {
 
 export const rentalTestHelpers = {
   assertRentalDates,
+  calculateRentalAmounts,
   rentalsOverlap,
   rentalFields,
   rentalDerivedVehicleStatus,

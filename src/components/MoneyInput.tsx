@@ -62,7 +62,7 @@ export const MoneyInput: React.FC<MoneyInputProps> = ({
     borderRadius: 'var(--radius-md)',
     border: '1.5px solid var(--border-strong)',
     fontSize: '15px',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-sans)',
     fontWeight: 600,
     color: 'var(--text-primary)',
     background: disabled ? 'var(--bg-hover)' : 'var(--bg-surface)',

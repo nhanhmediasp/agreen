@@ -573,6 +573,21 @@ test('rental overlap helper treats touching intervals as non-overlapping', () =>
   );
 });
 
+test('rental pricing accepts a custom rental fee and includes it in the total', () => {
+  const pricing = rentalTestHelpers.calculateRentalAmounts({
+    startDate: '2026-08-01T08:00:00.000Z',
+    endDate: '2026-08-03T08:00:00.000Z',
+    dailyRate: 500_000,
+    rentalFeeOverride: 750_000,
+    deliveryFee: 100_000,
+    extraFee: 50_000,
+  });
+
+  assert.equal(pricing.pricingDays, 2);
+  assert.equal(pricing.rentalFee, 750_000);
+  assert.equal(pricing.totalAmount, 900_000);
+});
+
 test('server entrypoint detection supports direct Node and PM2 execution', () => {
   const modulePath = '/srv/agreen/server/server.js';
   assert.equal(isServerEntrypoint({

@@ -11,7 +11,7 @@ import { hasBookingConflict, isVehicleSelectableForPeriod } from '../utils/renta
 const CreateRental = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { cars, addCar, addRental, customers, addCustomer, owners, showToast, rentals } = useApp();
+  const { cars, addCar, addRental, handoverRental, customers, addCustomer, owners, showToast, rentals } = useApp();
   
   const queryParams = new URLSearchParams(location.search);
   const preselectedCarId = queryParams.get('car') || '';
@@ -133,7 +133,7 @@ const CreateRental = () => {
   const [startKm, setStartKm] = useState('0');
   const [endKm, setEndKm] = useState('0');
   const startFuel = '8/8';
-  const initialRentalStatus = 'pending' as const;
+  const [initialRentalStatus, setInitialRentalStatus] = useState<'pending' | 'active'>('pending');
 
   // Form State - Customer Mode & Searching
   const [customerMode, setCustomerMode] = useState<'select' | 'create'>('select');
@@ -149,8 +149,9 @@ const CreateRental = () => {
 
   // Form State - Financials & Contract
   const [deposit, setDeposit] = useState('10000000');
-  const [deliveryFee, setDeliveryFee] = useState('150000');
+  const [deliveryFee, setDeliveryFee] = useState('0');
   const [paymentStatus, setPaymentStatus] = useState<Rental['paymentStatus']>('deposit');
+  const [rentalFeeOverride, setRentalFeeOverride] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Contract Source Selection & Receipt View State
@@ -168,6 +169,10 @@ const CreateRental = () => {
       setEndKm(selectedCarObj.km.toString());
     }
   }, [selectedCarId, selectedCarObj]);
+
+  useEffect(() => {
+    setRentalFeeOverride(null);
+  }, [selectedCarId]);
 
   useEffect(() => {
     if (selectedDates.length > 0) {
@@ -234,10 +239,15 @@ const CreateRental = () => {
 
   const baseRate = getRate();
   const durNum = parseFloat(customDuration) || 0;
-  const computedRentalFee = Math.round(durNum * baseRate);
+  const weekendSurcharge = isWeekend
+    ? Math.round(durNum * baseRate * ((parseFloat(weekendSurchargePercent) || 0) / 100))
+    : 0;
+  const computedRentalFee = Math.round(durNum * baseRate) + weekendSurcharge;
 
   // Allow user custom rental fee override
-  const rentalFee = computedRentalFee;
+  const rentalFee = rentalFeeOverride === null
+    ? computedRentalFee
+    : parseInt(rentalFeeOverride, 10) || 0;
   const delFeeNum = parseInt(deliveryFee) || 0;
   const totalAmount = rentalFee + delFeeNum;
 
@@ -342,7 +352,23 @@ const CreateRental = () => {
     setIsSubmitting(true);
     try {
       const success = await addRental(rentalToAdd);
-      if (success) setCreatedReceiptRental(rentalToAdd);
+      if (!success) return;
+
+      if (initialRentalStatus === 'active') {
+        const handedOver = await handoverRental(rentalToAdd.id, rentalToAdd.startKm, rentalToAdd.startFuel);
+        if (handedOver) {
+          setCreatedReceiptRental({
+            ...rentalToAdd,
+            status: 'active',
+            deliveredAt: new Date().toISOString(),
+          });
+        } else {
+          setCreatedReceiptRental(rentalToAdd);
+          showToast('Đơn đã được tạo ở trạng thái chờ bàn giao vì thao tác giao xe chưa hoàn tất.', 'info');
+        }
+      } else {
+        setCreatedReceiptRental(rentalToAdd);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -420,7 +446,7 @@ const CreateRental = () => {
     : [];
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+    <div style={{ width: '100%', maxWidth: '1440px', margin: '0 auto' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1143,22 +1169,32 @@ const CreateRental = () => {
             {isWeekend && (
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#d97706', fontSize: '12.5px', fontWeight: 600, background: '#fffbeb', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid #fef3c7' }}>
                 <span>Phụ phí Cuối tuần / Lễ tết (+{weekendSurchargePercent || 0}%):</span>
-                <span>+{Math.round(durNum * baseRate * ((parseFloat(weekendSurchargePercent) || 0) / 100)).toLocaleString('vi-VN')} ₫</span>
+                <span>+{weekendSurcharge.toLocaleString('vi-VN')} ₫</span>
               </div>
             )}
             
             {/* Tùy chỉnh Tiền thuê xe */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', background: 'white', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '12px' }}>Tiền thuê xe (Tùy chỉnh):</span>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Tự động: {computedRentalFee.toLocaleString('vi-VN')}₫</span>
               </div>
-              <MoneyInput
-                value={computedRentalFee}
-                onChange={() => undefined}
-                disabled
-                style={{ width: '110px', padding: '6px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '13px', fontFamily: 'inherit', textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }} 
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+                <MoneyInput
+                  value={rentalFeeOverride ?? computedRentalFee}
+                  onChange={value => setRentalFeeOverride(value)}
+                  style={{ width: '160px', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--primary)', fontSize: '13px', fontFamily: 'inherit', textAlign: 'right', fontWeight: 700, color: 'var(--primary)', background: 'white' }}
+                />
+                {rentalFeeOverride !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setRentalFeeOverride(null)}
+                    style={{ color: 'var(--primary)', fontSize: '10.5px', fontWeight: 700, textDecoration: 'underline' }}
+                  >
+                    Dùng lại giá tự động
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Tiền chi trả cho chủ xe — LUÔN HIỆN Ở SIDEBAR BÊN PHẢI */}
@@ -1183,7 +1219,7 @@ const CreateRental = () => {
               <MoneyInput
                 value={deliveryFee}
                 onChange={setDeliveryFee}
-                placeholder="150000"
+                placeholder="0"
                 style={{ width: '120px', padding: '5px 8px', fontSize: '12px', fontWeight: 600 }}
               />
             </div>
@@ -1193,13 +1229,15 @@ const CreateRental = () => {
               <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>Trạng thái đơn thuê khi tạo:</label>
               <select 
                 value={initialRentalStatus}
-                disabled
+                onChange={e => setInitialRentalStatus(e.target.value as 'pending' | 'active')}
                 style={{ padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontSize: '12.5px', fontWeight: 700, fontFamily: 'inherit', background: 'white' }}
               >
                 <option value="pending">🟡 Chờ bàn giao xe cho khách</option>
                 <option value="active">🔵 Đang thuê (Đã giao xe ngay)</option>
-                <option value="completed">🟢 Đã hoàn thành (Đã trả xe & chốt số KM)</option>
               </select>
+              <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                Chọn “Đang thuê” sẽ tạo đơn và thực hiện bàn giao xe ngay với số KM/nhiên liệu đã nhập.
+              </span>
             </div>
 
             {step === 3 && (
@@ -1506,7 +1544,15 @@ const CreateRental = () => {
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button 
                   type="button" 
-                  onClick={() => { setCreatedReceiptRental(null); setStep(1); setSelectedCarId(''); setCustomerName(''); setSelectedCustomerPhone(''); }}
+                  onClick={() => {
+                    setCreatedReceiptRental(null);
+                    setStep(1);
+                    setSelectedCarId('');
+                    setCustomerName('');
+                    setSelectedCustomerPhone('');
+                    setRentalFeeOverride(null);
+                    setInitialRentalStatus('pending');
+                  }}
                   style={{ padding: '10px 20px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--primary)', background: 'white', color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }}
                 >
                   + Tạo đơn khác

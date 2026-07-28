@@ -400,7 +400,7 @@ function VNDatetimeClock() {
       userSelect: 'none',
     }}>
       <span style={{
-        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+        fontFamily: 'var(--font-sans)',
         fontSize: '16px',
         fontWeight: 700,
         color: '#006837',

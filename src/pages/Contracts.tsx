@@ -5,6 +5,7 @@ import { Plus, X, Search, ArrowLeft, ShieldAlert, FileText, Edit, Trash, FileChe
 import { useApp, type Rental, type Violation } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { Pagination } from '../components/Pagination';
+import { MoneyInput } from '../components/MoneyInput';
 import { uploadFile, uploadFiles } from '../utils/upload';
 import { confirmAction } from '../utils/confirmAction';
 
@@ -82,6 +83,10 @@ const Contracts = () => {
   const [returnFuel, setReturnFuel] = useState('8/8');
   const [returnExtraFee, setReturnExtraFee] = useState('0');
   const [isReturning, setIsReturning] = useState(false);
+  const [isChangingRentalStatus, setIsChangingRentalStatus] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentType, setPaymentType] = useState<
     'deposit' | 'deposit_application' | 'balance' | 'deposit_refund' | 'surcharge' | 'refund'
@@ -126,6 +131,7 @@ const Contracts = () => {
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [editFile, setEditFile] = useState('');
+  const [editRentalFee, setEditRentalFee] = useState('0');
 
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [violationEditId, setViolationEditId] = useState<string | null>(null);
@@ -135,6 +141,10 @@ const Contracts = () => {
   const [violationEvidence, setViolationEvidence] = useState('');
   const [violationStatus, setViolationStatus] = useState<'paid' | 'unpaid'>('unpaid');
   const [isEditingFinancials, setIsEditingFinancials] = useState(false);
+  const [draftRentalFee, setDraftRentalFee] = useState('0');
+  const [draftDeliveryFee, setDraftDeliveryFee] = useState('0');
+  const [draftExtraFee, setDraftExtraFee] = useState('0');
+  const [isSavingFinancials, setIsSavingFinancials] = useState(false);
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
 
   const handleUploadConditionFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,6 +242,7 @@ const Contracts = () => {
     setEditStart(toDateTimeLocalValue(rental.startDate));
     setEditEnd(toDateTimeLocalValue(rental.endDate));
     setEditFile(rental.fileUrl || '');
+    setEditRentalFee(rental.rentalFee.toString());
     setShowEditModal(true);
   };
 
@@ -249,6 +260,10 @@ const Contracts = () => {
         showToast('Ngày trả xe phải sau ngày nhận xe.', 'error');
         return;
       }
+      if (!Number.isFinite(Number(editRentalFee)) || Number(editRentalFee) < 0) {
+        showToast('Tiền thuê xe không được nhỏ hơn 0.', 'error');
+        return;
+      }
     }
 
     const updates: Partial<Rental> = selectedRental.status === 'pending'
@@ -258,6 +273,7 @@ const Contracts = () => {
           customerPhone,
           startDate: editStart,
           endDate: editEnd,
+          rentalFee: Number(editRentalFee),
           fileUrl: editFile,
         }
       : { fileUrl: editFile };
@@ -276,6 +292,52 @@ const Contracts = () => {
     setReturnFuel(selectedDetailRental.endFuel || '8/8');
     setReturnExtraFee((selectedDetailRental.extraFee || 0).toString());
     setShowReturnModal(true);
+  };
+
+  const handleOpenCancel = () => {
+    if (!selectedDetailRental || !['pending', 'active'].includes(selectedDetailRental.status)) return;
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!selectedDetailRental || isCancelling) return;
+    const reason = cancelReason.trim();
+    if (!reason) {
+      showToast('Vui lòng nhập lý do huỷ hợp đồng.', 'error');
+      return;
+    }
+    setIsCancelling(true);
+    try {
+      const success = await cancelRental(selectedDetailRental.id, reason);
+      if (success) setShowCancelModal(false);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleRentalStatusChange = async (newStatus: Rental['status']) => {
+    if (!selectedDetailRental || newStatus === selectedDetailRental.status || isChangingRentalStatus) return;
+    if (selectedDetailRental.status === 'pending' && newStatus === 'active') {
+      setIsChangingRentalStatus(true);
+      try {
+        await handoverRental(
+          selectedDetailRental.id,
+          selectedDetailRental.startKm,
+          selectedDetailRental.startFuel,
+        );
+      } finally {
+        setIsChangingRentalStatus(false);
+      }
+      return;
+    }
+    if (selectedDetailRental.status === 'active' && newStatus === 'completed') {
+      handleOpenReturn();
+      return;
+    }
+    if (newStatus === 'cancelled' && ['pending', 'active'].includes(selectedDetailRental.status)) {
+      handleOpenCancel();
+    }
   };
 
   const handleConfirmReturn = async () => {
@@ -365,22 +427,32 @@ const Contracts = () => {
     setShowViolationModal(true);
   };
 
-  const handleUpdateFinancials = async (fields: Partial<Rental>) => {
+  const handleFinancialEditToggle = async () => {
     if (!selectedDetailRentalId || !selectedDetailRental) return;
+    if (!isEditingFinancials) {
+      setDraftRentalFee(selectedDetailRental.rentalFee.toString());
+      setDraftDeliveryFee(selectedDetailRental.deliveryFee.toString());
+      setDraftExtraFee(selectedDetailRental.extraFee.toString());
+      setIsEditingFinancials(true);
+      return;
+    }
 
-    const rentalFee = fields.rentalFee !== undefined ? fields.rentalFee : selectedDetailRental.rentalFee;
-    const deliveryFee = fields.deliveryFee !== undefined ? fields.deliveryFee : selectedDetailRental.deliveryFee;
-    const extraFee = fields.extraFee !== undefined ? fields.extraFee : selectedDetailRental.extraFee;
-    
-    const currentViolations = selectedDetailRental.violations || [];
-    const violationTotal = currentViolations.reduce((sum, v) => sum + v.amount, 0);
+    const rentalFee = Number(draftRentalFee);
+    const deliveryFee = Number(draftDeliveryFee);
+    const extraFee = Number(draftExtraFee);
+    if ([rentalFee, deliveryFee, extraFee].some(value => !Number.isFinite(value) || value < 0)) {
+      showToast('Các khoản tiền không được nhỏ hơn 0.', 'error');
+      return;
+    }
 
-    const totalAmount = rentalFee + deliveryFee + extraFee + violationTotal;
-
-    await updateRental(selectedDetailRentalId, {
-      ...fields,
-      totalAmount
-    });
+    setIsSavingFinancials(true);
+    try {
+      if (await updateRental(selectedDetailRentalId, { rentalFee, deliveryFee, extraFee })) {
+        setIsEditingFinancials(false);
+      }
+    } finally {
+      setIsSavingFinancials(false);
+    }
   };
 
   const handleViolationSubmit = async (e?: React.FormEvent) => {
@@ -412,12 +484,8 @@ const Contracts = () => {
       updated = [...currentViolations, newV];
     }
 
-    const violationTotal = updated.reduce((sum, v) => sum + v.amount, 0);
-    const newTotalAmount = selectedDetailRental.rentalFee + selectedDetailRental.deliveryFee + selectedDetailRental.extraFee + violationTotal;
-
     const success = await updateRental(selectedDetailRentalId, {
       violations: updated,
-      totalAmount: newTotalAmount
     });
     if (success) {
       showToast(
@@ -437,12 +505,8 @@ const Contracts = () => {
     })) {
       const currentViolations = selectedDetailRental.violations || [];
       const updated = currentViolations.filter(v => v.id !== violationId);
-      const violationTotal = updated.reduce((sum, v) => sum + v.amount, 0);
-      const newTotalAmount = selectedDetailRental.rentalFee + selectedDetailRental.deliveryFee + selectedDetailRental.extraFee + violationTotal;
-
       if (await updateRental(selectedDetailRentalId, {
         violations: updated,
-        totalAmount: newTotalAmount
       })) {
         showToast('Đã xóa vi phạm giao thông!', 'info');
       }
@@ -548,14 +612,11 @@ const Contracts = () => {
                 {['pending', 'active'].includes(selectedDetailRental.status) && (
                   <button
                     type="button"
-                    className="btn-secondary"
+                    className="btn-danger"
                     style={{ marginTop: '14px', marginLeft: '8px' }}
-                    onClick={async () => {
-                      const reason = window.prompt('Nhập lý do huỷ hợp đồng:')?.trim();
-                      if (reason) await cancelRental(selectedDetailRental.id, reason);
-                    }}
+                    onClick={handleOpenCancel}
                   >
-                    Huỷ hợp đồng
+                    <Trash size={15} /> Huỷ hợp đồng
                   </button>
                 )}
                 {selectedDetailRental.status === 'active' && (
@@ -878,10 +939,12 @@ const Contracts = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-strong)', paddingBottom: '12px' }}>
                 <h3 style={{ fontSize: '18px', margin: 0, color: 'var(--primary)' }}>Hóa đơn & Hợp đồng</h3>
                 <button 
-                  onClick={() => setIsEditingFinancials(!isEditingFinancials)}
+                  type="button"
+                  onClick={handleFinancialEditToggle}
+                  disabled={isSavingFinancials || selectedDetailRental.status === 'cancelled'}
                   style={{ background: '#f1f5f9', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', padding: '4px 10px', color: 'var(--text-main)', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}
                 >
-                  {isEditingFinancials ? 'Lưu giá' : 'Sửa giá'}
+                  {isSavingFinancials ? 'Đang lưu...' : isEditingFinancials ? 'Lưu giá' : 'Sửa giá'}
                 </button>
               </div>
               
@@ -893,11 +956,11 @@ const Contracts = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Giá thuê xe gốc:</span>
                       {isEditingFinancials ? (
-                        <input 
-                          type="number" 
-                          value={selectedDetailRental.rentalFee}
-                          onChange={e => handleUpdateFinancials({ rentalFee: parseInt(e.target.value) || 0 })}
-                          style={{ width: '140px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', textAlign: 'right', fontWeight: 600, fontFamily: 'inherit' }}
+                        <MoneyInput
+                          value={draftRentalFee}
+                          onChange={setDraftRentalFee}
+                          disabled={isSavingFinancials}
+                          style={{ width: '160px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', textAlign: 'right', fontWeight: 700 }}
                         />
                       ) : (
                         <strong>{selectedDetailRental.rentalFee.toLocaleString()} ₫</strong>
@@ -906,11 +969,11 @@ const Contracts = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Phí giao xe:</span>
                       {isEditingFinancials ? (
-                        <input 
-                          type="number" 
-                          value={selectedDetailRental.deliveryFee}
-                          onChange={e => handleUpdateFinancials({ deliveryFee: parseInt(e.target.value) || 0 })}
-                          style={{ width: '140px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', textAlign: 'right', fontWeight: 600, fontFamily: 'inherit' }}
+                        <MoneyInput
+                          value={draftDeliveryFee}
+                          onChange={setDraftDeliveryFee}
+                          disabled={isSavingFinancials}
+                          style={{ width: '160px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', textAlign: 'right', fontWeight: 700 }}
                         />
                       ) : (
                         <strong>{selectedDetailRental.deliveryFee.toLocaleString()} ₫</strong>
@@ -919,11 +982,11 @@ const Contracts = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Phụ phí phát sinh:</span>
                       {isEditingFinancials ? (
-                        <input 
-                          type="number" 
-                          value={selectedDetailRental.extraFee}
-                          onChange={e => handleUpdateFinancials({ extraFee: parseInt(e.target.value) || 0 })}
-                          style={{ width: '140px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', textAlign: 'right', fontWeight: 600, fontFamily: 'inherit' }}
+                        <MoneyInput
+                          value={draftExtraFee}
+                          onChange={setDraftExtraFee}
+                          disabled={isSavingFinancials}
+                          style={{ width: '160px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', textAlign: 'right', fontWeight: 700 }}
                         />
                       ) : (
                         <strong>{selectedDetailRental.extraFee.toLocaleString()} ₫</strong>
@@ -939,17 +1002,13 @@ const Contracts = () => {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-strong)', paddingTop: '10px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Tiền đặt cọc:</span>
-                      {isEditingFinancials ? (
-                        <input 
-                          type="number" 
-                          value={selectedDetailRental.deposit}
-                          onChange={e => handleUpdateFinancials({ deposit: parseInt(e.target.value) || 0 })}
-                          style={{ width: '140px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', textAlign: 'right', fontWeight: 600, color: 'var(--primary)', fontFamily: 'inherit' }}
-                        />
-                      ) : (
-                        <strong style={{ color: 'var(--primary)' }}>{selectedDetailRental.deposit.toLocaleString()} ₫</strong>
-                      )}
+                      <strong style={{ color: 'var(--primary)' }}>{selectedDetailRental.deposit.toLocaleString()} ₫</strong>
                     </div>
+                    {isEditingFinancials && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                        Tiền đặt cọc được quản lý bằng giao dịch thanh toán nên không sửa trực tiếp tại bảng giá.
+                      </div>
+                    )}
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 700, borderTop: '1px solid var(--border-strong)', paddingTop: '12px' }}>
                       <span>TỔNG CỘNG:</span>
@@ -964,13 +1023,30 @@ const Contracts = () => {
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--primary)' }}>Trạng thái Đơn thuê (Bàn giao & Trả xe)</label>
                 <select 
                   value={selectedDetailRental.status}
-                  disabled
+                  onChange={e => handleRentalStatusChange(e.target.value as Rental['status'])}
+                  disabled={isChangingRentalStatus || ['completed', 'cancelled'].includes(selectedDetailRental.status)}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '13.5px', fontFamily: 'inherit', fontWeight: 700, background: 'white' }}
                 >
-                  <option value="pending">🟡 Chờ bàn giao xe cho khách</option>
-                  <option value="active">🔵 Đang thuê (Đã giao xe cho khách)</option>
-                  <option value="completed">🟢 Đã trả xe (Khách đã trả xe xong)</option>
-                  <option value="cancelled">🔴 Đã hủy đơn thuê</option>
+                  {selectedDetailRental.status === 'pending' && (
+                    <>
+                      <option value="pending">🟡 Chờ bàn giao xe cho khách</option>
+                      <option value="active">🔵 Bàn giao xe & chuyển sang đang thuê</option>
+                      <option value="cancelled">🔴 Huỷ đơn thuê</option>
+                    </>
+                  )}
+                  {selectedDetailRental.status === 'active' && (
+                    <>
+                      <option value="active">🔵 Đang thuê (Đã giao xe cho khách)</option>
+                      <option value="completed">🟢 Nhận xe trả & chốt hợp đồng</option>
+                      <option value="cancelled">🔴 Huỷ hợp đồng</option>
+                    </>
+                  )}
+                  {selectedDetailRental.status === 'completed' && (
+                    <option value="completed">🟢 Đã trả xe (Khách đã trả xe xong)</option>
+                  )}
+                  {selectedDetailRental.status === 'cancelled' && (
+                    <option value="cancelled">🔴 Đã huỷ đơn thuê</option>
+                  )}
                 </select>
                 {selectedDetailRental.status === 'active' && (
                   <button
@@ -1659,6 +1735,50 @@ const Contracts = () => {
       )}
 
       <Modal
+        title={`Huỷ hợp đồng${selectedDetailRental ? ` · #${selectedDetailRental.id}` : ''}`}
+        open={showCancelModal && !!selectedDetailRental}
+        onCancel={() => {
+          if (!isCancelling) setShowCancelModal(false);
+        }}
+        footer={null}
+        width={560}
+        maskClosable={!isCancelling}
+        closable={!isCancelling}
+      >
+        <Form layout="vertical" onFinish={handleConfirmCancel} style={{ marginTop: '16px' }}>
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: '8px', padding: '11px 13px', marginBottom: '16px', fontSize: '13px', lineHeight: 1.5 }}>
+            Hợp đồng sẽ chuyển sang trạng thái đã huỷ và vẫn được giữ lại trong lịch sử.
+          </div>
+          <Form.Item label="Lý do huỷ hợp đồng" required>
+            <textarea
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              className="form-input"
+              rows={4}
+              maxLength={2000}
+              placeholder="Nhập lý do huỷ..."
+              disabled={isCancelling}
+              style={{ resize: 'vertical' }}
+              required
+            />
+          </Form.Item>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setShowCancelModal(false)}
+              disabled={isCancelling}
+            >
+              Quay lại
+            </button>
+            <button type="submit" className="btn-danger" disabled={isCancelling}>
+              <Trash size={15} /> {isCancelling ? 'Đang huỷ...' : 'Xác nhận huỷ hợp đồng'}
+            </button>
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
         title="Nhận xe trả & Chốt hợp đồng"
         open={showReturnModal && !!selectedDetailRental}
         onCancel={() => {
@@ -1842,7 +1962,7 @@ const Contracts = () => {
           <Form layout="vertical" onFinish={handleUpdateContractSubmit} style={{ marginTop: '16px' }}>
             <div style={{ background: selectedRental.status === 'pending' ? '#eff6ff' : '#f8fafc', border: `1px solid ${selectedRental.status === 'pending' ? '#bfdbfe' : '#e2e8f0'}`, padding: '11px 14px', borderRadius: '8px', marginBottom: '18px', color: '#475569', fontSize: '13px', lineHeight: 1.5 }}>
               {selectedRental.status === 'pending'
-                ? 'Đơn đang chờ bàn giao: có thể sửa xe, khách hàng và lịch thuê. Giá thuê sẽ được hệ thống tính lại.'
+                ? 'Đơn đang chờ bàn giao: có thể sửa xe, khách hàng, lịch thuê và tiền thuê tùy chỉnh.'
                 : 'Đơn đã bàn giao: thông tin vận hành, KM, giá và thanh toán được khóa để bảo toàn lịch sử. Tại đây chỉ cập nhật được tệp hợp đồng.'}
             </div>
 
@@ -1900,6 +2020,16 @@ const Contracts = () => {
                   min={editStart || undefined}
                   value={editEnd}
                   onChange={e => setEditEnd(e.target.value)}
+                  className="form-input"
+                  disabled={selectedRental.status !== 'pending'}
+                  required
+                />
+              </Form.Item>
+
+              <Form.Item label="Tiền thuê xe (tùy chỉnh)" required>
+                <MoneyInput
+                  value={editRentalFee}
+                  onChange={setEditRentalFee}
                   className="form-input"
                   disabled={selectedRental.status !== 'pending'}
                   required

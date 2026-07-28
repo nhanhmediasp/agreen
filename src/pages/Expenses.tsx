@@ -394,7 +394,7 @@ const Expenses = () => {
                   dataIndex: 'date',
                   key: 'date',
                   sorter: (a: Expense, b: Expense) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-                  render: (date: string) => <span style={{ fontFamily: 'monospace', color: '#595959' }}>{new Date(date).toLocaleDateString('vi-VN')}</span>
+                  render: (date: string) => <span style={{ fontFamily: 'var(--font-sans)', color: '#595959' }}>{new Date(date).toLocaleDateString('vi-VN')}</span>
                 },
                 {
                   title: 'Thao tác',

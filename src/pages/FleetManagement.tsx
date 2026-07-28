@@ -650,7 +650,7 @@ const FleetManagement = () => {
                     <div style={{ background: 'white', padding: '10px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
                       <div style={{ fontSize: '11px', color: '#64748B' }}>Khách thuê:</div>
                       <div style={{ fontWeight: 700, fontSize: '14px', color: '#0F172A' }}>{activeCar.customer || activeRental?.customerName}</div>
-                      {activeRental?.customerPhone && (<div style={{ fontSize: '12px', color: '#64748B', fontFamily: 'monospace' }}>{activeRental.customerPhone}</div>)}
+                      {activeRental?.customerPhone && (<div style={{ fontSize: '12px', color: '#64748B', fontFamily: 'var(--font-sans)' }}>{activeRental.customerPhone}</div>)}
                     </div>
                     {activeRental && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', background: 'white', padding: '8px 10px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
@@ -817,7 +817,7 @@ const FleetManagement = () => {
                         }}
                       >
                         <div style={{ fontSize: '11px', fontWeight: 700, color: '#1E293B', whiteSpace: 'nowrap' }}>{doc.label}</div>
-                        <div style={{ fontSize: '9.5px', color: '#64748B', fontFamily: 'monospace' }}>{new Date(doc.date).toLocaleDateString('vi-VN')}</div>
+                        <div style={{ fontSize: '9.5px', color: '#64748B', fontFamily: 'var(--font-sans)' }}>{new Date(doc.date).toLocaleDateString('vi-VN')}</div>
                         <span style={{ 
                           background: badgeBg, 
                           color: badgeColor, 
@@ -985,7 +985,7 @@ const FleetManagement = () => {
                     pagination={{ pageSize: 5, showSizeChanger: true, showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi` }}
                     locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa ghi nhận chi phí nào cho xe này" /> }}
                     columns={[
-                      { title: 'Ngày chi', dataIndex: 'date', key: 'date', render: (d: string) => <span style={{ fontFamily: 'monospace', color: '#64748B' }}>{new Date(d).toLocaleDateString('vi-VN')}</span> },
+                      { title: 'Ngày chi', dataIndex: 'date', key: 'date', render: (d: string) => <span style={{ fontFamily: 'var(--font-sans)', color: '#64748B' }}>{new Date(d).toLocaleDateString('vi-VN')}</span> },
                       { title: 'Nội dung', dataIndex: 'title', key: 'title', render: (t: string) => <span style={{ fontWeight: 600, color: '#0F172A' }}>{t}</span> },
                       { title: 'Danh mục', dataIndex: 'category', key: 'category', render: (cat: string) => <Tag color="blue">{cat}</Tag> },
                       { title: 'Số tiền', dataIndex: 'amount', key: 'amount', align: 'right',
@@ -1286,7 +1286,7 @@ const FleetManagement = () => {
                       dataIndex: 'km',
                       key: 'km',
                       sorter: (a: Car, b: Car) => a.km - b.km,
-                      render: (km: number) => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#262626' }}>{(km || 0).toLocaleString()} km</span>
+                      render: (km: number) => <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, color: '#262626' }}>{(km || 0).toLocaleString()} km</span>
                     },
                     {
                       title: 'Giá ngày',
