@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import { after, before, test } from 'node:test';
 import bcrypt from 'bcryptjs';
-import app, { rentalTestHelpers } from '../server/server.js';
+import app, { isServerEntrypoint, rentalTestHelpers } from '../server/server.js';
 import { authTestHelpers, passwordValidationError } from '../server/auth.js';
 
 const USER_DATE = new Date('2026-07-28T00:00:00.000Z');
@@ -571,6 +571,25 @@ test('rental overlap helper treats touching intervals as non-overlapping', () =>
     ),
     false,
   );
+});
+
+test('server entrypoint detection supports direct Node and PM2 execution', () => {
+  const modulePath = '/srv/agreen/server/server.js';
+  assert.equal(isServerEntrypoint({
+    argvPath: modulePath,
+    pmExecPath: undefined,
+    modulePath,
+  }), true);
+  assert.equal(isServerEntrypoint({
+    argvPath: '/usr/lib/node_modules/pm2/lib/ProcessContainerFork.js',
+    pmExecPath: modulePath,
+    modulePath,
+  }), true);
+  assert.equal(isServerEntrypoint({
+    argvPath: '/srv/agreen/tests/api.integration.test.js',
+    pmExecPath: undefined,
+    modulePath,
+  }), false);
 });
 
 test('frontend rental mapper preserves status and supports JSONB arrays, strings and objects', async () => {

@@ -2256,9 +2256,18 @@ export const startServer = async () => {
   });
 };
 
-const isMainModule = process.argv[1]
-  && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
-if (isMainModule) {
+const serverModulePath = path.resolve(fileURLToPath(import.meta.url));
+export const isServerEntrypoint = ({
+  argvPath = process.argv[1],
+  pmExecPath = process.env.pm_exec_path,
+  modulePath = serverModulePath,
+} = {}) => (
+  [argvPath, pmExecPath]
+    .filter((candidate) => typeof candidate === 'string' && candidate.length > 0)
+    .some((candidate) => path.resolve(candidate) === path.resolve(modulePath))
+);
+
+if (isServerEntrypoint()) {
   startServer().catch((error) => {
     console.error('[Server] Startup failed', error);
     process.exitCode = 1;
