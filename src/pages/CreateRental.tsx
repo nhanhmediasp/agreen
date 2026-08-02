@@ -567,8 +567,8 @@ const CreateRental = () => {
                   </div>
                 )}
                 {selectedCarId && (
-                  <div style={{ marginTop: '16px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '12px 16px', borderBottom: '1px solid var(--border-strong)' }}>
+                  <div className="rental-calendar" style={{ marginTop: '16px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                    <div className="rental-calendar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '12px 16px', borderBottom: '1px solid var(--border-strong)' }}>
                       <div style={{ fontSize: '14px', fontWeight: 600 }}>Lịch đặt xe tháng {calendarDate.getMonth() + 1}/{calendarDate.getFullYear()}</div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button type="button" onClick={() => { const d = new Date(calendarDate); d.setMonth(d.getMonth() - 1); setCalendarDate(d); }} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid var(--border-strong)', background: 'white' }}>Tháng trước</button>
@@ -576,12 +576,12 @@ const CreateRental = () => {
                       </div>
                     </div>
                     <div style={{ padding: '16px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '8px' }}>
+                      <div className="rental-calendar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '8px' }}>
                         {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(w => (
                           <div key={w} style={{ fontWeight: 700, color: '#475569', fontSize: '11px' }}>{w}</div>
                         ))}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                      <div className="rental-calendar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
                         {getMonthDays(calendarDate).map((day, idx) => {
                           const st = getCarStatusForDay(day.fullDate, selectedCarId);
                           const isToday = day.fullDate === todayVN;

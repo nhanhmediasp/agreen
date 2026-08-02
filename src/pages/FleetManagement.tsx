@@ -166,7 +166,6 @@ const FleetManagement = () => {
 
   // Return Car Form State
   const [returnKm, setReturnKm] = useState('');
-  const [returnFuel, setReturnFuel] = useState('8/8');
   const [surcharge, setSurcharge] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
@@ -366,7 +365,6 @@ const FleetManagement = () => {
       return;
     }
     setReturnKm(activeCar.km.toString());
-    setReturnFuel('8/8');
     setSurcharge('0');
     setShowReturnForm(true);
   };
@@ -392,7 +390,9 @@ const FleetManagement = () => {
         activeRental.id,
         kmNum,
         surchargeAmount,
-        returnFuel,
+        // Backend vẫn cần giá trị endFuel; khi không nhập ở màn nhận xe,
+        // giữ lại mức nhiên liệu đã ghi nhận lúc giao xe.
+        activeRental.endFuel || activeRental.startFuel || '8/8',
       );
 
       if (success) setShowReturnForm(false);
@@ -866,7 +866,7 @@ const FleetManagement = () => {
                 style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2' }}
                 bodyStyle={{ padding: '16px' }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                <div className="fleet-week-calendar" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
                   {weekDays.map(day => {
                     const status = getCarStatusForDay(day.fullDate);
                     const isToday = day.fullDate === todayVN;
@@ -1966,7 +1966,7 @@ const FleetManagement = () => {
       {/* Form Trả Xe */}
       {showReturnForm && activeCar && activeRental && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleConfirmReturn} style={{ width: '450px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form className="card return-car-form" onSubmit={handleConfirmReturn} style={{ width: '450px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h2 style={{ fontSize: '20px', margin: 0 }}>Nhận xe trả & Chốt hợp đồng</h2>
               <button type="button" onClick={() => setShowReturnForm(false)} style={{ color: 'var(--text-secondary)' }}>
@@ -1996,22 +1996,6 @@ const FleetManagement = () => {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Mức nhiên liệu lúc nhận lại</label>
-              <select
-                value={returnFuel}
-                onChange={e => setReturnFuel(e.target.value)}
-                disabled={isSubmittingReturn}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }}
-              >
-                <option value="8/8">Đầy bình (8/8)</option>
-                <option value="6/8">Khoảng 3/4 bình (6/8)</option>
-                <option value="4/8">Khoảng 1/2 bình (4/8)</option>
-                <option value="2/8">Khoảng 1/4 bình (2/8)</option>
-                <option value="1/8">Gần hết (1/8)</option>
-              </select>
-            </div>
-
-            <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Phụ phí phát sinh (nếu có)</label>
               <input type="number" min="0" placeholder="Quá giờ, vệ sinh, hư hỏng..." value={surcharge} onChange={e => setSurcharge(e.target.value)} disabled={isSubmittingReturn} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
             </div>
@@ -2034,7 +2018,7 @@ const FleetManagement = () => {
                 type="submit"
                 className="btn-primary"
                 disabled={isSubmittingReturn}
-                style={{ padding: '9px 18px', background: 'var(--status-ready-text)', opacity: isSubmittingReturn ? 0.7 : 1 }}
+                style={{ padding: '9px 18px', background: '#1D4ED8', color: '#FFFFFF', opacity: isSubmittingReturn ? 0.7 : 1 }}
               >
                 {isSubmittingReturn ? 'Đang chốt hợp đồng...' : 'Xác nhận trả xe'}
               </button>

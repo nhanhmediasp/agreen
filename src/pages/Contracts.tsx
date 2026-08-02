@@ -116,12 +116,11 @@ const Contracts = () => {
   const itemsPerPage = 10;
 
   // KPI Statistics for Contracts
-  const totalContractsCount = rentals.length;
-  const totalContractRevenue = rentals
-    .filter((r) => r.status === 'completed')
-    .reduce((sum, r) => sum + (r.totalAmount || 0), 0);
-  const activeContractsCount = rentals.filter(r => r.status === 'active').length;
-  const paidContractsCount = rentals.filter(r => r.paymentStatus === 'paid').length;
+  const validContracts = rentals.filter((r) => r.status !== 'cancelled');
+  const totalContractsCount = validContracts.length;
+  const totalContractRevenue = validContracts.reduce((sum, r) => sum + (Number(r.totalAmount) || 0), 0);
+  const activeContractsCount = validContracts.filter(r => r.status === 'active').length;
+  const paidContractsCount = validContracts.filter(r => r.paymentStatus === 'paid').length;
 
   // Edit Form State (Main Modal)
   const [editId, setEditId] = useState('');
