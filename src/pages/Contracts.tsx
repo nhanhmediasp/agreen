@@ -643,7 +643,7 @@ const Contracts = () => {
                 <h3 style={{ fontSize: '16px', margin: '0 0 16px', fontWeight: 600, color: 'var(--primary)' }}>Xe sử dụng & Chủ sở hữu</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'center' }}>
                   {carObj ? (
-                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div className="contract-car-layout" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                       <Link to={`/fleet?id=${carObj.id}`} style={{ flexShrink: 0 }}>
                         <img src={carObj.image} style={{ width: '90px', height: '60px', borderRadius: 'var(--radius-sm)', objectFit: 'cover', border: '1px solid var(--border-light)', cursor: 'pointer' }} title="Xem chi tiết xe" />
                       </Link>
@@ -654,7 +654,7 @@ const Contracts = () => {
                         <div style={{ marginTop: '4px' }}>
                           <span className="license-plate" style={{ fontSize: '11px', padding: '2px 8px' }}>{carObj.id}</span>
                         </div>
-                        <div style={{ fontSize: '13px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px', background: '#f8fafc', padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', minWidth: '180px' }}>
+                        <div className="contract-car-meta" style={{ fontSize: '13px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px', background: '#f8fafc', padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', minWidth: '180px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>📏 KM bàn giao:</span>
                             <strong className="font-mono" style={{ color: '#0F172A' }}>{selectedDetailRental.startKm ? selectedDetailRental.startKm.toLocaleString() : 0} km</strong>
@@ -678,7 +678,7 @@ const Contracts = () => {
                   )}
 
                   {ownerObj ? (
-                    <div style={{ borderLeft: '1px solid var(--border-light)', paddingLeft: '20px', fontSize: '14px' }}>
+                    <div className="contract-owner-info" style={{ borderLeft: '1px solid var(--border-light)', paddingLeft: '20px', fontSize: '14px' }}>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>CHỦ XE GÓP</div>
                       <Link to={`/owners?id=${ownerObj.id}`} style={{ textDecoration: 'none' }}>
                         <strong style={{ color: 'var(--primary)', fontSize: '15px', textDecoration: 'underline', cursor: 'pointer' }}>{ownerObj.name}</strong>
@@ -694,7 +694,7 @@ const Contracts = () => {
 
               {/* Chi phí phát sinh (Vi phạm giao thông, hỏng hóc, sửa chữa) */}
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="contract-violations-header" style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: '15px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontWeight: 700 }}>
                     <ShieldAlert size={18} color="var(--primary)" /> Chi phí phát sinh (Vi phạm giao thông, hỏng hóc, sửa chữa...)
                   </h3>
@@ -706,7 +706,7 @@ const Contracts = () => {
                   </button>
                 </div>
 
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <table className="detail-desktop-only contract-violations-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ padding: '12px 24px' }}>Ngày phát sinh</th>
@@ -770,6 +770,30 @@ const Contracts = () => {
                     )}
                   </tbody>
                 </table>
+
+                <div className="detail-mobile-only contract-mobile-violations">
+                  {(!selectedDetailRental.violations || selectedDetailRental.violations.length === 0) ? (
+                    <div className="detail-mobile-empty">Không ghi nhận chi phí phát sinh nào trong hợp đồng này.</div>
+                  ) : selectedDetailRental.violations.map(v => (
+                    <div className="detail-mobile-record" key={v.id}>
+                      <div className="detail-mobile-record-head">
+                        <strong>{v.description}</strong>
+                        <span className={v.status === 'paid' ? 'detail-status detail-status-completed' : 'detail-status detail-status-unpaid'}>
+                          {v.status === 'paid' ? 'Đã thu tiền' : 'Chưa thu tiền'}
+                        </span>
+                      </div>
+                      <div className="detail-mobile-row"><span>Ngày phát sinh</span><strong>{new Date(v.date).toLocaleDateString('vi-VN')}</strong></div>
+                      <div className="detail-mobile-row"><span>Số tiền</span><strong className="detail-mobile-expense">{v.amount.toLocaleString()} ₫</strong></div>
+                      <div className="detail-mobile-record-actions">
+                        {v.evidenceUrl ? (
+                          <a href={v.evidenceUrl} target="_blank" rel="noreferrer"><FileText size={14} /> Xem tệp</a>
+                        ) : <span className="detail-mobile-muted">Không có tệp</span>}
+                        <button onClick={() => handleOpenEditViolation(v)}><Edit size={14} /> Sửa</button>
+                        <button className="detail-mobile-delete" onClick={() => handleDeleteViolation(v.id)}><Trash size={14} /> Xóa</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* TIMELINE HOẠT ĐỘNG ĐƠN HÀNG */}
@@ -934,7 +958,7 @@ const Contracts = () => {
             </div>
 
             {/* Cột Phải: Thanh toán, Hợp đồng & Cập nhật trạng thái */}
-            <div className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="card contract-finance-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-strong)', paddingBottom: '12px' }}>
                 <h3 style={{ fontSize: '18px', margin: 0, color: 'var(--primary)' }}>Hóa đơn & Hợp đồng</h3>
                 <button 
@@ -951,7 +975,7 @@ const Contracts = () => {
               {(() => {
                 const violationSubtotal = (selectedDetailRental.violations || []).reduce((sum, v) => sum + v.amount, 0);
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
+                  <div className="contract-invoice-lines" style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Giá thuê xe gốc:</span>
                       {isEditingFinancials ? (
@@ -1018,7 +1042,7 @@ const Contracts = () => {
               })()}
 
               {/* Cập nhật Trạng thái Đơn thuê / Bàn giao / Trả xe */}
-              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+              <div className="contract-form-panel contract-status-panel" style={{ background: '#f8fafc', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--primary)' }}>Trạng thái Đơn thuê (Bàn giao & Trả xe)</label>
                 <select 
                   value={selectedDetailRental.status}
@@ -1028,20 +1052,20 @@ const Contracts = () => {
                 >
                   {selectedDetailRental.status === 'pending' && (
                     <>
-                      <option value="pending">🟡 Chờ bàn giao xe cho khách</option>
-                      <option value="active">🔵 Bàn giao xe & chuyển sang đang thuê</option>
-                      <option value="cancelled">🔴 Huỷ đơn thuê</option>
+                      <option value="pending">🟡 Chờ bàn giao</option>
+                      <option value="active">🔵 Bàn giao xe</option>
+                      <option value="cancelled">🔴 Huỷ đơn</option>
                     </>
                   )}
                   {selectedDetailRental.status === 'active' && (
                     <>
-                      <option value="active">🔵 Đang thuê (Đã giao xe cho khách)</option>
-                      <option value="completed">🟢 Nhận xe trả & chốt hợp đồng</option>
+                      <option value="active">🔵 Đang thuê</option>
+                      <option value="completed">🟢 Nhận xe trả</option>
                       <option value="cancelled">🔴 Huỷ hợp đồng</option>
                     </>
                   )}
                   {selectedDetailRental.status === 'completed' && (
-                    <option value="completed">🟢 Đã trả xe (Khách đã trả xe xong)</option>
+                    <option value="completed">🟢 Đã trả xe</option>
                   )}
                   {selectedDetailRental.status === 'cancelled' && (
                     <option value="cancelled">🔴 Đã huỷ đơn thuê</option>
@@ -1063,16 +1087,16 @@ const Contracts = () => {
               </div>
 
               {/* Trạng thái thanh toán của Khách */}
-              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+              <div className="contract-form-panel contract-payment-panel" style={{ background: '#f8fafc', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-main)' }}>Trạng thái thanh toán</label>
                 <select 
                   value={selectedDetailRental.paymentStatus}
                   disabled
                   style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontSize: '14px', fontFamily: 'inherit', fontWeight: 600 }}
                 >
-                  <option value="deposit">Đã đặt cọc (Chưa thanh toán hết)</option>
-                  <option value="paid">Đã thanh toán toàn bộ</option>
-                  <option value="debt">Còn nợ (Chờ thanh toán sau)</option>
+                  <option value="deposit">Đã đặt cọc</option>
+                  <option value="paid">Đã thanh toán</option>
+                  <option value="debt">Còn nợ</option>
                 </select>
                 <button
                   type="button"
@@ -1085,11 +1109,11 @@ const Contracts = () => {
               </div>
 
               {/* Loại Hợp đồng thuê & Đính kèm */}
-              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="contract-form-panel contract-source-panel" style={{ background: '#f8fafc', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>Loại Hợp đồng thuê</label>
                 
                 {/* Radio selection between automatic system contract and manual upload */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="contract-source-options" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px 12px', background: 'white', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontSize: '13px', fontWeight: 600 }}>
                     <input 
                       type="radio" 

@@ -515,7 +515,7 @@ const FleetManagement = () => {
               style={{ marginBottom: '12px' }}
             />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="fleet-detail-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <Button
                   icon={<ArrowLeftOutlined />}
@@ -552,7 +552,7 @@ const FleetManagement = () => {
                 </div>
               </div>
 
-              <Space size={10} wrap>
+              <Space className="fleet-detail-actions" size={10} wrap>
                 <Button icon={<EditOutlined />} onClick={handleOpenEdit} style={{ borderRadius: '8px' }}>Chỉnh sửa</Button>
                 <Button danger ghost icon={<DeleteOutlined />} style={{ borderRadius: '8px' }}
                   onClick={async () => {
@@ -584,7 +584,7 @@ const FleetManagement = () => {
           <div className="fleet-detail-main-grid" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '20px', alignItems: 'flex-start' }}>
 
             {/* ===== CỘT TRÁI: Ảnh + Thông số + Bảng giá ===== */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="fleet-detail-column" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
               {/* Ảnh xe */}
               <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #E8EDF2', overflow: 'hidden' }} bodyStyle={{ padding: '16px' }}>
@@ -646,8 +646,8 @@ const FleetManagement = () => {
                 )}
 
                 {activeRental ? (
-                  <div style={{ background: '#EFF6FF', padding: '12px', borderRadius: '8px', border: '1px solid #BFDBFE', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div className="fleet-active-rental" style={{ background: '#EFF6FF', padding: '12px', borderRadius: '8px', border: '1px solid #BFDBFE', marginBottom: '12px' }}>
+                    <div className="fleet-active-rental-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <span style={{ color: '#1D4ED8', fontWeight: 700, fontSize: '13px' }}>🔑 Hợp đồng đang chạy</span>
                       <Link to={`/contracts?id=${activeRental.id}`} style={{ fontSize: '12px', color: '#1D4ED8', fontWeight: 700, textDecoration: 'none' }}>Đơn #{activeRental.id} →</Link>
                     </div>
@@ -780,7 +780,7 @@ const FleetManagement = () => {
             </div>
 
             {/* ===== CỘT PHẢI: Giấy tờ + Lịch + Bảng ===== */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="fleet-detail-column" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
               {/* Thời hạn giấy tờ pháp lý - 3 Columns Compact */}
               <Card
@@ -894,9 +894,9 @@ const FleetManagement = () => {
               </Card>
 
               {/* Lịch sử & Chi phí - Tabs */}
-              <Card style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2', overflow: 'hidden' }} bodyStyle={{ padding: 0 }}>
+              <Card className="fleet-history-card" style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #E8EDF2', overflow: 'hidden' }} bodyStyle={{ padding: 0 }}>
                 <div style={{ padding: '12px 20px', borderBottom: '1px solid #E8EDF2', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                  <div style={{ display: 'flex', gap: '8px', background: '#F1F5F9', padding: '4px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                  <div className="fleet-detail-tabs" style={{ display: 'flex', gap: '8px', background: '#F1F5F9', padding: '4px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                     <button
                       onClick={() => setActiveDetailTab('rentals')}
                       style={{
@@ -969,36 +969,78 @@ const FleetManagement = () => {
                   )}
                 </div>
                 {activeDetailTab === 'rentals' ? (
-                  <Table<Rental> dataSource={carRentals} rowKey="id"
-                    pagination={{ pageSize: 5, showSizeChanger: true, showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} lượt thuê` }}
-                    locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có lịch sử thuê cho xe này" /> }}
-                    columns={[
-                      { title: 'Khách hàng', dataIndex: 'customerName', key: 'customerName',
-                        render: (name: string, record: Rental) => (<div><strong style={{ color: '#0F172A' }}>{name}</strong><div style={{ fontSize: '11px', color: '#64748B' }} className="font-mono">{record.customerPhone}</div></div>) },
-                      { title: 'Thời gian thuê', key: 'time',
-                        render: (_: unknown, record: Rental) => (<span style={{ fontSize: '12px', color: '#475569' }} className="font-mono">{new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}</span>) },
-                      { title: 'Tổng tiền', dataIndex: 'totalAmount', key: 'totalAmount',
-                        sorter: (a: Rental, b: Rental) => a.totalAmount - b.totalAmount,
-                        render: (val: number) => (<span style={{ fontWeight: 700, color: '#006837' }}>{(val || 0).toLocaleString()} ₫</span>) },
-                      { title: 'Trạng thái', dataIndex: 'status', key: 'status',
-                        render: (st: string) => st === 'active'
-                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Đang thuê</span>
-                          : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#F0FDF4', color: '#16A34A', border: '#86EFAC', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Hoàn tất</span> }
-                    ]}
-                  />
+                  <>
+                    <div className="detail-desktop-only">
+                      <Table<Rental> dataSource={carRentals} rowKey="id"
+                        pagination={{ pageSize: 5, showSizeChanger: true, showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} lượt thuê` }}
+                        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có lịch sử thuê cho xe này" /> }}
+                        columns={[
+                          { title: 'Khách hàng', dataIndex: 'customerName', key: 'customerName',
+                            render: (name: string, record: Rental) => (<div><strong style={{ color: '#0F172A' }}>{name}</strong><div style={{ fontSize: '11px', color: '#64748B' }} className="font-mono">{record.customerPhone}</div></div>) },
+                          { title: 'Thời gian thuê', key: 'time',
+                            render: (_: unknown, record: Rental) => (<span style={{ fontSize: '12px', color: '#475569' }} className="font-mono">{new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}</span>) },
+                          { title: 'Tổng tiền', dataIndex: 'totalAmount', key: 'totalAmount',
+                            sorter: (a: Rental, b: Rental) => a.totalAmount - b.totalAmount,
+                            render: (val: number) => (<span style={{ fontWeight: 700, color: '#006837' }}>{(val || 0).toLocaleString()} ₫</span>) },
+                          { title: 'Trạng thái', dataIndex: 'status', key: 'status',
+                            render: (st: string) => st === 'active'
+                              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Đang thuê</span>
+                              : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#F0FDF4', color: '#16A34A', border: '#86EFAC', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>Hoàn tất</span> }
+                        ]}
+                      />
+                    </div>
+                    <div className="detail-mobile-only fleet-mobile-record-list">
+                      {carRentals.length === 0 ? (
+                        <div className="detail-mobile-empty">Chưa có lịch sử thuê cho xe này</div>
+                      ) : carRentals.map(record => (
+                        <div className="detail-mobile-record" key={record.id}>
+                          <div className="detail-mobile-record-head">
+                            <div>
+                              <strong>{record.customerName}</strong>
+                              <div className="detail-mobile-muted">{record.customerPhone || '—'}</div>
+                            </div>
+                            <span className={record.status === 'active' ? 'detail-status detail-status-active' : 'detail-status detail-status-completed'}>
+                              {record.status === 'active' ? 'Đang thuê' : record.status === 'cancelled' ? 'Đã hủy' : record.status === 'pending' ? 'Chờ giao' : 'Hoàn tất'}
+                            </span>
+                          </div>
+                          <div className="detail-mobile-row"><span>Thời gian</span><strong>{new Date(record.startDate).toLocaleDateString('vi-VN')} → {new Date(record.endDate).toLocaleDateString('vi-VN')}</strong></div>
+                          <div className="detail-mobile-row"><span>Tổng tiền</span><strong className="detail-mobile-money">{(record.totalAmount || 0).toLocaleString()} ₫</strong></div>
+                          <Link className="detail-mobile-link" to={`/contracts?id=${record.id}`}>Xem hợp đồng #{record.id}</Link>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 ) : (
-                  <Table<Expense> dataSource={expenses.filter(e => e.ref === activeCar.id)} rowKey="id"
-                    pagination={{ pageSize: 5, showSizeChanger: true, showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi` }}
-                    locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa ghi nhận chi phí nào cho xe này" /> }}
-                    columns={[
-                      { title: 'Ngày chi', dataIndex: 'date', key: 'date', render: (d: string) => <span style={{ fontFamily: 'var(--font-sans)', color: '#64748B' }}>{new Date(d).toLocaleDateString('vi-VN')}</span> },
-                      { title: 'Nội dung', dataIndex: 'title', key: 'title', render: (t: string) => <span style={{ fontWeight: 600, color: '#0F172A' }}>{t}</span> },
-                      { title: 'Danh mục', dataIndex: 'category', key: 'category', render: (cat: string) => <Tag color="blue">{cat}</Tag> },
-                      { title: 'Số tiền', dataIndex: 'amount', key: 'amount', align: 'right',
-                        sorter: (a: Expense, b: Expense) => a.amount - b.amount,
-                        render: (val: number) => <span style={{ fontWeight: 700, color: '#DC2626' }}>{(val || 0).toLocaleString()} ₫</span> }
-                    ]}
-                  />
+                  <>
+                    <div className="detail-desktop-only">
+                      <Table<Expense> dataSource={expenses.filter(e => e.ref === activeCar.id)} rowKey="id"
+                        pagination={{ pageSize: 5, showSizeChanger: true, showTotal: (total: number, range: [number, number]) => `Hiển thị ${range[0]}-${range[1]} / ${total} khoản chi` }}
+                        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa ghi nhận chi phí nào cho xe này" /> }}
+                        columns={[
+                          { title: 'Ngày chi', dataIndex: 'date', key: 'date', render: (d: string) => <span style={{ fontFamily: 'var(--font-sans)', color: '#64748B' }}>{new Date(d).toLocaleDateString('vi-VN')}</span> },
+                          { title: 'Nội dung', dataIndex: 'title', key: 'title', render: (t: string) => <span style={{ fontWeight: 600, color: '#0F172A' }}>{t}</span> },
+                          { title: 'Danh mục', dataIndex: 'category', key: 'category', render: (cat: string) => <Tag color="blue">{cat}</Tag> },
+                          { title: 'Số tiền', dataIndex: 'amount', key: 'amount', align: 'right',
+                            sorter: (a: Expense, b: Expense) => a.amount - b.amount,
+                            render: (val: number) => <span style={{ fontWeight: 700, color: '#DC2626' }}>{(val || 0).toLocaleString()} ₫</span> }
+                        ]}
+                      />
+                    </div>
+                    <div className="detail-mobile-only fleet-mobile-record-list">
+                      {expenses.filter(e => e.ref === activeCar.id).length === 0 ? (
+                        <div className="detail-mobile-empty">Chưa ghi nhận chi phí nào cho xe này</div>
+                      ) : expenses.filter(e => e.ref === activeCar.id).map(record => (
+                        <div className="detail-mobile-record" key={record.id}>
+                          <div className="detail-mobile-record-head">
+                            <strong>{record.title}</strong>
+                            <span className="detail-status detail-status-expense">{record.category}</span>
+                          </div>
+                          <div className="detail-mobile-row"><span>Ngày chi</span><strong>{new Date(record.date).toLocaleDateString('vi-VN')}</strong></div>
+                          <div className="detail-mobile-row"><span>Số tiền</span><strong className="detail-mobile-expense">{(record.amount || 0).toLocaleString()} ₫</strong></div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </Card>
 
