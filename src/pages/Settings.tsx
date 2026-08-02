@@ -119,7 +119,7 @@ const SettingsPage = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border-light)' }}>
+      <div className="settings-tabs" style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border-light)' }}>
         <button 
           onClick={() => setActiveTab('interface')}
           style={{ padding: '12px 16px', borderBottom: activeTab === 'interface' ? '2px solid var(--primary)' : 'none', color: activeTab === 'interface' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600 }}
@@ -389,7 +389,8 @@ const SettingsPage = () => {
                   <p style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Chưa phát hiện sự cố bảo mật nào. Hệ thống an toàn!</p>
                 </div>
               ) : (
-                <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                <>
+                <div className="responsive-desktop-table" style={{ maxHeight: '350px', overflowY: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                     <thead>
                       <tr style={{ background: '#F1F5F9', color: '#475569', fontSize: '11px', textTransform: 'uppercase' }}>
@@ -425,6 +426,29 @@ const SettingsPage = () => {
                     </tbody>
                   </table>
                 </div>
+                <div className="responsive-mobile-list entity-mobile-list entity-mobile-list-in-card security-log-mobile-list">
+                  {securityLogs.map(log => {
+                    const badges = {
+                      LOGIN_SUCCESS: { className: 'success', text: 'Đăng nhập thành công' },
+                      LOGIN_FAILED: { className: 'warning', text: 'Đăng nhập sai' },
+                      LOCKOUT: { className: 'warning', text: 'Khóa Brute-force' },
+                      PASSWORD_CHANGE: { className: 'active', text: 'Đổi mật khẩu' },
+                    };
+                    const badgeInfo = badges[log.type] || badges.LOGIN_SUCCESS;
+                    return (
+                      <article className="entity-mobile-card" key={log.id}>
+                        <div className="entity-mobile-head">
+                          <div><strong>{log.username}</strong><span>{log.timestamp}</span></div>
+                          <span className={`entity-mobile-status ${badgeInfo.className}`}>{badgeInfo.text}</span>
+                        </div>
+                        <div className="entity-mobile-fields">
+                          <div><span>Chi tiết</span><strong>{log.message}</strong></div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+                </>
               )}
             </div>
           </div>

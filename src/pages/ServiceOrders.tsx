@@ -775,7 +775,8 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                     Tài xế này chưa có chuyến xe nào trong hệ thống!
                   </div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
+                  <>
+                  <div className="responsive-desktop-table" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                       <thead>
                         <tr style={{ background: '#F8FAFC', color: '#475569', fontSize: '11.5px', textTransform: 'uppercase', borderBottom: '1px solid #E2E8F0' }}>
@@ -869,6 +870,45 @@ Cảm ơn quý khách đã sử dụng dịch vụ!`;
                       </tbody>
                     </table>
                   </div>
+                  <div className="responsive-mobile-list entity-mobile-list driver-history-mobile-list">
+                    {filteredDriverOrders.map(order => {
+                      const distance = Math.max(0, order.endKm - order.startKm);
+                      const commissionRate = order.driverCommissionRate || selectedDriver.commissionRate || 80;
+                      const commissionAmount = order.driverCommissionAmount || Math.round(order.totalAmount * (commissionRate / 100));
+                      const isPaid = order.paymentStatus === 'paid';
+                      return (
+                        <article className="entity-mobile-card" key={order.id}>
+                          <div className="entity-mobile-head">
+                            <div><strong>{order.id}</strong><span>{new Date(order.serviceDate).toLocaleString('vi-VN')}</span></div>
+                            <span className={`entity-mobile-status ${isPaid ? 'success' : 'warning'}`}>
+                              {isPaid ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                            </span>
+                          </div>
+                          <div className="entity-mobile-fields">
+                            <div><span>Xe chạy</span><strong>{order.carId}</strong></div>
+                            <div><span>Điểm đón</span><strong>{order.pickupLocation || '---'}</strong></div>
+                            <div><span>Điểm trả</span><strong>{order.dropoffLocation || '---'}</strong></div>
+                            <div><span>Quãng đường</span><strong>{distance} KM ({order.startKm} → {order.endKm})</strong></div>
+                            <div><span>Cước thu khách</span><strong className="entity-mobile-amount">{order.totalAmount.toLocaleString('vi-VN')} ₫</strong></div>
+                            <div><span>Chiết khấu tài xế</span><strong>{commissionAmount.toLocaleString('vi-VN')} ₫ ({commissionRate}%)</strong></div>
+                          </div>
+                          <div className="entity-mobile-actions">
+                            <button
+                              type="button"
+                              disabled={order.status !== 'completed' || isPaid}
+                              onClick={async () => { await toggleServiceOrderPayment(order.id); }}
+                            >
+                              {isPaid ? 'Đã thanh toán' : 'Xác nhận thanh toán'}
+                            </button>
+                            <button type="button" onClick={() => handleOpenQuoteModal(order)}>
+                              <Eye size={13} /> Xem đơn
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                  </>
                 )}
               </div>
 

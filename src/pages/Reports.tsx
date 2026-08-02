@@ -135,6 +135,22 @@ const Reports = () => {
 
   const avgUtilization = cars.length > 0 ? Math.round(sortedUtilization.reduce((sum, u) => sum + u.rate, 0) / cars.length) : 0;
 
+  const expenseBreakdown = cars.map(car => {
+    const carExpenses = expenses.filter(expense => expense.ref === car.id);
+    return {
+      id: car.id,
+      maint: carExpenses
+        .filter(expense => expense.category === 'Bảo dưỡng')
+        .reduce((sum, expense) => sum + expense.amount, 0),
+      clean: carExpenses
+        .filter(expense => expense.category === 'Vệ sinh')
+        .reduce((sum, expense) => sum + expense.amount, 0),
+      repair: carExpenses
+        .filter(expense => ['Sửa chữa', 'Giấy tờ', 'Chiết khấu chủ xe', 'Khác'].includes(expense.category))
+        .reduce((sum, expense) => sum + expense.amount, 0),
+    };
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
@@ -165,7 +181,7 @@ const Reports = () => {
         </div>
 
         {/* Time Range Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
+        <div className="reports-time-filter" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
           {(['1d', '7d', '30d', 'quarter', 'custom'] as const).map(range => (
             <button
               key={range}
@@ -182,7 +198,7 @@ const Reports = () => {
             </button>
           ))}
           {timeRange === 'custom' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderLeft: '1px solid var(--border)', paddingLeft: '8px', marginLeft: '4px' }}>
+            <div className="reports-custom-range" style={{ display: 'flex', alignItems: 'center', gap: '6px', borderLeft: '1px solid var(--border)', paddingLeft: '8px', marginLeft: '4px' }}>
               <Calendar size={13} color="var(--text-muted)" />
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="form-input" style={{ padding: '4px 8px', width: 'auto', fontSize: '12px' }} />
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>đến</span>
@@ -328,48 +344,55 @@ const Reports = () => {
         {/* Expense breakdown by Car */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>Cơ cấu Chi phí Bảo dưỡng Xe</h2>
-          <Table
-            dataSource={cars.map(c => {
-              const carExps = expenses.filter(e => e.ref === c.id);
-              const maint = carExps.filter(e => e.category === 'Bảo dưỡng').reduce((sum, e) => sum + e.amount, 0);
-              const clean = carExps.filter(e => e.category === 'Vệ sinh').reduce((sum, e) => sum + e.amount, 0);
-              const repair = carExps.filter(e => ['Sửa chữa', 'Giấy tờ', 'Chiết khấu chủ xe', 'Khác'].includes(e.category)).reduce((sum, e) => sum + e.amount, 0);
-              return {
-                id: c.id,
-                maint,
-                clean,
-                repair
-              };
-            })}
-            rowKey="id"
-            pagination={false}
-            columns={[
-              {
-                title: 'Biển số',
-                dataIndex: 'id',
-                key: 'id',
-                render: (id: string) => <span className="license-plate" style={{ fontSize: '11px', padding: '2px 6px' }}>{id}</span>
-              },
-              {
-                title: 'Bảo dưỡng',
-                dataIndex: 'maint',
-                key: 'maint',
-                render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
-              },
-              {
-                title: 'Vệ sinh',
-                dataIndex: 'clean',
-                key: 'clean',
-                render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
-              },
-              {
-                title: 'Chiết khấu / Khác',
-                dataIndex: 'repair',
-                key: 'repair',
-                render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
-              }
-            ]}
-          />
+          <div className="responsive-desktop-table">
+            <Table
+              dataSource={expenseBreakdown}
+              rowKey="id"
+              pagination={false}
+              columns={[
+                {
+                  title: 'Biển số',
+                  dataIndex: 'id',
+                  key: 'id',
+                  render: (id: string) => <span className="license-plate" style={{ fontSize: '11px', padding: '2px 6px' }}>{id}</span>
+                },
+                {
+                  title: 'Bảo dưỡng',
+                  dataIndex: 'maint',
+                  key: 'maint',
+                  render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                },
+                {
+                  title: 'Vệ sinh',
+                  dataIndex: 'clean',
+                  key: 'clean',
+                  render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                },
+                {
+                  title: 'Chiết khấu / Khác',
+                  dataIndex: 'repair',
+                  key: 'repair',
+                  render: (val: number) => <span style={{ color: '#595959' }}>{val.toLocaleString()} ₫</span>
+                }
+              ]}
+            />
+          </div>
+          <div className="responsive-mobile-list entity-mobile-list">
+            {expenseBreakdown.length === 0 ? (
+              <div className="entity-mobile-empty">Chưa có dữ liệu chi phí theo xe.</div>
+            ) : (
+              expenseBreakdown.map(item => (
+                <article className="entity-mobile-card" key={item.id}>
+                  <div className="entity-mobile-head"><div><strong>{item.id}</strong></div></div>
+                  <div className="entity-mobile-fields">
+                    <div><span>Bảo dưỡng</span><strong>{item.maint.toLocaleString()} ₫</strong></div>
+                    <div><span>Vệ sinh</span><strong>{item.clean.toLocaleString()} ₫</strong></div>
+                    <div><span>Chiết khấu / Khác</span><strong>{item.repair.toLocaleString()} ₫</strong></div>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
         </div>
 
       </div>

@@ -10,7 +10,7 @@ interface RecentBookingsTableProps {
 
 export const RecentBookingsTable: React.FC<RecentBookingsTableProps> = ({ rentals, onViewAll, onSelectRental }) => {
   return (
-    <div className="card" style={{ padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div className="card recent-bookings-card" style={{ padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       
       {/* Header */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-surface)' }}>
@@ -31,7 +31,7 @@ export const RecentBookingsTable: React.FC<RecentBookingsTableProps> = ({ rental
       </div>
 
       {/* Table Content */}
-      <div style={{ overflowX: 'auto' }}>
+      <div className="responsive-desktop-table" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
           <thead>
             <tr style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>
@@ -88,6 +88,30 @@ export const RecentBookingsTable: React.FC<RecentBookingsTableProps> = ({ rental
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="responsive-mobile-list entity-mobile-list entity-mobile-list-in-card">
+        {rentals.length === 0 ? (
+          <div className="entity-mobile-empty">Chưa có đơn thuê nào.</div>
+        ) : (
+          rentals.slice(0, 5).map(rental => (
+            <article className="entity-mobile-card" key={rental.id}>
+              <div className="entity-mobile-head">
+                <div><strong>#{rental.id}</strong><span>{rental.carId}</span></div>
+              </div>
+              <div className="entity-mobile-fields">
+                <div><span>Khách hàng</span><strong>{rental.customerName}</strong></div>
+                <div><span>Điện thoại</span><strong>{rental.customerPhone}</strong></div>
+                <div><span>Tổng tiền</span><strong className="entity-mobile-amount">{rental.totalAmount.toLocaleString()} ₫</strong></div>
+              </div>
+              {onSelectRental && (
+                <div className="entity-mobile-actions">
+                  <button type="button" onClick={() => onSelectRental(rental)}>Xem chi tiết</button>
+                </div>
+              )}
+            </article>
+          ))
+        )}
       </div>
 
     </div>

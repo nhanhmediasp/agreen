@@ -4,6 +4,7 @@ import { Table, Tag, Modal, Form } from 'antd';
 import { Search, Plus, Phone, FileCheck, AlertCircle, MapPin, FileText, ArrowLeft, Trash2 } from 'lucide-react';
 import { useApp, type Customer } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
+import { Pagination } from '../components/Pagination';
 import { confirmAction } from '../utils/confirmAction';
 
 const Customers = () => {
@@ -11,6 +12,8 @@ const Customers = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const selectedCustomerId = searchParams.get('id');
   const setSelectedCustomerId = (id: string | null) => {
     if (id) {
@@ -160,7 +163,7 @@ const Customers = () => {
   };
 
   return (
-    <div style={{ height: '100%' }}>
+    <div className="customers-page" style={{ height: '100%' }}>
       {selectedCustomerId && activeCustomer ? (
         /* Sub-page chi tiết khách hàng */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -289,7 +292,7 @@ const Customers = () => {
             </div>
 
             {/* Cột phải: Lịch sử thuê + Bộ lọc & Tìm kiếm */}
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card customer-history-card" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: '16px', margin: 0 }}>Lịch sử giao dịch & đơn thuê</h3>
@@ -297,7 +300,7 @@ const Customers = () => {
                 </div>
 
                 {/* Filter and Search Bar for History */}
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div className="entity-history-filters" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                   <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '6px 12px', borderRadius: 'var(--radius-md)', flex: 1 }}>
                     <Search size={16} color="var(--text-secondary)" />
                     <input 
@@ -320,7 +323,7 @@ const Customers = () => {
                 </div>
               </div>
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="responsive-desktop-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '13px' }}>
                     <th style={{ padding: '12px 24px' }}>Mã hợp đồng</th>
@@ -366,6 +369,27 @@ const Customers = () => {
                   )}
                 </tbody>
               </table>
+
+              <div className="responsive-mobile-list entity-mobile-list entity-mobile-list-in-card">
+                {filteredCustomerHistory.length === 0 ? (
+                  <div className="entity-mobile-empty">Chưa phát sinh giao dịch phù hợp.</div>
+                ) : (
+                  filteredCustomerHistory.map(rental => (
+                    <article className="entity-mobile-card" key={rental.id}>
+                      <div className="entity-mobile-head">
+                        <div><strong>#{rental.id}</strong><span>{rental.carId}</span></div>
+                        <span className={`entity-mobile-status ${rental.status === 'active' ? 'active' : 'success'}`}>
+                          {rental.status === 'active' ? 'Đang thuê' : 'Đã trả xe'}
+                        </span>
+                      </div>
+                      <div className="entity-mobile-fields">
+                        <div><span>Thời gian thuê</span><strong>{new Date(rental.startDate).toLocaleDateString('vi-VN')} → {new Date(rental.endDate).toLocaleDateString('vi-VN')}</strong></div>
+                        <div><span>Tổng thanh toán</span><strong className="entity-mobile-amount">{rental.totalAmount.toLocaleString()} ₫</strong></div>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -469,13 +493,13 @@ const Customers = () => {
                 type="text" 
                 placeholder="Tìm theo tên hoặc số điện thoại..." 
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 style={{ border: 'none', background: 'transparent', marginLeft: '8px', outline: 'none', width: '100%', fontFamily: 'inherit' }}
               />
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, overflowX: 'auto', width: '100%', background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+          <div className="card responsive-desktop-table" style={{ padding: 0, overflowX: 'auto', width: '100%', background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
             <Table<Customer>
               dataSource={filteredCustomers}
               rowKey="id"
@@ -580,6 +604,80 @@ const Customers = () => {
                   )
                 }
               ]}
+            />
+          </div>
+
+          <div className="responsive-mobile-list entity-mobile-list">
+            {filteredCustomers.length === 0 ? (
+              <div className="entity-mobile-empty">Không tìm thấy khách hàng phù hợp.</div>
+            ) : (
+              filteredCustomers
+                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                .map(customer => (
+                  <article
+                    className="entity-mobile-card entity-mobile-card-clickable"
+                    key={customer.id}
+                    onClick={() => setSelectedCustomerId(customer.id)}
+                  >
+                    <div className="entity-mobile-head">
+                      <div className="entity-mobile-person">
+                        <input
+                          type="checkbox"
+                          checked={selectedCustomerIds.includes(customer.id)}
+                          onClick={event => event.stopPropagation()}
+                          onChange={event => {
+                            setSelectedCustomerIds(current => event.target.checked
+                              ? [...current, customer.id]
+                              : current.filter(id => id !== customer.id));
+                          }}
+                          aria-label={`Chọn khách hàng ${customer.name}`}
+                        />
+                        <img src={customer.image} alt={customer.name} />
+                        <div><strong>{customer.name}</strong><span>ID: #{customer.id}</span></div>
+                      </div>
+                      <span className={`entity-mobile-status ${customer.status === 'verified' ? 'success' : 'warning'}`}>
+                        {customer.statusText || (customer.status === 'verified' ? 'Đã xác minh' : 'Cần kiểm tra')}
+                      </span>
+                    </div>
+                    <div className="entity-mobile-fields">
+                      <div><span>Số điện thoại</span><strong>{customer.phone}</strong></div>
+                      <div><span>Số CCCD</span><strong>{customer.cccd || 'Chưa cập nhật'}</strong></div>
+                      <div><span>Giấy phép lái xe</span><strong>{customer.license || 'Chưa cập nhật'}</strong></div>
+                      <div><span>Địa chỉ</span><strong>{customer.address || 'Chưa cập nhật'}</strong></div>
+                      <div><span>Phân loại</span><strong>{customer.classification === 'vip' ? '⭐ VIP' : customer.classification === 'warning' ? '⚠️ Cần chú ý' : 'Khách thường'}</strong></div>
+                      <div><span>Đơn đang thuê</span><strong>{customer.activeRentals}</strong></div>
+                    </div>
+                    <div className="entity-mobile-actions">
+                      <button type="button" onClick={event => { event.stopPropagation(); setSelectedCustomerId(customer.id); }}>
+                        Xem thông tin
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={async event => {
+                          event.stopPropagation();
+                          if (await confirmAction({
+                            title: `Xoá khách hàng ${customer.name}?`,
+                            content: 'Khách hàng có hợp đồng liên kết sẽ không thể xoá.',
+                            danger: true,
+                          })) {
+                            await deleteCustomer(customer.id);
+                          }
+                        }}
+                      >
+                        <Trash2 size={14} /> Xóa
+                      </button>
+                    </div>
+                  </article>
+                ))
+            )}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredCustomers.length / itemsPerPage)}
+              totalItems={filteredCustomers.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              unitName="khách hàng"
             />
           </div>
         </div>

@@ -195,7 +195,7 @@ const Owners = () => {
   };
 
   return (
-    <div style={{ height: '100%' }}>
+    <div className="owners-page" style={{ height: '100%' }}>
       {selectedOwnerId && activeOwner ? (
         /* Sub-page chi tiết chủ xe */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -300,7 +300,7 @@ const Owners = () => {
                 <div style={{ padding: '0 24px 16px', borderBottom: '1px solid var(--border-light)' }}>
                   <h3 style={{ fontSize: '16px', margin: 0 }}>Danh sách xe sở hữu ({ownerCars.length})</h3>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="responsive-desktop-table" style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '13px' }}>
@@ -353,6 +353,29 @@ const Owners = () => {
                     </tbody>
                   </table>
                 </div>
+                <div className="responsive-mobile-list entity-mobile-list entity-mobile-list-in-card">
+                  {ownerCars.length === 0 ? (
+                    <div className="entity-mobile-empty">Chủ xe này chưa đăng ký xe nào trên hệ thống.</div>
+                  ) : (
+                    ownerCars.map(car => (
+                      <article className="entity-mobile-card" key={car.id}>
+                        <div className="entity-mobile-head">
+                          <div><strong>{car.id}</strong><span>{car.name}</span></div>
+                          <span className={`entity-mobile-status ${car.status === 'ready' ? 'success' : car.status === 'rented' ? 'active' : 'warning'}`}>
+                            {car.status === 'ready' ? 'Sẵn sàng' : car.status === 'rented' ? 'Đang thuê' : car.status === 'maintenance' ? 'Bảo trì' : 'Tạm ngưng'}
+                          </span>
+                        </div>
+                        <div className="entity-mobile-fields">
+                          <div><span>Màu sắc</span><strong>{car.color}</strong></div>
+                          <div><span>Số KM</span><strong>{car.km.toLocaleString()} km</strong></div>
+                        </div>
+                        <div className="entity-mobile-actions">
+                          <Link to={`/fleet?id=${car.id}`}>Xem chi tiết xe</Link>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
               </div>
 
               {/* Lịch sử thuê xe */}
@@ -360,7 +383,7 @@ const Owners = () => {
                 <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-light)' }}>
                   <h3 style={{ fontSize: '16px', margin: 0 }}>Lịch sử lượt thuê xe</h3>
                 </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <table className="responsive-desktop-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '13px' }}>
                       <th style={{ padding: '12px 24px' }}>Mã hợp đồng</th>
@@ -394,6 +417,25 @@ const Owners = () => {
                     )}
                   </tbody>
                 </table>
+
+                <div className="responsive-mobile-list entity-mobile-list entity-mobile-list-in-card">
+                  {ownerRentals.length === 0 ? (
+                    <div className="entity-mobile-empty">Chưa phát sinh lượt thuê nào đối với các xe của chủ xe này.</div>
+                  ) : (
+                    pagedOwnerRentals.map(rental => (
+                      <article className="entity-mobile-card" key={rental.id}>
+                        <div className="entity-mobile-head">
+                          <div><strong>#{rental.id}</strong><span>{rental.carId}</span></div>
+                        </div>
+                        <div className="entity-mobile-fields">
+                          <div><span>Khách hàng</span><strong>{rental.customerName}</strong></div>
+                          <div><span>Thời gian thuê</span><strong>{new Date(rental.startDate).toLocaleDateString('vi-VN')} → {new Date(rental.endDate).toLocaleDateString('vi-VN')}</strong></div>
+                          <div><span>Doanh thu</span><strong className="entity-mobile-amount">{rental.totalAmount.toLocaleString()} ₫</strong></div>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
 
                 {/* Phân trang lịch sử thuê xe */}
                 {ownerRentalTotalPages > 1 && (
@@ -531,7 +573,7 @@ const Owners = () => {
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, overflowX: 'auto', width: '100%' }}>
+          <div className="card responsive-desktop-table" style={{ padding: 0, overflowX: 'auto', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-main)', color: 'var(--text-secondary)', fontSize: '14px' }}>
@@ -651,6 +693,85 @@ const Owners = () => {
               </tbody>
             </table>
 
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredOwners.length / itemsPerPage)}
+              totalItems={filteredOwners.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              unitName="chủ xe"
+            />
+          </div>
+
+          <div className="responsive-mobile-list entity-mobile-list">
+            {filteredOwners.length === 0 ? (
+              <div className="entity-mobile-empty">Không tìm thấy chủ xe nào.</div>
+            ) : (
+              filteredOwners
+                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                .map(owner => {
+                  const ownerCarsForCard = cars.filter(car => car.ownerPhone === owner.phone);
+                  const ownerCarIdsForCard = ownerCarsForCard.map(car => car.id);
+                  const ownerPayoutTotal = rentals
+                    .filter(rental => ownerCarIdsForCard.includes(rental.carId) && rental.status === 'completed')
+                    .reduce((sum, rental) => sum + (rental.ownerCommissionAmount ?? 0), 0);
+
+                  return (
+                    <article
+                      className="entity-mobile-card entity-mobile-card-clickable"
+                      key={owner.id}
+                      onClick={() => setSelectedOwnerId(owner.id)}
+                    >
+                      <div className="entity-mobile-head">
+                        <div className="entity-mobile-person">
+                          <input
+                            type="checkbox"
+                            checked={selectedOwnerIds.includes(owner.id)}
+                            onClick={event => event.stopPropagation()}
+                            onChange={event => {
+                              setSelectedOwnerIds(current => event.target.checked
+                                ? [...current, owner.id]
+                                : current.filter(id => id !== owner.id));
+                            }}
+                            aria-label={`Chọn chủ xe ${owner.name}`}
+                          />
+                          <img src={owner.image} alt={owner.name} />
+                          <div><strong>{owner.name}</strong><span>ID: #{owner.id}</span></div>
+                        </div>
+                      </div>
+                      <div className="entity-mobile-fields">
+                        <div><span>Số điện thoại</span><strong>{owner.phone}</strong></div>
+                        <div><span>Địa chỉ</span><strong>{owner.address || 'Chưa cập nhật'}</strong></div>
+                        <div><span>Tỷ lệ chi trả</span><strong>{owner.commissionRate ?? 75}%</strong></div>
+                        <div><span>Xe sở hữu</span><strong>{ownerCarsForCard.map(car => car.id).join(', ') || 'Chưa có xe'}</strong></div>
+                        <div><span>Tổng chi trả</span><strong className="entity-mobile-amount">{ownerPayoutTotal.toLocaleString()} ₫</strong></div>
+                        <div><span>Ghi chú</span><strong>{owner.notes || 'Không có ghi chú'}</strong></div>
+                      </div>
+                      <div className="entity-mobile-actions">
+                        <button type="button" onClick={event => { event.stopPropagation(); setSelectedOwnerId(owner.id); }}>
+                          Xem thông tin
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={async event => {
+                            event.stopPropagation();
+                            if (await confirmAction({
+                              title: `Xoá chủ xe ${owner.name}?`,
+                              content: 'Hành động chỉ thành công khi chủ xe không còn xe liên kết.',
+                              danger: true,
+                            })) {
+                              await deleteOwner(owner.id);
+                            }
+                          }}
+                        >
+                          <Trash2 size={14} /> Xóa
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
+            )}
             <Pagination
               currentPage={currentPage}
               totalPages={Math.ceil(filteredOwners.length / itemsPerPage)}

@@ -148,7 +148,7 @@ const PublicStatus = () => {
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 500 }}>
                   Đối tác sở hữu {matchedCarList.length} xe trên hệ thống:
                 </div>
-                <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
+                <div className="public-car-selector" style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
                   {matchedCarList.map(c => (
                     <div 
                       key={c.id} 

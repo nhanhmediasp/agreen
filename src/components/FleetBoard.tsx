@@ -55,7 +55,7 @@ export const FleetBoard: React.FC<FleetBoardProps> = ({ cars, onSelectCar }) => 
         </div>
 
         {/* Search Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', width: '280px' }}>
+        <div className="fleet-board-search" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', width: '280px' }}>
           <Search size={16} style={{ color: 'var(--text-secondary)', marginRight: '8px' }} />
           <input 
             type="text" 
@@ -68,7 +68,7 @@ export const FleetBoard: React.FC<FleetBoardProps> = ({ cars, onSelectCar }) => 
       </div>
 
       {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '12px', overflowX: 'auto' }}>
+      <div className="fleet-board-tabs" style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '12px', overflowX: 'auto' }}>
         <button 
           onClick={() => setActiveTab('all')}
           style={{

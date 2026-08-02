@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Table, Tag, Modal, Form, Card, Statistic } from 'antd';
 import { Plus, Search, ShieldAlert, UserCheck, DollarSign, Receipt } from 'lucide-react';
-import { useApp, type Expense } from '../context/AppContext';
+import { useApp, type Expense, type Owner } from '../context/AppContext';
 import { MoneyInputLeft } from '../components/MoneyInput';
 import { Pagination } from '../components/Pagination';
 import { confirmAction } from '../utils/confirmAction';
@@ -23,6 +23,7 @@ const Expenses = () => {
   const [timeFilter, setTimeFilter] = useState<'all' | '7' | '30' | 'custom'>('all');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
+  const [generalPage, setGeneralPage] = useState(1);
   const itemsPerPage = 10;
 
   // Edit Operational Expense States
@@ -154,15 +155,62 @@ const Expenses = () => {
   const sortedList = [...filteredList].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // Filter Logic Incidental Costs
-  const filteredIncidentals = allIncidentalExpenses.filter(i => 
-    i.rentalId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    i.carId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    i.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    i.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredIncidentals = allIncidentalExpenses.filter(inc => {
+    const keyword = incidentalSearch.toLowerCase();
+    const matchesSearch = inc.description.toLowerCase().includes(keyword) ||
+      inc.rentalId.toLowerCase().includes(keyword) ||
+      inc.carId.toLowerCase().includes(keyword) ||
+      inc.customerName.toLowerCase().includes(keyword);
+    const matchesStatus = incidentalStatusFilter === 'all' || inc.status === incidentalStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredPayoutOwners = owners.filter(owner => {
+    const ownerCars = cars.filter(car => car.ownerPhone === owner.phone);
+    const carPlates = ownerCars.map(car => car.id).join(' ');
+    const keyword = ownerSearch.toLowerCase();
+    return owner.name.toLowerCase().includes(keyword) ||
+      owner.phone.includes(ownerSearch) ||
+      carPlates.toLowerCase().includes(keyword);
+  });
+
+  const getOwnerPayoutSummary = (owner: Owner) => {
+    const ownerCars = cars.filter(car => car.ownerPhone === owner.phone);
+    const ownerCarIds = ownerCars.map(car => car.id);
+    const completedRentals = rentals.filter(
+      rental => ownerCarIds.includes(rental.carId) && rental.status === 'completed',
+    );
+    return {
+      ownerCars,
+      grossRevenue: completedRentals.reduce((sum, rental) => sum + rental.totalAmount, 0),
+      payoutTotal: completedRentals.reduce(
+        (sum, rental) => sum + (rental.ownerCommissionAmount ?? 0),
+        0,
+      ),
+    };
+  };
+
+  const handleCreateOwnerExpense = async (owner: Owner) => {
+    const { ownerCars, payoutTotal } = getOwnerPayoutSummary(owner);
+    if (payoutTotal <= 0) {
+      showToast('Chủ xe này chưa có số tiền chi trả cần thanh toán!', 'error');
+      return;
+    }
+    const success = await addExpense({
+      id: Date.now().toString(),
+      title: `Thanh toán chi trả cho chủ xe ${owner.name}`,
+      amount: payoutTotal,
+      category: 'Chiết khấu chủ xe',
+      date: new Date().toISOString().split('T')[0],
+      ref: ownerCars[0]?.id || '',
+    });
+    if (success) {
+      showToast(`Đã tạo phiếu chi ${payoutTotal.toLocaleString()} ₫ cho chủ xe ${owner.name}!`, 'success');
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="expenses-page" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
       {/* Top Header & Action */}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '4px' }}>
@@ -202,7 +250,7 @@ const Expenses = () => {
       </div>
 
       {/* Main Subtabs Navigation */}
-      <div style={{ display: 'flex', gap: '12px', borderBottom: '2px solid var(--border)', paddingBottom: '2px' }}>
+      <div className="expenses-tabs" style={{ display: 'flex', gap: '12px', borderBottom: '2px solid var(--border)', paddingBottom: '2px' }}>
         <button 
           onClick={() => setActiveTab('general')}
           style={{
@@ -279,39 +327,39 @@ const Expenses = () => {
             </Card>
           </div>
 
-          <div className="card" style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px 24px', flexWrap: 'wrap', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '8px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flex: 1, minWidth: '240px' }}>
+          <div className="card expenses-filter-bar" style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px 24px', flexWrap: 'wrap', marginBottom: '16px' }}>
+            <div className="expenses-search" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '8px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flex: 1, minWidth: '240px' }}>
               <Search size={18} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
               <input 
                 type="text" 
                 placeholder="Tìm theo nội dung, danh mục, biển số xe..." 
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+                onChange={e => { setSearchTerm(e.target.value); setGeneralPage(1); }}
                 style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontFamily: 'inherit', color: 'var(--text-primary)', fontSize: '13px' }}
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-surface)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            <div className="expenses-filter-options" style={{ display: 'flex', gap: '4px', background: 'var(--bg-surface)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
               <button 
-                onClick={() => setTimeFilter('all')}
+                onClick={() => { setTimeFilter('all'); setGeneralPage(1); }}
                 style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: timeFilter === 'all' ? 'var(--primary)' : 'transparent', color: timeFilter === 'all' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 Tất cả
               </button>
               <button 
-                onClick={() => setTimeFilter('7')}
+                onClick={() => { setTimeFilter('7'); setGeneralPage(1); }}
                 style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: timeFilter === '7' ? 'var(--primary)' : 'transparent', color: timeFilter === '7' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 7 ngày
               </button>
               <button 
-                onClick={() => setTimeFilter('30')}
+                onClick={() => { setTimeFilter('30'); setGeneralPage(1); }}
                 style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: timeFilter === '30' ? 'var(--primary)' : 'transparent', color: timeFilter === '30' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 30 ngày
               </button>
               <button 
-                onClick={() => setTimeFilter('custom')}
+                onClick={() => { setTimeFilter('custom'); setGeneralPage(1); }}
                 style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: timeFilter === 'custom' ? 'var(--primary)' : 'transparent', color: timeFilter === 'custom' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 Tùy chỉnh
@@ -325,19 +373,19 @@ const Expenses = () => {
               <input 
                 type="date" 
                 value={startDateFilter} 
-                onChange={e => setStartDateFilter(e.target.value)} 
+                onChange={e => { setStartDateFilter(e.target.value); setGeneralPage(1); }}
                 style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }} 
               />
               <span style={{ color: '#64748B', fontSize: '13px' }}>đến ngày:</span>
               <input 
                 type="date" 
                 value={endDateFilter} 
-                onChange={e => setEndDateFilter(e.target.value)} 
+                onChange={e => { setEndDateFilter(e.target.value); setGeneralPage(1); }}
                 style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }} 
               />
               {(startDateFilter || endDateFilter) && (
                 <button 
-                  onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}
+                  onClick={() => { setStartDateFilter(''); setEndDateFilter(''); setGeneralPage(1); }}
                   style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: '4px' }}
                 >
                   Xóa lọc
@@ -346,7 +394,7 @@ const Expenses = () => {
             </div>
           )}
 
-          <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0', overflow: 'hidden' }}>
+          <div className="responsive-desktop-table" style={{ background: 'white', borderRadius: '8px', border: '1px solid #f0f0f0', overflow: 'hidden' }}>
             <Table<Expense>
               dataSource={sortedList}
               rowKey="id"
@@ -420,6 +468,44 @@ const Expenses = () => {
             />
           </div>
 
+          <div className="responsive-mobile-list entity-mobile-list">
+            {sortedList.length === 0 ? (
+              <div className="entity-mobile-empty">Không tìm thấy khoản chi phù hợp.</div>
+            ) : (
+              sortedList
+                .slice((generalPage - 1) * itemsPerPage, generalPage * itemsPerPage)
+                .map(expense => (
+                  <article className="entity-mobile-card" key={expense.id}>
+                    <div className="entity-mobile-head">
+                      <div>
+                        <strong>{expense.title}</strong>
+                        <span>{expense.category}</span>
+                      </div>
+                      <strong className="entity-mobile-amount">
+                        {(expense.amount || 0).toLocaleString()} ₫
+                      </strong>
+                    </div>
+                    <div className="entity-mobile-fields">
+                      <div><span>Ngày chi</span><strong>{new Date(expense.date).toLocaleDateString('vi-VN')}</strong></div>
+                      <div><span>Liên kết xe</span><strong>{expense.ref || 'Chi phí chung'}</strong></div>
+                    </div>
+                    <div className="entity-mobile-actions">
+                      <button type="button" onClick={() => handleOpenEdit(expense)}>Sửa</button>
+                      <button type="button" className="danger" onClick={() => handleDelete(expense.id)}>Xóa</button>
+                    </div>
+                  </article>
+                ))
+            )}
+            <Pagination
+              currentPage={generalPage}
+              totalPages={Math.ceil(sortedList.length / itemsPerPage)}
+              totalItems={sortedList.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setGeneralPage}
+              unitName="khoản chi"
+            />
+          </div>
+
         </>
       )}
 
@@ -446,8 +532,8 @@ const Expenses = () => {
               </div>
             </div>
           </div>
-          <div className="card" style={{ padding: '16px 24px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '8px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flex: 1, minWidth: '240px' }}>
+          <div className="card expenses-filter-bar" style={{ padding: '16px 24px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="expenses-search" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '8px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flex: 1, minWidth: '240px' }}>
               <Search size={18} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
               <input 
                 type="text" 
@@ -458,7 +544,7 @@ const Expenses = () => {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-surface)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            <div className="expenses-filter-options" style={{ display: 'flex', gap: '4px', background: 'var(--bg-surface)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
               <button 
                 onClick={() => { setIncidentalStatusFilter('all'); setIncidentalPage(1); }}
                 style={{ padding: '6px 14px', border: 'none', borderRadius: 'var(--radius-sm)', background: incidentalStatusFilter === 'all' ? 'var(--primary)' : 'transparent', color: incidentalStatusFilter === 'all' ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: '12.5px', cursor: 'pointer' }}
@@ -480,7 +566,7 @@ const Expenses = () => {
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card responsive-desktop-table" style={{ padding: 0, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
@@ -579,6 +665,43 @@ const Expenses = () => {
               );
             })()}
           </div>
+
+          <div className="responsive-mobile-list entity-mobile-list">
+            {filteredIncidentals.length === 0 ? (
+              <div className="entity-mobile-empty">Không tìm thấy chi phí phát sinh phù hợp.</div>
+            ) : (
+              filteredIncidentals
+                .slice((incidentalPage - 1) * itemsPerPage, incidentalPage * itemsPerPage)
+                .map(incidental => (
+                  <article className="entity-mobile-card" key={incidental.id}>
+                    <div className="entity-mobile-head">
+                      <div>
+                        <strong>{incidental.description}</strong>
+                        <span>Đơn #{incidental.rentalId}</span>
+                      </div>
+                      <span className={`entity-mobile-status ${incidental.status === 'paid' ? 'success' : 'warning'}`}>
+                        {incidental.status === 'paid' ? 'Đã thu' : 'Chưa thu'}
+                      </span>
+                    </div>
+                    <div className="entity-mobile-fields">
+                      <div><span>Xe</span><strong>{incidental.carId}</strong></div>
+                      <div><span>Khách hàng</span><strong>{incidental.customerName}</strong></div>
+                      <div><span>Điện thoại</span><strong>{incidental.customerPhone}</strong></div>
+                      <div><span>Ngày phát sinh</span><strong>{new Date(incidental.date).toLocaleDateString('vi-VN')}</strong></div>
+                      <div><span>Số tiền</span><strong className="entity-mobile-amount">{incidental.amount.toLocaleString()} ₫</strong></div>
+                    </div>
+                  </article>
+                ))
+            )}
+            <Pagination
+              currentPage={incidentalPage}
+              totalPages={Math.ceil(filteredIncidentals.length / itemsPerPage)}
+              totalItems={filteredIncidentals.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setIncidentalPage}
+              unitName="khoản chi phát sinh"
+            />
+          </div>
         </>
       )}
 
@@ -586,8 +709,8 @@ const Expenses = () => {
       {activeTab === 'owners' && (
         <>
           {/* Search Bar for Tab 3 */}
-          <div className="card" style={{ padding: '16px 24px', display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '8px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flex: 1 }}>
+          <div className="card expenses-filter-bar" style={{ padding: '16px 24px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <div className="expenses-search" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-page)', padding: '8px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flex: 1 }}>
               <Search size={18} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
               <input 
                 type="text" 
@@ -599,7 +722,7 @@ const Expenses = () => {
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card responsive-desktop-table" style={{ padding: 0, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', fontSize: '13px', borderBottom: '1px solid var(--border)' }}>
@@ -614,15 +737,7 @@ const Expenses = () => {
               </thead>
               <tbody>
                 {(() => {
-                  const filteredOwners = owners.filter(o => {
-                    const oCars = cars.filter(c => c.ownerPhone === o.phone);
-                    const carPlates = oCars.map(c => c.id).join(' ');
-                    return o.name.toLowerCase().includes(ownerSearch.toLowerCase()) ||
-                      o.phone.includes(ownerSearch) ||
-                      carPlates.toLowerCase().includes(ownerSearch.toLowerCase());
-                  });
-
-                  if (filteredOwners.length === 0) {
+                  if (filteredPayoutOwners.length === 0) {
                     return (
                       <tr>
                         <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -633,17 +748,12 @@ const Expenses = () => {
                   }
 
                   const startIndex = (ownerPage - 1) * itemsPerPage;
-                  const paginated = filteredOwners.slice(startIndex, startIndex + itemsPerPage);
+                  const paginated = filteredPayoutOwners.slice(startIndex, startIndex + itemsPerPage);
 
                   return (
                     <>
                       {paginated.map((owner, idx) => {
-                        const ownerCars = cars.filter(c => c.ownerPhone === owner.phone);
-                        const ownerCarIds = ownerCars.map(c => c.id);
-                        const ownerRentals = rentals.filter(r => ownerCarIds.includes(r.carId));
-                        const completedRentals = ownerRentals.filter((rental) => rental.status === 'completed');
-                        const grossRevenue = completedRentals.reduce((s, r) => s + r.totalAmount, 0);
-                        const payoutTotal = completedRentals.reduce((s, r) => s + (r.ownerCommissionAmount ?? 0), 0);
+                        const { ownerCars, grossRevenue, payoutTotal } = getOwnerPayoutSummary(owner);
 
                         return (
                           <tr key={owner.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -670,21 +780,7 @@ const Expenses = () => {
                             </td>
                             <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                               <button 
-                                onClick={async () => {
-                                  if (payoutTotal <= 0) {
-                                    showToast('Chủ xe này chưa có số tiền chi trả cần thanh toán!', 'error');
-                                    return;
-                                  }
-                                  const success = await addExpense({
-                                    id: Date.now().toString(),
-                                    title: `Thanh toán chi trả cho chủ xe ${owner.name}`,
-                                    amount: payoutTotal,
-                                    category: 'Chiết khấu chủ xe',
-                                    date: new Date().toISOString().split('T')[0],
-                                    ref: ownerCars[0]?.id || ''
-                                  });
-                                  if (success) showToast(`Đã tạo phiếu chi ${payoutTotal.toLocaleString()} ₫ cho chủ xe ${owner.name}!`, 'success');
-                                }}
+                                onClick={() => handleCreateOwnerExpense(owner)}
                                 className="btn-primary"
                                 style={{ padding: '6px 12px', fontSize: '12px' }}
                               >
@@ -701,24 +797,58 @@ const Expenses = () => {
             </table>
 
             {(() => {
-              const filteredOwners = owners.filter(o => {
-                const oCars = cars.filter(c => c.ownerPhone === o.phone);
-                const carPlates = oCars.map(c => c.id).join(' ');
-                return o.name.toLowerCase().includes(ownerSearch.toLowerCase()) ||
-                  o.phone.includes(ownerSearch) ||
-                  carPlates.toLowerCase().includes(ownerSearch.toLowerCase());
-              });
               return (
                 <Pagination
                   currentPage={ownerPage}
-                  totalPages={Math.ceil(filteredOwners.length / itemsPerPage)}
-                  totalItems={filteredOwners.length}
+                  totalPages={Math.ceil(filteredPayoutOwners.length / itemsPerPage)}
+                  totalItems={filteredPayoutOwners.length}
                   itemsPerPage={itemsPerPage}
                   onPageChange={setOwnerPage}
                   unitName="đối tác chủ xe"
                 />
               );
             })()}
+          </div>
+
+          <div className="responsive-mobile-list entity-mobile-list">
+            {filteredPayoutOwners.length === 0 ? (
+              <div className="entity-mobile-empty">Không tìm thấy chủ xe / đối tác nào.</div>
+            ) : (
+              filteredPayoutOwners
+                .slice((ownerPage - 1) * itemsPerPage, ownerPage * itemsPerPage)
+                .map(owner => {
+                  const { ownerCars, grossRevenue, payoutTotal } = getOwnerPayoutSummary(owner);
+                  return (
+                    <article className="entity-mobile-card" key={owner.id}>
+                      <div className="entity-mobile-head">
+                        <div className="entity-mobile-person">
+                          <img src={owner.image} alt={owner.name} />
+                          <div><strong>{owner.name}</strong><span>#{owner.id}</span></div>
+                        </div>
+                      </div>
+                      <div className="entity-mobile-fields">
+                        <div><span>Số điện thoại</span><strong>{owner.phone}</strong></div>
+                        <div><span>Xe sở hữu</span><strong>{ownerCars.map(car => car.id).join(', ') || 'Chưa có xe'}</strong></div>
+                        <div><span>Doanh số xe</span><strong>{grossRevenue.toLocaleString()} ₫</strong></div>
+                        <div><span>Tiền chi trả</span><strong className="entity-mobile-amount">{payoutTotal.toLocaleString()} ₫</strong></div>
+                      </div>
+                      <div className="entity-mobile-actions">
+                        <button type="button" onClick={() => handleCreateOwnerExpense(owner)}>
+                          <Receipt size={14} /> Tạo phiếu chi
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
+            )}
+            <Pagination
+              currentPage={ownerPage}
+              totalPages={Math.ceil(filteredPayoutOwners.length / itemsPerPage)}
+              totalItems={filteredPayoutOwners.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setOwnerPage}
+              unitName="đối tác chủ xe"
+            />
           </div>
         </>
       )}

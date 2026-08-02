@@ -52,12 +52,12 @@ export const Pagination: React.FC<PaginationProps> = ({
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: '12px', background: 'white' }}>
-      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+    <div className="pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: '12px', background: 'white' }}>
+      <div className="pagination-summary" style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
         Hiển thị <strong style={{ color: 'var(--text-primary)' }}>{startItem} - {endItem}</strong> trong tổng số <strong style={{ color: 'var(--primary)' }}>{totalItems}</strong> {unitName}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div className="pagination-controls" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
         <button
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
