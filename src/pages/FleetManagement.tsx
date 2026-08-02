@@ -361,6 +361,10 @@ const FleetManagement = () => {
 
   const handleOpenReturn = () => {
     if (!activeCar) return;
+    if (!activeRental) {
+      showToast('Không tìm thấy hợp đồng đang chạy của xe. Vui lòng tải lại trang hoặc kiểm tra dữ liệu hợp đồng.', 'error');
+      return;
+    }
     setReturnKm(activeCar.km.toString());
     setReturnFuel('8/8');
     setSurcharge('0');
@@ -567,7 +571,7 @@ const FleetManagement = () => {
                     <Button type="primary" icon={<PlusOutlined />} style={{ borderRadius: '8px', background: '#006837', boxShadow: '0 2px 6px rgba(0,104,55,0.25)' }}>Tạo đơn thuê mới</Button>
                   </Link>
                 )}
-                {activeCar.status === 'rented' && (
+                {activeRental && (
                   <Button type="primary" icon={<CheckSquareOutlined />} onClick={handleOpenReturn} style={{ borderRadius: '8px', background: '#1D4ED8' }}>Nhận trả xe</Button>
                 )}
               </Space>
@@ -641,32 +645,34 @@ const FleetManagement = () => {
                   </div>
                 )}
 
-                {activeCar.status === 'rented' && (
+                {activeRental ? (
                   <div style={{ background: '#EFF6FF', padding: '12px', borderRadius: '8px', border: '1px solid #BFDBFE', marginBottom: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <span style={{ color: '#1D4ED8', fontWeight: 700, fontSize: '13px' }}>🔑 Hợp đồng đang chạy</span>
-                      {activeRental && (<Link to={`/contracts?id=${activeRental.id}`} style={{ fontSize: '12px', color: '#1D4ED8', fontWeight: 700, textDecoration: 'none' }}>Đơn #{activeRental.id} →</Link>)}
+                      <Link to={`/contracts?id=${activeRental.id}`} style={{ fontSize: '12px', color: '#1D4ED8', fontWeight: 700, textDecoration: 'none' }}>Đơn #{activeRental.id} →</Link>
                     </div>
                     <div style={{ background: 'white', padding: '10px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
                       <div style={{ fontSize: '11px', color: '#64748B' }}>Khách thuê:</div>
-                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#0F172A' }}>{activeCar.customer || activeRental?.customerName}</div>
-                      {activeRental?.customerPhone && (<div style={{ fontSize: '12px', color: '#64748B', fontFamily: 'var(--font-sans)' }}>{activeRental.customerPhone}</div>)}
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#0F172A' }}>{activeRental.customerName}</div>
+                      {activeRental.customerPhone && (<div style={{ fontSize: '12px', color: '#64748B', fontFamily: 'var(--font-sans)' }}>{activeRental.customerPhone}</div>)}
                     </div>
-                    {activeRental && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', background: 'white', padding: '8px 10px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
-                        <span style={{ color: '#1D4ED8', fontWeight: 600, fontSize: '12px' }}>⏳ Còn lại:</span>
-                        <SpeedometerCountdown endDateStr={activeRental.endDate} />
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', background: 'white', padding: '8px 10px', borderRadius: '6px', border: '1px solid #BFDBFE' }}>
+                      <span style={{ color: '#1D4ED8', fontWeight: 600, fontSize: '12px' }}>⏳ Còn lại:</span>
+                      <SpeedometerCountdown endDateStr={activeRental.endDate} />
+                    </div>
                   </div>
-                )}
+                ) : activeCar.status === 'rented' ? (
+                  <div style={{ background: '#FEF2F2', padding: '12px', borderRadius: '8px', border: '1px solid #FECACA', marginBottom: '12px', color: '#B91C1C', fontSize: '13px', lineHeight: 1.5 }}>
+                    Không tìm thấy hợp đồng đang chạy cho xe này. Chức năng trả xe đã được khóa để tránh cập nhật nhầm dữ liệu; hãy tải lại trang hoặc kiểm tra trạng thái hợp đồng.
+                  </div>
+                ) : null}
 
                 {(activeCar.status === 'ready' || activeCar.status === 'suspended') && (
                   <Link to={`/rental/new?car=${activeCar.id}`} style={{ textDecoration: 'none', display: 'block' }}>
                     <Button type="primary" size="large" block icon={<CarOutlined />} style={{ height: '42px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, background: '#006837', boxShadow: '0 2px 8px rgba(0,104,55,0.25)' }}>Tạo đơn cho thuê ngay</Button>
                   </Link>
                 )}
-                {activeCar.status === 'rented' && (
+                {activeRental && (
                   <Button type="primary" size="large" block icon={<CheckSquareOutlined />} onClick={handleOpenReturn} style={{ height: '42px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, background: '#1D4ED8' }}>Nhận trả xe & Thanh lý</Button>
                 )}
               </Card>
@@ -1970,7 +1976,7 @@ const FleetManagement = () => {
 
             <div style={{ background: 'var(--bg-main)', padding: '12px 16px', borderRadius: 'var(--radius-md)', fontSize: '14px', border: '1px solid var(--border-light)' }}>
               <div>Xe: <strong>{activeCar.id} ({activeCar.name})</strong></div>
-              <div>Khách thuê: <strong>{activeCar.customer}</strong></div>
+              <div>Khách thuê: <strong>{activeRental.customerName}</strong></div>
               <div style={{ marginTop: '4px' }}>Số KM lúc giao: <strong>{activeCar.km.toLocaleString()} km</strong></div>
             </div>
 

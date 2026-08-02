@@ -534,7 +534,7 @@ function errorMessage(error: unknown): string {
 // DB mapper functions – chuyển đổi dữ liệu DB → Frontend types
 // ============================================================
 function mapCarFromDB(db: Record<string, unknown>): Car {
-  const status = db.status as string;
+  const status = (db.derived_status || db.status) as string;
   return {
     id: (db.plate_number || db.id) as string,
     name: `${db.brand} ${db.model}`,
@@ -554,6 +554,7 @@ function mapCarFromDB(db: Record<string, unknown>): Car {
     image: db.image_url as string || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
     km: Number(db.current_mileage) || 0,
     ownerPhone: db.owner_phone as string || '',
+    customer: db.active_customer_name as string || undefined,
     expiryRegistration: db.registration_expiry ? (db.registration_expiry as string).split('T')[0] : '',
     expiryInsurance: db.insurance_expiry ? (db.insurance_expiry as string).split('T')[0] : '',
     expiryLicense: db.license_expiry ? (db.license_expiry as string).split('T')[0] : '',

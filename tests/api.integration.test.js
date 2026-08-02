@@ -87,6 +87,8 @@ test('public lookup rejects enumeration input and uses exact approved-field look
     queryCount += 1;
     assert.doesNotMatch(sql, /\bLIKE\b/i);
     assert.doesNotMatch(sql, /current_mileage|registration_expiry/i);
+    assert.match(sql, /FROM rentals active_rental/i);
+    assert.match(sql, /active_rental\.status='active'/i);
     assert.deepEqual(params, ['51A12345']);
     return result([{
       plate_number: '51A-123.45',
@@ -126,6 +128,31 @@ test('public lookup rejects enumeration input and uses exact approved-field look
     'status',
     'year',
   ]);
+});
+
+test('vehicle list derives rental status and active customer from open rentals', async () => {
+  let vehicleSql = '';
+  app.locals.dbQuery = async (sql) => {
+    if (sql.includes('FROM users WHERE id::text')) return result([USER]);
+    vehicleSql = sql;
+    return result([{
+      id: 'vehicle-1',
+      plate_number: '51A-123.45',
+      status: 'Available',
+      operational_status: 'Available',
+      active_rental_id: null,
+      active_customer_name: null,
+      active_customer_phone: null,
+    }]);
+  };
+
+  const response = await jsonRequest('/api/vehicles');
+  assert.equal(response.status, 200);
+  assert.match(vehicleSql, /FROM rentals active_rental/i);
+  assert.match(vehicleSql, /FROM rentals pending_rental/i);
+  assert.match(vehicleSql, /LEFT JOIN LATERAL/i);
+  assert.match(vehicleSql, /AS status/i);
+  assert.equal((await response.json()).data[0].status, 'Available');
 });
 
 test('CSRF rejects cross-origin or missing-token mutations and accepts a valid request', async () => {

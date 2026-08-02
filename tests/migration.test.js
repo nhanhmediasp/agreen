@@ -34,6 +34,22 @@ test('financial workflow migration is additive and creates protected ledgers', a
   assert.doesNotMatch(sql, /\bDELETE\s+FROM\b/i);
 });
 
+test('vehicle status reconciliation uses open rentals as the source of truth', async () => {
+  const sql = await fs.readFile(
+    new URL('../database/migrations/20260802_reconcile_vehicle_rental_status.sql', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(sql, /active_rental\.status = 'active'/i);
+  assert.match(sql, /pending_rental\.status = 'pending'/i);
+  assert.match(sql, /THEN 'Rented'/i);
+  assert.match(sql, /THEN 'Reserved'/i);
+  assert.match(sql, /UPDATE vehicles/i);
+  assert.match(sql, /IS DISTINCT FROM/i);
+  assert.doesNotMatch(sql, /\bDELETE\s+FROM\b/i);
+  assert.doesNotMatch(sql, /\bTRUNCATE\b/i);
+});
+
 test('migration ledger applies a file once and rejects a changed checksum', async () => {
   const ledger = new Map();
   let migrationExecutions = 0;

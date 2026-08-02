@@ -39,6 +39,20 @@ const PAYMENT_TYPES = new Set([
   'refund',
 ]);
 const PAYMENT_RECORD_STATUSES = new Set(['pending', 'completed', 'void']);
+
+const effectiveVehicleStatusSql = (vehicleAlias = 'v') => `CASE
+  WHEN EXISTS (
+    SELECT 1 FROM rentals active_rental
+    WHERE active_rental.car_id=${vehicleAlias}.plate_number
+      AND active_rental.status='active'
+  ) THEN 'Rented'
+  WHEN EXISTS (
+    SELECT 1 FROM rentals pending_rental
+    WHERE pending_rental.car_id=${vehicleAlias}.plate_number
+      AND pending_rental.status='pending'
+  ) THEN 'Reserved'
+  ELSE ${vehicleAlias}.operational_status
+END`;
 const RENTAL_SAFE_DOCUMENT_FIELDS = new Set([
   'condition_images',
   'file_url',
@@ -434,9 +448,10 @@ app.post('/api/public/vehicles/search', publicLookupLimiter, asyncRoute(async (r
   ) {
     throw new ApiError(400, 'A complete plate number is required');
   }
+  const effectiveStatus = effectiveVehicleStatusSql('v');
   const result = await query(
     `SELECT v.plate_number, v.brand, v.model, v.year, v.color, v.seats,
-            v.status, v.image_url
+            ${effectiveStatus} AS status, v.image_url
      FROM vehicles v
      WHERE regexp_replace(upper(v.plate_number), '[^A-Z0-9]', '', 'g') = $1
      ORDER BY v.plate_number
@@ -447,11 +462,16 @@ app.post('/api/public/vehicles/search', publicLookupLimiter, asyncRoute(async (r
 }));
 
 app.get('/api/stats', asyncRoute(async (_req, res) => {
+  const effectiveStatus = effectiveVehicleStatusSql('v');
   const [vehicles, customers, activeRentals, monthlyFinance, schedule] = await Promise.all([
-    query(`SELECT COUNT(*) AS total,
+    query(`WITH vehicle_statuses AS (
+             SELECT ${effectiveStatus} AS status
+             FROM vehicles v
+           )
+           SELECT COUNT(*) AS total,
                   COUNT(*) FILTER (WHERE status='Available') AS available,
                   COUNT(*) FILTER (WHERE status='Rented') AS rented
-           FROM vehicles`),
+           FROM vehicle_statuses`),
     query('SELECT COUNT(*) AS total FROM customers'),
     query("SELECT COUNT(*) AS total FROM rentals WHERE status IN ('active','pending')"),
     query(
@@ -545,9 +565,27 @@ const vehicleFields = (body) => ({
 });
 
 app.get('/api/vehicles', asyncRoute(async (_req, res) => {
+  const effectiveStatus = effectiveVehicleStatusSql('v');
   const result = await query(
-    `SELECT v.*, o.name AS owner_name, o.phone AS owner_phone
-     FROM vehicles v LEFT JOIN owners o ON v.owner_id=o.id
+    `SELECT v.id, v.plate_number, v.brand, v.model, v.year, v.color, v.seats,
+            v.transmission, v.fuel_type, v.daily_rate, v.hourly_rate, v.weekly_rate,
+            v.owner_id, ${effectiveStatus} AS status, v.operational_status,
+            v.current_mileage, v.registration_expiry, v.insurance_expiry,
+            v.license_expiry, v.image_url, v.gallery_urls, v.notes,
+            v.created_at, v.updated_at,
+            o.name AS owner_name, o.phone AS owner_phone,
+            active_rental.id AS active_rental_id,
+            active_rental.customer_name AS active_customer_name,
+            active_rental.customer_phone AS active_customer_phone
+     FROM vehicles v
+     LEFT JOIN owners o ON v.owner_id=o.id
+     LEFT JOIN LATERAL (
+       SELECT r.id, r.customer_name, r.customer_phone
+       FROM rentals r
+       WHERE r.car_id=v.plate_number AND r.status='active'
+       ORDER BY r.start_date, r.created_at
+       LIMIT 1
+     ) active_rental ON TRUE
      ORDER BY v.created_at DESC`,
   );
   res.json({ success: true, data: result.rows });
