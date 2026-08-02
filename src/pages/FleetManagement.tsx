@@ -501,7 +501,7 @@ const FleetManagement = () => {
     <div style={{ height: '100%' }}>
       {selectedCarId && activeCar ? (
         /* Trang Chi tiết xe - Redesigned Layout */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+        <div className="fleet-detail-page" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
           
           {/* 1. Page Header & Breadcrumb Bar - Redesigned */}
           <Card style={{ borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', border: '1px solid #E8EDF2' }} bodyStyle={{ padding: '16px 24px' }}>
@@ -581,7 +581,7 @@ const FleetManagement = () => {
           {/* Stat cards removed - info now shown inline in left column */}
 
           {/* 3. Main 2-Column Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '20px', alignItems: 'flex-start' }}>
+          <div className="fleet-detail-main-grid" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '20px', alignItems: 'flex-start' }}>
 
             {/* ===== CỘT TRÁI: Ảnh + Thông số + Bảng giá ===== */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

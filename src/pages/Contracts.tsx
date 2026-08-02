@@ -517,10 +517,10 @@ const Contracts = () => {
       
       {/* 1. TRANG CHI TIẾT ĐƠN THUÊ */}
       {selectedDetailRentalId && selectedDetailRental ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="contract-detail-page" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="contract-detail-header" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button 
               onClick={() => setSelectedDetailRentalId(null)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#e2e8f0', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
@@ -541,7 +541,7 @@ const Contracts = () => {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.2fr', gap: '24px', alignItems: 'flex-start' }}>
+          <div className="contract-detail-main-grid" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.2fr', gap: '24px', alignItems: 'flex-start' }}>
             
             {/* Cột Trái: Khách hàng, Thời gian thuê, Xe & Vi phạm giao thông */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
