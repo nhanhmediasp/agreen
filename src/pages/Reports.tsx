@@ -20,6 +20,8 @@ const Reports = () => {
     cash_collected: number;
     receivables: number;
     deposits_held: number;
+    deposit_refunded: number;
+    motorcycle_collateral_held: number;
     expenses: number;
   } | null>(null);
   const [financeError, setFinanceError] = useState<string | null>(null);
@@ -70,6 +72,8 @@ const Reports = () => {
           cash_collected: Number(payload.data.cash_collected) || 0,
           receivables: Number(payload.data.receivables) || 0,
           deposits_held: Number(payload.data.deposits_held) || 0,
+          deposit_refunded: Number(payload.data.deposit_refunded) || 0,
+          motorcycle_collateral_held: Number(payload.data.motorcycle_collateral_held) || 0,
           expenses: Number(payload.data.expenses) || 0,
         });
         setFinanceError(null);
@@ -230,6 +234,14 @@ const Reports = () => {
         <Card style={{ borderLeft: '4px solid #7C3AED', borderRadius: 8 }}>
           <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Tiền cọc đang giữ</div>
           <Statistic value={financeSummary?.deposits_held ?? 0} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#7C3AED' }} />
+        </Card>
+        <Card style={{ borderLeft: '4px solid #DB2777', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Tiền cọc đã hoàn</div>
+          <Statistic value={financeSummary?.deposit_refunded ?? 0} suffix="₫" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#DB2777' }} />
+        </Card>
+        <Card style={{ borderLeft: '4px solid #0891B2', borderRadius: 8 }}>
+          <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Xe máy đang giữ</div>
+          <Statistic value={financeSummary?.motorcycle_collateral_held ?? 0} suffix=" xe" valueStyle={{ fontSize: '22px', fontWeight: 700, color: '#0891B2' }} />
         </Card>
         <Card style={{ borderLeft: '4px solid #C2410C', borderRadius: 8 }}>
           <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Chi phí hoạt động</div>

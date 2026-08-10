@@ -148,7 +148,13 @@ const CreateRental = () => {
   const [customerLicense, setCustomerLicense] = useState('');
 
   // Form State - Financials & Contract
+  const [depositType, setDepositType] = useState<'cash' | 'motorbike'>('cash');
   const [deposit, setDeposit] = useState('10000000');
+  const [depositVehiclePlate, setDepositVehiclePlate] = useState('');
+  const [depositVehicleBrand, setDepositVehicleBrand] = useState('');
+  const [depositVehicleModel, setDepositVehicleModel] = useState('');
+  const [depositVehicleColor, setDepositVehicleColor] = useState('');
+  const [depositVehicleNote, setDepositVehicleNote] = useState('');
   const [deliveryFee, setDeliveryFee] = useState('0');
   const [paymentStatus, setPaymentStatus] = useState<Rental['paymentStatus']>('deposit');
   const [rentalFeeOverride, setRentalFeeOverride] = useState<string | null>(null);
@@ -289,6 +295,16 @@ const CreateRental = () => {
       return;
     }
 
+    const depositAmount = Number(deposit);
+    if (depositType === 'cash' && (!Number.isFinite(depositAmount) || depositAmount <= 0)) {
+      showToast('Cash deposit amount must be greater than zero.', 'error');
+      return;
+    }
+    if (depositType === 'motorbike' && !depositVehiclePlate.trim()) {
+      showToast('Motorcycle collateral plate is required.', 'error');
+      return;
+    }
+
     if (contractSource === 'uploaded' && !uploadedFileUrl) {
       showToast('Vui lòng chọn hoặc tải lên tệp hợp đồng có sẵn!', 'error');
       return;
@@ -333,7 +349,15 @@ const CreateRental = () => {
       endDate,
       rentalFee,
       deliveryFee: delFeeNum,
-      deposit: parseInt(deposit) || 0,
+      deposit: depositType === 'cash' ? Math.round(depositAmount) : 0,
+      depositType,
+      depositVehicle: {
+        plate: depositVehiclePlate.trim(),
+        brand: depositVehicleBrand.trim(),
+        model: depositVehicleModel.trim(),
+        color: depositVehicleColor.trim(),
+        note: depositVehicleNote.trim(),
+      },
       extraFee: 0,
       totalAmount,
       paymentStatus,
@@ -1060,16 +1084,66 @@ const CreateRental = () => {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1.2 }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Tiền cọc giữ xe (Bắt buộc)</label>
-                  <MoneyInput
-                    value={deposit}
-                    onChange={setDeposit}
-                    placeholder="10000000"
-                    style={{ padding: '12px 16px', fontSize: '15px', textAlign: 'left', fontWeight: 700, color: 'var(--primary)' }}
-                  />
-                </div>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1.2, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>Tiền cọc giữ xe (Bắt buộc)</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {[
+                      { value: 'cash' as const, label: 'Cọc bằng tiền mặt' },
+                      { value: 'motorbike' as const, label: 'Cọc bằng xe máy để lại' },
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setDepositType(option.value);
+                          if (option.value === 'cash' && (!deposit || deposit === '0')) setDeposit('10000000');
+                          if (option.value === 'motorbike') setDeposit('0');
+                        }}
+                        style={{ padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: depositType === option.value ? '2px solid var(--primary)' : '1px solid var(--border-strong)', background: depositType === option.value ? '#ecfdf5' : 'white', color: depositType === option.value ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                {depositType === 'cash' ? (
+                  <div style={{ maxWidth: '360px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Số tiền cọc tiền mặt</label>
+                    <MoneyInput
+                      value={deposit}
+                      onChange={setDeposit}
+                      placeholder="10000000"
+                      required
+                      style={{ padding: '12px 16px', fontSize: '15px', textAlign: 'left', fontWeight: 700, color: 'var(--primary)' }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '5px' }}>Biển số xe máy *</label>
+                      <input value={depositVehiclePlate} onChange={e => setDepositVehiclePlate(e.target.value)} className="form-input" placeholder="VD: 59X1-123.45" required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '5px' }}>Hãng xe</label>
+                      <input value={depositVehicleBrand} onChange={e => setDepositVehicleBrand(e.target.value)} className="form-input" placeholder="Honda, Yamaha..." />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '5px' }}>Dòng xe</label>
+                      <input value={depositVehicleModel} onChange={e => setDepositVehicleModel(e.target.value)} className="form-input" placeholder="Vision, Air Blade..." />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '5px' }}>Màu xe</label>
+                      <input value={depositVehicleColor} onChange={e => setDepositVehicleColor(e.target.value)} className="form-input" placeholder="Đen, trắng..." />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '5px' }}>Ghi chú tài sản cọc</label>
+                      <textarea value={depositVehicleNote} onChange={e => setDepositVehicleNote(e.target.value)} className="form-input" rows={2} placeholder="Tình trạng xe, giấy tờ, phụ kiện đi kèm..." />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ flex: 1 }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Tình trạng thanh toán</label>
                   <select 
@@ -1082,6 +1156,8 @@ const CreateRental = () => {
                     <option value="debt">Còn nợ (Thanh toán sau)</option>
                   </select>
                 </div>
+              </div>
+
               </div>
 
               {/* Step Navigation Buttons */}
@@ -1243,7 +1319,9 @@ const CreateRental = () => {
             {step === 3 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border)', paddingTop: '12px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Tiền đặt cọc:</span>
-                <strong style={{ color: 'var(--primary)' }}>{(parseInt(deposit) || 0).toLocaleString()} ₫</strong>
+                <strong style={{ color: 'var(--primary)' }}>
+                  {depositType === 'cash' ? `${(parseInt(deposit) || 0).toLocaleString()} ₫` : 'Xe máy để lại'}
+                </strong>
               </div>
             )}
           </div>
@@ -1508,7 +1586,9 @@ const CreateRental = () => {
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '10px 14px' }}>Tiền cọc giữ xe (Đã nhận)</td>
                     <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }} className="font-mono">
-                      {createdReceiptRental.deposit.toLocaleString()} ₫
+                      {createdReceiptRental.depositType === 'motorbike'
+                        ? `Xe máy ${createdReceiptRental.depositVehicle?.plate || ''}`
+                        : `${createdReceiptRental.deposit.toLocaleString()} ₫`}
                     </td>
                   </tr>
                 </tbody>
@@ -1552,6 +1632,13 @@ const CreateRental = () => {
                     setSelectedCustomerPhone('');
                     setRentalFeeOverride(null);
                     setInitialRentalStatus('pending');
+                    setDepositType('cash');
+                    setDeposit('10000000');
+                    setDepositVehiclePlate('');
+                    setDepositVehicleBrand('');
+                    setDepositVehicleModel('');
+                    setDepositVehicleColor('');
+                    setDepositVehicleNote('');
                   }}
                   style={{ padding: '10px 20px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--primary)', background: 'white', color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }}
                 >

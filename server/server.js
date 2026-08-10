@@ -39,6 +39,7 @@ const PAYMENT_TYPES = new Set([
   'refund',
 ]);
 const PAYMENT_RECORD_STATUSES = new Set(['pending', 'completed', 'void']);
+const DEPOSIT_TYPES = new Set(['cash', 'motorbike']);
 
 const effectiveVehicleStatusSql = (vehicleAlias = 'v') => `CASE
   WHEN EXISTS (
@@ -120,6 +121,15 @@ const optionalNumber = (body, names, { min, max, integer = false, nullable = fal
   if (min !== undefined && number < min) throw new ApiError(400, `${names[0]} is below the minimum`);
   if (max !== undefined && number > max) throw new ApiError(400, `${names[0]} exceeds the maximum`);
   return number;
+};
+
+const optionalBoolean = (body, names) => {
+  const value = firstDefined(body, names);
+  if (value === undefined) return undefined;
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new ApiError(400, `${names[0]} must be a boolean`);
 };
 
 const optionalDate = (body, names, { nullable = false } = {}) => {
@@ -499,7 +509,29 @@ app.get('/api/stats', asyncRoute(async (_req, res) => {
            WHERE status='completed'
              AND paid_at >= bounds.start_at
              AND paid_at < bounds.end_at
-         ),0) AS cash_collected`,
+         ),0) AS cash_collected,
+         COALESCE((
+           SELECT SUM(amount)
+           FROM rental_payments, bounds
+           WHERE status='completed'
+             AND payment_type='deposit_refund'
+             AND paid_at >= bounds.start_at
+             AND paid_at < bounds.end_at
+         ),0) AS deposit_refunded,
+         COALESCE((
+           SELECT SUM(CASE
+             WHEN payment_type='deposit' THEN amount
+             WHEN payment_type IN ('deposit_refund','deposit_application') THEN -amount
+             ELSE 0
+           END)
+           FROM rental_payments
+           WHERE status='completed'
+         ),0) AS deposits_held,
+         (SELECT COUNT(*)
+          FROM rentals
+          WHERE deposit_type='motorbike'
+            AND status <> 'cancelled'
+            AND deposit_returned_at IS NULL) AS motorcycle_collateral_held`,
     ),
     query(
       `SELECT id, car_id, customer_name, customer_phone, status, start_date, end_date,
@@ -529,6 +561,9 @@ app.get('/api/stats', asyncRoute(async (_req, res) => {
       activeRentals: activeRentals.rows[0].total,
       monthlyRevenue: monthlyFinance.rows[0].completed_revenue,
       monthlyCashCollected: monthlyFinance.rows[0].cash_collected,
+      monthlyDepositRefunded: monthlyFinance.rows[0].deposit_refunded,
+      depositsHeld: monthlyFinance.rows[0].deposits_held,
+      motorcycleCollateralHeld: monthlyFinance.rows[0].motorcycle_collateral_held,
       schedule: schedule.rows,
     },
   });
@@ -804,6 +839,23 @@ app.delete('/api/owners/:id', requireRole('admin'), asyncRoute(async (req, res) 
 }));
 
 const rentalFields = (body, { requireCore = false } = {}) => {
+  const depositVehicle = firstDefined(body, ['depositVehicle', 'deposit_vehicle']);
+  if (
+    depositVehicle !== undefined
+    && (depositVehicle === null || typeof depositVehicle !== 'object' || Array.isArray(depositVehicle))
+  ) {
+    throw new ApiError(400, 'depositVehicle must be an object');
+  }
+  const nestedVehicleString = (property, names, max = 10_000) => {
+    const flatValue = firstDefined(body, names);
+    if (flatValue !== undefined) return optionalString(body, names, { max });
+    if (depositVehicle === undefined) return undefined;
+    const value = depositVehicle[property];
+    if (value === undefined) return undefined;
+    if (typeof value !== 'string') throw new ApiError(400, `${names[0]} must be a string`);
+    if (value.length > max) throw new ApiError(400, `${names[0]} is too long`);
+    return value;
+  };
   const fields = {
     car_id: optionalString(body, ['carId', 'car_id'], { max: 20 }),
     customer_name: optionalString(body, ['customerName', 'customer_name'], { max: 100 }),
@@ -813,6 +865,17 @@ const rentalFields = (body, { requireCore = false } = {}) => {
     rental_fee: optionalNumber(body, ['rentalFee', 'rental_fee'], { min: 0 }),
     delivery_fee: optionalNumber(body, ['deliveryFee', 'delivery_fee'], { min: 0 }),
     deposit: optionalNumber(body, ['deposit'], { min: 0 }),
+    deposit_type: ensureEnum(
+      optionalString(body, ['depositType', 'deposit_type'], { max: 20 }),
+      DEPOSIT_TYPES,
+      'depositType',
+    ),
+    deposit_vehicle_plate: nestedVehicleString('plate', ['depositVehiclePlate', 'deposit_vehicle_plate'], 20),
+    deposit_vehicle_brand: nestedVehicleString('brand', ['depositVehicleBrand', 'deposit_vehicle_brand'], 50),
+    deposit_vehicle_model: nestedVehicleString('model', ['depositVehicleModel', 'deposit_vehicle_model'], 50),
+    deposit_vehicle_color: nestedVehicleString('color', ['depositVehicleColor', 'deposit_vehicle_color'], 30),
+    deposit_vehicle_note: nestedVehicleString('note', ['depositVehicleNote', 'deposit_vehicle_note']),
+    deposit_return_note: optionalString(body, ['depositReturnNote', 'deposit_return_note']),
     discount_amount: optionalNumber(body, ['discountAmount', 'discount_amount'], { min: 0 }),
     extra_fee: optionalNumber(body, ['extraFee', 'extra_fee'], { min: 0 }),
     total_amount: optionalNumber(body, ['totalAmount', 'total_amount'], { min: 0 }),
@@ -986,10 +1049,20 @@ const createRental = async (body, userId) => withTransaction(async (client) => {
   const fields = rentalFields(body, { requireCore: true });
   const requestedRentalFee = fields.rental_fee;
   const id = optionalString(body, ['id'], { max: 50 })?.trim() || `RNT-${crypto.randomUUID()}`;
+  const hasDepositInput = firstDefined(body, [
+    'deposit',
+    'depositType',
+    'deposit_type',
+    'depositVehicle',
+    'deposit_vehicle',
+    'depositVehiclePlate',
+    'deposit_vehicle_plate',
+  ]) !== undefined;
   if (fields.status !== undefined && fields.status !== 'pending') {
     throw new ApiError(409, 'New rentals must start in pending status', 'INVALID_RENTAL_TRANSITION');
   }
   fields.status = 'pending';
+  fields.deposit_type ??= 'cash';
   fields.payment_status = fields.deposit && fields.deposit > 0 ? 'deposit' : 'debt';
   fields.delivery_fee ??= 0;
   fields.deposit ??= 0;
@@ -1005,6 +1078,12 @@ const createRental = async (body, userId) => withTransaction(async (client) => {
   fields.source ??= 'system';
   fields.file_url ??= '';
   fields.file_name ??= '';
+  fields.deposit_vehicle_plate ??= '';
+  fields.deposit_vehicle_brand ??= '';
+  fields.deposit_vehicle_model ??= '';
+  fields.deposit_vehicle_color ??= '';
+  fields.deposit_vehicle_note ??= '';
+  fields.deposit_return_note ??= '';
   fields.owner_commission_amount ??= 0;
   fields.condition_images ??= '[]';
   fields.violations ??= '[]';
@@ -1038,6 +1117,17 @@ const createRental = async (body, userId) => withTransaction(async (client) => {
     endDate: fields.end_date,
     status: fields.status,
   });
+  if (hasDepositInput && fields.deposit_type === 'cash' && (!fields.deposit || fields.deposit <= 0)) {
+    throw new ApiError(400, 'Cash deposit amount is required', 'DEPOSIT_REQUIRED');
+  }
+  if (hasDepositInput && fields.deposit_type === 'motorbike' && !fields.deposit_vehicle_plate?.trim()) {
+    throw new ApiError(400, 'Motorcycle collateral plate is required', 'DEPOSIT_COLLATERAL_REQUIRED');
+  }
+  if (fields.deposit_type === 'motorbike' && (fields.deposit ?? 0) > 0) {
+    throw new ApiError(400, 'Motorcycle collateral cannot include a cash deposit', 'DEPOSIT_TYPE_CONFLICT');
+  }
+  if (fields.deposit_type === 'motorbike') fields.deposit = 0;
+  fields.payment_status = fields.deposit && fields.deposit > 0 ? 'deposit' : 'debt';
 
   const keys = Object.keys(fields);
   const values = keys.map((key) => fields[key]);
@@ -1218,7 +1308,28 @@ const handoverRental = async (id, body) => withTransaction(async (client) => {
   return result.rows[0];
 });
 
-const returnRental = async (id, body) => withTransaction(async (client) => {
+const getHeldCashDeposit = async (client, rentalId) => {
+  const result = await client.query(
+    `SELECT r.deposit_type,
+            COALESCE(SUM(CASE
+              WHEN p.status='completed' AND p.payment_type='deposit' THEN p.amount
+              WHEN p.status='completed' AND p.payment_type IN ('deposit_refund','deposit_application') THEN -p.amount
+              ELSE 0
+            END), 0) AS held_deposit
+     FROM rentals r
+     LEFT JOIN rental_payments p ON p.rental_id=r.id
+     WHERE r.id=$1
+     GROUP BY r.id, r.deposit_type`,
+    [rentalId],
+  );
+  if (result.rowCount === 0) throw new ApiError(404, 'Rental not found');
+  return {
+    depositType: result.rows[0].deposit_type || 'cash',
+    heldDeposit: Number(result.rows[0].held_deposit) || 0,
+  };
+};
+
+const returnRental = async (id, body, userId = null) => withTransaction(async (client) => {
   const currentResult = await client.query('SELECT * FROM rentals WHERE id=$1 FOR UPDATE', [id]);
   if (currentResult.rowCount === 0) throw new ApiError(404, 'Rental not found');
   const current = currentResult.rows[0];
@@ -1230,6 +1341,8 @@ const returnRental = async (id, body) => withTransaction(async (client) => {
   const returnedAt = optionalDate(body, ['returnedAt', 'returned_at']) ?? new Date().toISOString();
   const extraFee = optionalNumber(body, ['extraFee', 'extra_fee'], { min: 0 }) ?? Number(current.extra_fee);
   const violations = optionalArray(body, ['violations']) ?? parseJsonArray(current.violations);
+  const returnDeposit = optionalBoolean(body, ['returnDeposit', 'return_deposit', 'depositReturned', 'deposit_returned']);
+  const depositReturnNote = optionalString(body, ['depositReturnNote', 'deposit_return_note'])?.trim() || '';
   if (endKm === undefined) throw new ApiError(400, 'endKm is required');
   const vehicle = await lockVehicle(client, current.car_id);
   if (endKm < Number(vehicle.current_mileage) || endKm < Number(current.start_km)) {
@@ -1245,11 +1358,34 @@ const returnRental = async (id, body) => withTransaction(async (client) => {
     violations,
     rentalFeeOverride: Number(current.rental_fee),
   });
+  let depositReturn;
+  if (returnDeposit === true) {
+    depositReturn = await getHeldCashDeposit(client, id);
+    if (depositReturn.depositType === 'cash' && depositReturn.heldDeposit > 0) {
+      await client.query(
+        `INSERT INTO rental_payments
+           (rental_id, payment_type, amount, status, paid_at, note, idempotency_key, created_by)
+         VALUES ($1, 'deposit_refund', $2, 'completed', $3, $4, $5, $6)`,
+        [
+          id,
+          depositReturn.heldDeposit,
+          returnedAt,
+          depositReturnNote || 'Hoàn cọc cùng lúc chốt hợp đồng',
+          `rental:${id}:deposit-refund-on-return`,
+          userId,
+        ],
+      );
+      await syncLegacyPaymentStatus(client, id);
+    }
+  }
   const result = await client.query(
     `UPDATE rentals
      SET status='completed', end_km=$2, end_fuel=$3, returned_at=$4,
          extra_fee=$5, violations=$6::jsonb, pricing_days=$7, rental_fee=$8,
-         total_amount=$9, owner_commission_amount=$10, updated_at=NOW()
+         total_amount=$9, owner_commission_amount=$10,
+         deposit_returned_at=CASE WHEN $11::boolean THEN $4 ELSE deposit_returned_at END,
+         deposit_return_note=CASE WHEN $11::boolean AND $12 <> '' THEN $12 ELSE deposit_return_note END,
+         updated_at=NOW()
      WHERE id=$1
      RETURNING *`,
     [
@@ -1263,6 +1399,8 @@ const returnRental = async (id, body) => withTransaction(async (client) => {
       pricing.rentalFee,
       pricing.totalAmount,
       Math.round(pricing.rentalFee * Number(vehicle.owner_commission_rate) / 100),
+      returnDeposit === true,
+      depositReturnNote,
     ],
   );
   await syncVehicleFromRentals(client, current.car_id, endKm);
@@ -1331,7 +1469,7 @@ app.post('/api/rentals/:id/handover', requireRole('admin', 'operations', 'staff'
 }));
 
 app.post('/api/rentals/:id/return', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
-  const rental = await returnRental(req.params.id, requireObjectBody(req));
+  const rental = await returnRental(req.params.id, requireObjectBody(req), req.user.id);
   res.json({ success: true, data: rental });
 }));
 
@@ -1341,7 +1479,7 @@ app.post('/api/rentals/:id/cancel', requireRole('admin', 'operations', 'staff'),
 }));
 
 app.post('/api/rentals/:id/complete', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
-  const rental = await returnRental(req.params.id, requireObjectBody(req));
+  const rental = await returnRental(req.params.id, requireObjectBody(req), req.user.id);
   res.json({ success: true, data: rental });
 }));
 
@@ -1424,8 +1562,25 @@ app.post('/api/rentals/:id/payments', requireRole('admin', 'accounting'), asyncR
   fields.note ??= '';
   fields.idempotency_key ??= null;
   const payment = await withTransaction(async (client) => {
-    const rental = await client.query('SELECT id FROM rentals WHERE id=$1 FOR UPDATE', [req.params.id]);
+    const rental = await client.query(
+      'SELECT id, deposit_type FROM rentals WHERE id=$1 FOR UPDATE',
+      [req.params.id],
+    );
     if (rental.rowCount === 0) throw new ApiError(404, 'Rental not found');
+    const depositPaymentType = ['deposit', 'deposit_application', 'deposit_refund'].includes(fields.payment_type);
+    let heldDeposit = null;
+    if (depositPaymentType) {
+      if (rental.rows[0].deposit_type === 'motorbike') {
+        throw new ApiError(409, 'Motorcycle collateral is not a cash payment', 'DEPOSIT_TYPE_CONFLICT');
+      }
+      if (fields.status === 'completed') {
+        heldDeposit = (await getHeldCashDeposit(client, req.params.id)).heldDeposit;
+        if (['deposit_application', 'deposit_refund'].includes(fields.payment_type)
+          && fields.amount > heldDeposit + 0.001) {
+          throw new ApiError(409, 'Deposit transaction exceeds the cash deposit currently held', 'DEPOSIT_BALANCE_EXCEEDED');
+        }
+      }
+    }
     const result = await client.query(
       `INSERT INTO rental_payments
          (rental_id, payment_type, amount, status, paid_at, note, idempotency_key, created_by)
@@ -1443,6 +1598,21 @@ app.post('/api/rentals/:id/payments', requireRole('admin', 'accounting'), asyncR
       ],
     );
     await syncLegacyPaymentStatus(client, req.params.id);
+    if (
+      fields.payment_type === 'deposit_refund'
+      && fields.status === 'completed'
+      && heldDeposit !== null
+      && fields.amount >= heldDeposit - 0.001
+    ) {
+      await client.query(
+        `UPDATE rentals
+         SET deposit_returned_at=COALESCE(deposit_returned_at,$2),
+             deposit_return_note=CASE WHEN $3 <> '' THEN $3 ELSE deposit_return_note END,
+             updated_at=NOW()
+         WHERE id=$1`,
+        [req.params.id, fields.paid_at, fields.note],
+      );
+    }
     return result.rows[0];
   });
   res.status(201).json({ success: true, data: payment });
@@ -1469,7 +1639,11 @@ app.get('/api/finance/summary', requireRole('admin', 'accounting'), asyncRoute(a
             ELSE 0
           END),0)
           FROM rental_payments
-          WHERE ($2::timestamptz IS NULL OR paid_at < $2)) AS held_deposit
+          WHERE ($2::timestamptz IS NULL OR paid_at < $2)) AS held_deposit,
+         (SELECT COALESCE(SUM(amount) FILTER (WHERE status='completed' AND payment_type='deposit_refund'),0)
+          FROM rental_payments
+          WHERE ($1::timestamptz IS NULL OR paid_at >= $1)
+            AND ($2::timestamptz IS NULL OR paid_at < $2)) AS deposit_refunded
      ),
      rental_payment_totals AS (
        SELECT rental_id,
@@ -1517,14 +1691,25 @@ app.get('/api/finance/summary', requireRole('admin', 'accounting'), asyncRoute(a
        WHERE s.status='completed'
          AND ($1::timestamptz IS NULL OR COALESCE(s.completed_at,s.created_at) >= $1)
          AND ($2::timestamptz IS NULL OR COALESCE(s.completed_at,s.created_at) < $2)
+     ),
+     collateral_scope AS (
+       SELECT COUNT(*) FILTER (
+         WHERE deposit_type='motorbike'
+           AND status <> 'cancelled'
+           AND deposit_returned_at IS NULL
+       ) AS motorcycle_collateral_held
+       FROM rentals
+       WHERE ($2::timestamptz IS NULL OR created_at < $2)
      )
      SELECT
        COALESCE(SUM(total_amount) FILTER (WHERE status IN ('pending','active','completed')),0) AS booked_revenue,
        COALESCE(SUM(total_amount) FILTER (WHERE status='completed'),0)
          + (SELECT COALESCE(SUM(total_amount),0) FROM scoped_services) AS completed_revenue,
        (SELECT net_cash FROM payment_scope)
-         + (SELECT net_cash FROM service_payment_scope) AS cash_collected,
+       + (SELECT net_cash FROM service_payment_scope) AS cash_collected,
        (SELECT held_deposit FROM payment_scope) AS deposits_held,
+       (SELECT deposit_refunded FROM payment_scope) AS deposit_refunded,
+       (SELECT motorcycle_collateral_held FROM collateral_scope) AS motorcycle_collateral_held,
        COALESCE(SUM(GREATEST(total_amount-applied,0)) FILTER (WHERE status='completed'),0)
          + (SELECT COALESCE(SUM(GREATEST(total_amount-applied,0)),0) FROM scoped_services) AS receivables
      FROM scoped_rentals`,

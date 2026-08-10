@@ -80,6 +80,16 @@ export interface Rental {
   rentalFee: number;
   deliveryFee: number;
   deposit: number;
+  depositType?: 'cash' | 'motorbike';
+  depositVehicle?: {
+    plate: string;
+    brand: string;
+    model: string;
+    color: string;
+    note: string;
+  };
+  depositReturnedAt?: string;
+  depositReturnNote?: string;
   discountAmount?: number;
   extraFee: number;
   totalAmount: number;
@@ -205,7 +215,14 @@ interface AppContextType {
     amount: number,
     note?: string,
   ) => Promise<boolean>;
-  completeRental: (id: string, endKm: number, extraFee: number, endFuel: string) => Promise<boolean>;
+  completeRental: (
+    id: string,
+    endKm: number,
+    extraFee: number,
+    endFuel: string,
+    returnDeposit?: boolean,
+    depositReturnNote?: string,
+  ) => Promise<boolean>;
   addDriver: (driver: Driver) => Promise<boolean>;
   updateDriver: (id: string, updatedFields: Partial<Driver>) => Promise<boolean>;
   deleteDriver: (id: string) => Promise<boolean>;
@@ -1296,11 +1313,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     endKm: number,
     extraFee: number,
     endFuel: string,
+    returnDeposit?: boolean,
+    depositReturnNote?: string,
   ): Promise<boolean> => {
     try {
       await apiFetch<Record<string, unknown>>(`/rentals/${id}/return`, {
         method: 'POST',
-        body: JSON.stringify({ endKm, extraFee, endFuel }),
+        body: JSON.stringify({
+          endKm,
+          extraFee,
+          endFuel,
+          ...(returnDeposit === undefined ? {} : { returnDeposit }),
+          ...(depositReturnNote?.trim() ? { depositReturnNote: depositReturnNote.trim() } : {}),
+        }),
       });
       await refreshRentalDomain();
       showToast('Đã hoàn tất trả xe và đồng bộ dữ liệu!', 'success');

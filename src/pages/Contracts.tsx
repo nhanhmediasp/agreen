@@ -82,6 +82,8 @@ const Contracts = () => {
   const [returnKm, setReturnKm] = useState('');
   const [returnFuel, setReturnFuel] = useState('8/8');
   const [returnExtraFee, setReturnExtraFee] = useState('0');
+  const [returnDeposit, setReturnDeposit] = useState<'return' | 'hold'>('hold');
+  const [depositReturnNote, setDepositReturnNote] = useState('');
   const [isReturning, setIsReturning] = useState(false);
   const [isChangingRentalStatus, setIsChangingRentalStatus] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -290,6 +292,8 @@ const Contracts = () => {
     setReturnKm(Math.max(currentMileage, selectedDetailRental.startKm).toString());
     setReturnFuel(selectedDetailRental.endFuel || '8/8');
     setReturnExtraFee((selectedDetailRental.extraFee || 0).toString());
+    setReturnDeposit(selectedDetailRental.depositReturnedAt ? 'return' : 'hold');
+    setDepositReturnNote('');
     setShowReturnModal(true);
   };
 
@@ -360,6 +364,8 @@ const Contracts = () => {
         endKm,
         extraFee,
         returnFuel,
+        returnDeposit === 'return',
+        depositReturnNote,
       );
       if (success) setShowReturnModal(false);
     } finally {
@@ -1025,8 +1031,21 @@ const Contracts = () => {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-strong)', paddingTop: '10px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Tiền đặt cọc:</span>
-                      <strong style={{ color: 'var(--primary)' }}>{selectedDetailRental.deposit.toLocaleString()} ₫</strong>
+                      <strong style={{ color: 'var(--primary)' }}>
+                        {selectedDetailRental.depositType === 'motorbike'
+                          ? `Xe máy ${selectedDetailRental.depositVehicle?.plate || ''}`
+                          : `${selectedDetailRental.deposit.toLocaleString()} ₫`}
+                      </strong>
                     </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Trạng thái hoàn cọc:</span>
+                      <strong style={{ color: selectedDetailRental.depositReturnedAt ? '#047857' : '#b45309' }}>
+                        {selectedDetailRental.depositReturnedAt ? 'Đã trả khách' : 'Chưa trả / đang giữ'}
+                      </strong>
+                    </div>
+                    {selectedDetailRental.depositType === 'motorbike' && selectedDetailRental.depositVehicle?.note && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ghi chú xe máy: {selectedDetailRental.depositVehicle.note}</div>
+                    )}
                     {isEditingFinancials && (
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                         Tiền đặt cọc được quản lý bằng giao dịch thanh toán nên không sửa trực tiếp tại bảng giá.
@@ -1863,6 +1882,35 @@ const Contracts = () => {
                 disabled={isReturning}
               />
             </Form.Item>
+
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 14px', marginBottom: '18px' }}>
+              <div style={{ fontWeight: 700, marginBottom: '8px', color: '#166534' }}>Xử lý tài sản cọc khi chốt hợp đồng</div>
+              <div style={{ fontSize: '13px', color: '#475569', marginBottom: '8px' }}>
+                {selectedDetailRental.depositType === 'motorbike'
+                  ? `Xe máy để lại: ${selectedDetailRental.depositVehicle?.plate || 'chưa cập nhật'}`
+                  : `Tiền mặt đang ghi nhận: ${selectedDetailRental.deposit.toLocaleString()} ₫`}
+              </div>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontWeight: 600 }}>
+                  <input type="radio" name="return-deposit" checked={returnDeposit === 'return'} onChange={() => setReturnDeposit('return')} disabled={isReturning} />
+                  {selectedDetailRental.depositType === 'motorbike' ? 'Đã trả lại xe máy' : 'Đã hoàn tiền cọc'}
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontWeight: 600 }}>
+                  <input type="radio" name="return-deposit" checked={returnDeposit === 'hold'} onChange={() => setReturnDeposit('hold')} disabled={isReturning} />
+                  Chưa trả / tiếp tục giữ
+                </label>
+              </div>
+              {returnDeposit === 'return' && (
+                <input
+                  value={depositReturnNote}
+                  onChange={e => setDepositReturnNote(e.target.value)}
+                  className="form-input"
+                  placeholder="Ghi chú hoàn cọc (tuỳ chọn)"
+                  disabled={isReturning}
+                  style={{ marginTop: '10px' }}
+                />
+              )}
+            </div>
 
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 12px', color: '#92400e', fontSize: '12.5px', lineHeight: 1.5, marginBottom: '18px' }}>
               Xác nhận sẽ chốt hợp đồng, lưu thời điểm trả xe, cập nhật KM xe và đưa xe về trạng thái vận hành phù hợp. Trạng thái thanh toán vẫn lấy theo các giao dịch đã ghi nhận.

@@ -167,6 +167,8 @@ const FleetManagement = () => {
   // Return Car Form State
   const [returnKm, setReturnKm] = useState('');
   const [surcharge, setSurcharge] = useState('');
+  const [returnDeposit, setReturnDeposit] = useState<'return' | 'hold'>('hold');
+  const [depositReturnNote, setDepositReturnNote] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
   // Gallery States
@@ -366,6 +368,8 @@ const FleetManagement = () => {
     }
     setReturnKm(activeCar.km.toString());
     setSurcharge('0');
+    setReturnDeposit(activeRental.depositReturnedAt ? 'return' : 'hold');
+    setDepositReturnNote('');
     setShowReturnForm(true);
   };
 
@@ -393,6 +397,8 @@ const FleetManagement = () => {
         // Backend vẫn cần giá trị endFuel; khi không nhập ở màn nhận xe,
         // giữ lại mức nhiên liệu đã ghi nhận lúc giao xe.
         activeRental.endFuel || activeRental.startFuel || '8/8',
+        returnDeposit === 'return',
+        depositReturnNote,
       );
 
       if (success) setShowReturnForm(false);
@@ -2040,6 +2046,28 @@ const FleetManagement = () => {
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Phụ phí phát sinh (nếu có)</label>
               <input type="number" min="0" placeholder="Quá giờ, vệ sinh, hư hỏng..." value={surcharge} onChange={e => setSurcharge(e.target.value)} disabled={isSubmittingReturn} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
+            </div>
+
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-md)', padding: '12px 14px' }}>
+              <div style={{ fontWeight: 700, marginBottom: '8px', color: '#166534' }}>Xử lý tài sản cọc</div>
+              <div style={{ fontSize: '13px', color: '#475569', marginBottom: '8px' }}>
+                {activeRental.depositType === 'motorbike'
+                  ? `Xe máy để lại: ${activeRental.depositVehicle?.plate || 'chưa cập nhật'}`
+                  : `Tiền mặt đang ghi nhận: ${activeRental.deposit.toLocaleString()} ₫`}
+              </div>
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontWeight: 600 }}>
+                  <input type="radio" name="fleet-return-deposit" checked={returnDeposit === 'return'} onChange={() => setReturnDeposit('return')} disabled={isSubmittingReturn} />
+                  {activeRental.depositType === 'motorbike' ? 'Đã trả lại xe máy' : 'Đã hoàn tiền cọc'}
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontWeight: 600 }}>
+                  <input type="radio" name="fleet-return-deposit" checked={returnDeposit === 'hold'} onChange={() => setReturnDeposit('hold')} disabled={isSubmittingReturn} />
+                  Chưa trả / tiếp tục giữ
+                </label>
+              </div>
+              {returnDeposit === 'return' && (
+                <input value={depositReturnNote} onChange={e => setDepositReturnNote(e.target.value)} placeholder="Ghi chú hoàn cọc (tuỳ chọn)" disabled={isSubmittingReturn} style={{ width: '100%', marginTop: '10px', padding: '9px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
+              )}
             </div>
 
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '10px 12px', borderRadius: 'var(--radius-md)', fontSize: '12.5px', lineHeight: 1.5 }}>
