@@ -146,6 +146,7 @@ const Contracts = () => {
   const [draftDeliveryFee, setDraftDeliveryFee] = useState('0');
   const [draftExtraFee, setDraftExtraFee] = useState('0');
   const [isSavingFinancials, setIsSavingFinancials] = useState(false);
+  const [isUpdatingDepositStatus, setIsUpdatingDepositStatus] = useState(false);
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
 
   const handleUploadConditionFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -457,6 +458,21 @@ const Contracts = () => {
       }
     } finally {
       setIsSavingFinancials(false);
+    }
+  };
+
+  const handleDepositStatusChange = async (depositStatus: NonNullable<Rental['depositStatus']>) => {
+    if (
+      !selectedDetailRental
+      || depositStatus === (selectedDetailRental.depositStatus ?? 'received')
+      || isUpdatingDepositStatus
+    ) return;
+
+    setIsUpdatingDepositStatus(true);
+    try {
+      await updateRental(selectedDetailRental.id, { depositStatus });
+    } finally {
+      setIsUpdatingDepositStatus(false);
     }
   };
 
@@ -1034,13 +1050,28 @@ const Contracts = () => {
                       <strong style={{ color: 'var(--primary)' }}>
                         {selectedDetailRental.depositType === 'motorbike'
                           ? `Xe máy ${selectedDetailRental.depositVehicle?.plate || ''}`
-                          : `${selectedDetailRental.deposit.toLocaleString()} ₫`}
+                        : `${selectedDetailRental.deposit.toLocaleString()} ₫`}
                       </strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', fontSize: '12.5px' }}>
+                      <label htmlFor="contract-deposit-status" style={{ color: 'var(--text-secondary)' }}>Trạng thái tiền cọc:</label>
+                      <select
+                        id="contract-deposit-status"
+                        value={selectedDetailRental.depositStatus ?? 'received'}
+                        onChange={e => void handleDepositStatusChange(e.target.value as NonNullable<Rental['depositStatus']>)}
+                        disabled={isUpdatingDepositStatus || selectedDetailRental.status === 'cancelled'}
+                        style={{ minWidth: '150px', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', background: 'white', color: (selectedDetailRental.depositStatus ?? 'received') === 'received' ? '#047857' : '#b45309', fontFamily: 'inherit', fontWeight: 700 }}
+                      >
+                        <option value="received">Đã cọc</option>
+                        <option value="pending">Chưa cọc</option>
+                      </select>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Trạng thái hoàn cọc:</span>
                       <strong style={{ color: selectedDetailRental.depositReturnedAt ? '#047857' : '#b45309' }}>
-                        {selectedDetailRental.depositReturnedAt ? 'Đã trả khách' : 'Chưa trả / đang giữ'}
+                        {(selectedDetailRental.depositStatus ?? 'received') === 'pending'
+                          ? 'Chưa nhận cọc'
+                          : selectedDetailRental.depositReturnedAt ? 'Đã trả khách' : 'Chưa trả / đang giữ'}
                       </strong>
                     </div>
                     {selectedDetailRental.depositType === 'motorbike' && selectedDetailRental.depositVehicle?.note && (

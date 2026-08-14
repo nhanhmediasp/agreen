@@ -37,6 +37,7 @@ export function mapRentalFromDB(db: Record<string, unknown>): Rental {
     deliveryFee: Number(db.delivery_fee) || 0,
     deposit: Number(db.deposit) || 0,
     depositType: db.deposit_type === 'motorbike' ? 'motorbike' : 'cash',
+    depositStatus: db.deposit_status === 'pending' ? 'pending' : 'received',
     depositVehicle: {
       plate: db.deposit_vehicle_plate as string || '',
       brand: db.deposit_vehicle_brand as string || '',

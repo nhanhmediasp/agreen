@@ -151,6 +151,7 @@ const FleetManagement = () => {
   const [newOwnerAddress, setNewOwnerAddress] = useState('');
 
   // Edit Car Form State
+  const [editPlate, setEditPlate] = useState('');
   const [editName, setEditName] = useState('');
   const [editBrand, setEditBrand] = useState('');
   const [editYear, setEditYear] = useState('');
@@ -299,6 +300,7 @@ const FleetManagement = () => {
 
   const handleOpenEdit = () => {
     if (!activeCar) return;
+    setEditPlate(activeCar.id);
     setEditName(activeCar.name);
     setEditBrand(activeCar.brand);
     setEditYear(activeCar.year);
@@ -323,7 +325,21 @@ const FleetManagement = () => {
     e.preventDefault();
     if (!selectedCarId) return;
 
+    const cleanEditPlate = editPlate.trim().toUpperCase();
+    if (!cleanEditPlate) {
+      showToast('Vui lòng nhập biển số xe.', 'error');
+      return;
+    }
+    if (cars.some(car => (
+      normalizePlate(car.id) === normalizePlate(cleanEditPlate)
+      && car.id !== activeCar?.id
+    ))) {
+      showToast(`Biển số xe "${cleanEditPlate}" đã tồn tại trong hệ thống.`, 'error');
+      return;
+    }
+
     const success = await updateCar(selectedCarId, {
+      id: cleanEditPlate,
       name: editName,
       brand: editBrand,
       year: editYear,
@@ -339,7 +355,10 @@ const FleetManagement = () => {
       images: editGalleryImages
     });
 
-    if (success) setShowEditForm(false);
+    if (success) {
+      setSelectedCarId(cleanEditPlate);
+      setShowEditForm(false);
+    }
   };
 
   const handleDeleteCar = async () => {
@@ -1868,12 +1887,28 @@ const FleetManagement = () => {
       {/* Form chỉnh sửa xe */}
       {showEditForm && activeCar && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleUpdateCar} style={{ width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <form className="card" onSubmit={handleUpdateCar} style={{ width: '780px', maxWidth: '95vw', padding: '28px', display: 'flex', flexDirection: 'column', gap: '18px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h2 style={{ fontSize: '20px', margin: 0 }}>Chỉnh sửa xe {selectedCarId}</h2>
               <button type="button" onClick={() => setShowEditForm(false)} style={{ color: 'var(--text-secondary)' }}>
                 <X size={20} />
               </button>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Biển số xe *</label>
+              <input
+                type="text"
+                value={editPlate}
+                onChange={e => setEditPlate(e.target.value.toUpperCase())}
+                maxLength={20}
+                placeholder="VD: 51A-123.45"
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'var(--font-mono)', fontWeight: 700, textTransform: 'uppercase' }}
+                required
+              />
+              <span style={{ display: 'block', marginTop: '5px', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                Khi đổi biển số, các đơn thuê và dữ liệu xe liên quan sẽ được cập nhật theo.
+              </span>
             </div>
 
             <div style={{ display: 'flex', gap: '16px' }}>

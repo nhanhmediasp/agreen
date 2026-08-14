@@ -351,6 +351,7 @@ const CreateRental = () => {
       deliveryFee: delFeeNum,
       deposit: depositType === 'cash' ? Math.round(depositAmount) : 0,
       depositType,
+      depositStatus: 'received',
       depositVehicle: {
         plate: depositVehiclePlate.trim(),
         brand: depositVehicleBrand.trim(),

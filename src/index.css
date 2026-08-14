@@ -1331,6 +1331,18 @@ html, body {
     align-items: stretch !important;
   }
 
+  .deposits-filter-bar {
+    width: 100%;
+    min-width: 0;
+    padding: 12px !important;
+    align-items: stretch !important;
+  }
+
+  .deposits-filter-bar > * {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
   .expenses-search {
     width: 100%;
     min-width: 0 !important;

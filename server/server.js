@@ -40,6 +40,7 @@ const PAYMENT_TYPES = new Set([
 ]);
 const PAYMENT_RECORD_STATUSES = new Set(['pending', 'completed', 'void']);
 const DEPOSIT_TYPES = new Set(['cash', 'motorbike']);
+const DEPOSIT_STATUSES = new Set(['pending', 'received']);
 
 const effectiveVehicleStatusSql = (vehicleAlias = 'v') => `CASE
   WHEN EXISTS (
@@ -68,6 +69,7 @@ const RENTAL_EDITABLE_FINANCIAL_FIELDS = new Set([
   'extra_fee',
   'violations',
 ]);
+const RENTAL_EDITABLE_DEPOSIT_FIELDS = new Set(['deposit_status']);
 
 class ApiError extends Error {
   constructor(status, message, code) {
@@ -570,6 +572,7 @@ app.get('/api/stats', asyncRoute(async (_req, res) => {
 }));
 
 const vehicleFields = (body) => ({
+  plate_number: optionalString(body, ['plate_number', 'plateNumber'], { max: 20 }),
   brand: optionalString(body, ['brand'], { max: 50 }),
   model: optionalString(body, ['model'], { max: 50 }),
   year: optionalNumber(body, ['year'], { integer: true, min: 1900, max: 2200 }),
@@ -676,6 +679,11 @@ app.put('/api/vehicles/:id', requireRole('admin', 'operations', 'staff'), asyncR
     if (currentResult.rowCount === 0) throw new ApiError(404, 'Vehicle not found');
     const current = currentResult.rows[0];
 
+    if (fields.plate_number !== undefined) {
+      fields.plate_number = fields.plate_number.trim().toUpperCase();
+      if (!fields.plate_number) throw new ApiError(400, 'plateNumber is required');
+    }
+
     const openRentals = await client.query(
       `SELECT status FROM rentals
        WHERE car_id=$1 AND status IN ('pending','active')`,
@@ -727,6 +735,14 @@ app.put('/api/vehicles/:id', requireRole('admin', 'operations', 'staff'), asyncR
        RETURNING *`,
       values,
     );
+    if (fields.plate_number !== undefined && fields.plate_number !== current.plate_number) {
+      await client.query(
+        `UPDATE expenses
+         SET ref=$1, updated_at=NOW()
+         WHERE vehicle_id=$2 AND ref=$3`,
+        [fields.plate_number, current.id, current.plate_number],
+      );
+    }
     return updateResult.rows[0];
   });
   res.json({ success: true, data: vehicle });
@@ -869,6 +885,11 @@ const rentalFields = (body, { requireCore = false } = {}) => {
       optionalString(body, ['depositType', 'deposit_type'], { max: 20 }),
       DEPOSIT_TYPES,
       'depositType',
+    ),
+    deposit_status: ensureEnum(
+      optionalString(body, ['depositStatus', 'deposit_status'], { max: 20 }),
+      DEPOSIT_STATUSES,
+      'depositStatus',
     ),
     deposit_vehicle_plate: nestedVehicleString('plate', ['depositVehiclePlate', 'deposit_vehicle_plate'], 20),
     deposit_vehicle_brand: nestedVehicleString('brand', ['depositVehicleBrand', 'deposit_vehicle_brand'], 50),
@@ -1063,6 +1084,7 @@ const createRental = async (body, userId) => withTransaction(async (client) => {
   }
   fields.status = 'pending';
   fields.deposit_type ??= 'cash';
+  fields.deposit_status ??= 'received';
   fields.payment_status = fields.deposit && fields.deposit > 0 ? 'deposit' : 'debt';
   fields.delivery_fee ??= 0;
   fields.deposit ??= 0;
@@ -1180,6 +1202,7 @@ const updateRental = async (id, body) => withTransaction(async (client) => {
   if (current.status !== 'pending') {
     const unsafeKey = providedKeys.find((key) => (
       !RENTAL_SAFE_DOCUMENT_FIELDS.has(key)
+      && !RENTAL_EDITABLE_DEPOSIT_FIELDS.has(key)
       && !(
         ['active', 'completed'].includes(current.status)
         && RENTAL_EDITABLE_FINANCIAL_FIELDS.has(key)
@@ -1204,6 +1227,7 @@ const updateRental = async (id, body) => withTransaction(async (client) => {
       'discount_amount',
       'extra_fee',
       'violations',
+      ...RENTAL_EDITABLE_DEPOSIT_FIELDS,
       ...RENTAL_SAFE_DOCUMENT_FIELDS,
     ]);
     const unsafeKey = providedKeys.find((key) => !pendingAllowed.has(key));

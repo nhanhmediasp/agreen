@@ -50,6 +50,20 @@ test('vehicle status reconciliation uses open rentals as the source of truth', a
   assert.doesNotMatch(sql, /\bTRUNCATE\b/i);
 });
 
+test('deposit status migration is additive and indexed for the management page', async () => {
+  const sql = await fs.readFile(
+    new URL('../database/migrations/20260814_rental_deposit_status.sql', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS deposit_status/i);
+  assert.match(sql, /CHECK \(deposit_status IN \('pending', 'received'\)\)/i);
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_rentals_deposit_status/i);
+  assert.doesNotMatch(sql, /\bDROP\s+TABLE\b/i);
+  assert.doesNotMatch(sql, /\bTRUNCATE\b/i);
+  assert.doesNotMatch(sql, /\bDELETE\s+FROM\b/i);
+});
+
 test('migration ledger applies a file once and rejects a changed checksum', async () => {
   const ledger = new Map();
   let migrationExecutions = 0;

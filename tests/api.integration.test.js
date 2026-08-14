@@ -262,6 +262,42 @@ test('vehicle update rejects direct rental-derived statuses and mileage decrease
   assert.equal(mileageStatements.some((sql) => sql.includes('UPDATE vehicles SET')), false);
 });
 
+test('vehicle update changes the plate and keeps linked expense references in sync', async () => {
+  app.locals.dbQuery = authQuery;
+  const statements = [];
+  app.locals.getDbClient = async () => transactionClient(async (sql, params = []) => {
+    statements.push({ sql, params });
+    if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return result();
+    if (sql.includes('FROM vehicles') && sql.includes('FOR UPDATE')) {
+      return result([{
+        id: 'vehicle-1',
+        plate_number: '51A-123.45',
+        status: 'Available',
+        operational_status: 'Available',
+        current_mileage: 50_000,
+      }]);
+    }
+    if (sql.includes('SELECT status FROM rentals')) return result([]);
+    if (sql.startsWith('UPDATE vehicles SET')) {
+      return result([{ id: 'vehicle-1', plate_number: '51A-999.99' }]);
+    }
+    if (sql.startsWith('UPDATE expenses')) return result([]);
+    throw new Error(`Unexpected vehicle plate query: ${sql}`);
+  });
+
+  const response = await jsonRequest('/api/vehicles/51A-123.45', {
+    method: 'PUT',
+    body: { plateNumber: ' 51a-999.99 ' },
+  });
+  assert.equal(response.status, 200);
+  const vehicleUpdate = statements.find(({ sql }) => sql.startsWith('UPDATE vehicles SET'));
+  assert.match(vehicleUpdate.sql, /"plate_number"/);
+  assert.equal(vehicleUpdate.params.includes('51A-999.99'), true);
+  const expenseUpdate = statements.find(({ sql }) => sql.startsWith('UPDATE expenses'));
+  assert.deepEqual(expenseUpdate.params, ['51A-999.99', 'vehicle-1', '51A-123.45']);
+  assert.equal(statements.at(-1).sql, 'COMMIT');
+});
+
 test('upload rejects and removes a fake JPEG whose bytes do not match its MIME type', async () => {
   app.locals.dbQuery = authQuery;
   const uploadsDirectory = new URL('../public/uploads/', import.meta.url);
@@ -483,6 +519,60 @@ test('return and cancel rental synchronize vehicle mileage/status and customer c
   assert.equal(deleteStatements.at(-1), 'COMMIT');
 });
 
+test('rental deposit receipt status can be updated without changing pricing', async () => {
+  app.locals.dbQuery = authQuery;
+  const currentRental = {
+    id: 'RNT-DEPOSIT',
+    car_id: '51A-123.45',
+    customer_phone: '0900000000',
+    start_date: '2026-08-01T08:00:00.000Z',
+    end_date: '2026-08-03T08:00:00.000Z',
+    status: 'active',
+    rental_fee: 1_000_000,
+    delivery_fee: 0,
+    extra_fee: 0,
+    discount_amount: 0,
+    violations: [],
+    deposit_status: 'pending',
+  };
+  const statements = [];
+  app.locals.getDbClient = async () => transactionClient(async (sql, params = []) => {
+    statements.push({ sql, params });
+    if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return result();
+    if (sql.includes('SELECT * FROM rentals WHERE id=$1 FOR UPDATE')) return result([currentRental]);
+    if (sql.includes('FROM vehicles v') && sql.includes('FOR UPDATE')) {
+      return result([{
+        id: 'vehicle-1',
+        plate_number: currentRental.car_id,
+        operational_status: 'Available',
+        current_mileage: 50_000,
+        daily_rate: 500_000,
+        owner_commission_rate: 70,
+      }]);
+    }
+    if (sql.includes('FROM customers WHERE phone')) return result([{ id: 'customer-1' }]);
+    if (sql.includes('SELECT id FROM rentals')) return result([]);
+    if (sql.startsWith('UPDATE rentals SET')) {
+      return result([{ ...currentRental, deposit_status: 'received' }]);
+    }
+    if (sql.includes('SELECT status FROM rentals')) return result([{ status: 'active' }]);
+    if (sql.startsWith('UPDATE vehicles')) return result([{ id: 'vehicle-1' }]);
+    if (sql.startsWith('UPDATE customers')) return result([{ id: 'customer-1' }]);
+    throw new Error(`Unexpected deposit status query: ${sql}`);
+  });
+
+  const response = await jsonRequest('/api/rentals/RNT-DEPOSIT', {
+    method: 'PUT',
+    body: { depositStatus: 'received' },
+  });
+  assert.equal(response.status, 200);
+  const rentalUpdate = statements.find(({ sql }) => sql.startsWith('UPDATE rentals SET'));
+  assert.match(rentalUpdate.sql, /"deposit_status"/);
+  assert.doesNotMatch(rentalUpdate.sql, /pricing_days|rental_fee|total_amount/);
+  assert.equal(rentalUpdate.params.includes('received'), true);
+  assert.equal(statements.at(-1).sql, 'COMMIT');
+});
+
 test('expense and scheduled service-order PUT endpoints persist editable fields', async () => {
   const expenseStatements = [];
   app.locals.dbQuery = async (sql, params = []) => {
@@ -642,6 +732,7 @@ test('frontend rental mapper preserves status and supports JSONB arrays, strings
     start_date: '2026-08-01T00:00:00Z',
     end_date: '2026-08-02T00:00:00Z',
     payment_status: 'deposit',
+    deposit_status: 'pending',
     status: 'active',
     source: 'system',
   };
@@ -651,6 +742,7 @@ test('frontend rental mapper preserves status and supports JSONB arrays, strings
     violations: [{ id: 'V1', amount: 100_000 }],
   });
   assert.equal(fromArray.status, 'active');
+  assert.equal(fromArray.depositStatus, 'pending');
   assert.equal(fromArray.violations.length, 1);
 
   const fromString = mapRentalFromDB({

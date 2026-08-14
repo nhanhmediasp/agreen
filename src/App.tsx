@@ -19,6 +19,7 @@ import {
   Plus,
   Compass,
   AlertCircle,
+  WalletCards,
 } from 'lucide-react';
 import { AppProvider, useApp } from './context/AppContext';
 import Login from './pages/Login';
@@ -36,6 +37,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Contracts = lazy(() => import('./pages/Contracts'));
 const Owners = lazy(() => import('./pages/Owners'));
 const ServiceOrders = lazy(() => import('./pages/ServiceOrders'));
+const Deposits = lazy(() => import('./pages/Deposits'));
 
 const RouteFallback = () => (
   <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>Đang tải…</div>
@@ -59,6 +61,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/tai-xe':     'Quản lý Đơn Dịch vụ & Tài xế',
   '/customers':  'Khách hàng',
   '/owners':     'Chủ xe / Đối tác',
+  '/deposits':   'Quản lý Tiền cọc',
   '/expenses':   'Sổ Thu chi & Chi phí',
   '/reports':    'Báo cáo & Thống kê',
   '/settings':   'Cài đặt Hệ thống',
@@ -132,6 +135,10 @@ function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
           <Link to="/owners" onClick={onClose} className={`nav-item${isActive('/owners')}`}>
             <UserCheck size={17} />
             <span>Chủ xe / Đối tác</span>
+          </Link>
+          <Link to="/deposits" onClick={onClose} className={`nav-item${isActive('/deposits')}`}>
+            <WalletCards size={17} />
+            <span>Tiền cọc</span>
           </Link>
           <Link to="/expenses" onClick={onClose} className={`nav-item${isActive('/expenses')}`}>
             <DollarSign size={17} />
@@ -557,6 +564,7 @@ function App() {
             <Route path="/tai-xe/:id" element={<AdminLayout><ServiceOrders /></AdminLayout>} />
             <Route path="/customers" element={<AdminLayout><Customers /></AdminLayout>} />
             <Route path="/owners" element={<AdminLayout><Owners /></AdminLayout>} />
+            <Route path="/deposits" element={<AdminLayout><Deposits /></AdminLayout>} />
             <Route path="/expenses" element={<AdminLayout><Expenses /></AdminLayout>} />
             <Route path="/reports" element={<AdminLayout><Reports /></AdminLayout>} />
             <Route path="/settings" element={<AdminLayout><SettingsPage /></AdminLayout>} />

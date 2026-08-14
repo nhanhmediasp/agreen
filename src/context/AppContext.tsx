@@ -81,6 +81,7 @@ export interface Rental {
   deliveryFee: number;
   deposit: number;
   depositType?: 'cash' | 'motorbike';
+  depositStatus?: 'pending' | 'received';
   depositVehicle?: {
     plate: string;
     brand: string;
@@ -942,6 +943,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateCar = async (id: string, updatedFields: Partial<Car>): Promise<boolean> => {
     const dbFields: Record<string, unknown> = {};
+    if (updatedFields.id !== undefined) dbFields.plate_number = updatedFields.id;
     if (updatedFields.status && !['rented', 'reserved'].includes(updatedFields.status)) {
       dbFields.status = updatedFields.status === 'maintenance'
         ? 'Maintenance'
@@ -977,7 +979,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (Object.keys(dbFields).length === 0) return true;
     try {
       await apiFetch(`/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) });
-      await refreshCars();
+      if (updatedFields.id !== undefined && updatedFields.id !== id) {
+        await Promise.all([refreshRentalDomain(), refreshServiceDomain()]);
+      } else {
+        await refreshCars();
+      }
       showToast('Đã đồng bộ thông tin cập nhật xe lên CSDL!', 'success');
       return true;
     } catch (error) {

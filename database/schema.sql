@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS rentals (
     delivery_fee NUMERIC(12,2) DEFAULT 0,
     deposit NUMERIC(12,2) DEFAULT 0,
     deposit_type VARCHAR(20) NOT NULL DEFAULT 'cash',
+    deposit_status VARCHAR(20) NOT NULL DEFAULT 'received',
     deposit_vehicle_plate VARCHAR(20) NOT NULL DEFAULT '',
     deposit_vehicle_brand VARCHAR(50) NOT NULL DEFAULT '',
     deposit_vehicle_model VARCHAR(50) NOT NULL DEFAULT '',
@@ -150,7 +151,8 @@ CREATE TABLE IF NOT EXISTS rentals (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT rentals_valid_dates CHECK (end_date > start_date),
-    CONSTRAINT rentals_deposit_type_check CHECK (deposit_type IN ('cash', 'motorbike'))
+    CONSTRAINT rentals_deposit_type_check CHECK (deposit_type IN ('cash', 'motorbike')),
+    CONSTRAINT rentals_deposit_status_check CHECK (deposit_status IN ('pending', 'received'))
 );
 
 -- ============================================================
