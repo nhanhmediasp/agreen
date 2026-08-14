@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Table, Tag, Modal, Form } from 'antd';
 import { Plus, X, Search, ArrowLeft, ShieldAlert, FileText, Edit, Trash, FileCheck, Eye, Filter, Calendar, Clock, Camera, Upload, DollarSign, Image as ImageIcon } from 'lucide-react';
-import { useApp, type Rental, type Violation } from '../context/AppContext';
+import { useApp, type DepositLifecycleState, type Rental, type Violation } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { Pagination } from '../components/Pagination';
 import { MoneyInput } from '../components/MoneyInput';
@@ -31,6 +31,10 @@ const toDateTimeLocalValue = (value: string) => {
   const offsetMs = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 };
+
+const depositStateOf = (rental: Rental): DepositLifecycleState => (
+  rental.depositReturnedAt ? 'returned' : rental.depositStatus ?? 'received'
+);
 
 const LiveCountdown = ({ endDateStr }: { endDateStr: string }) => {
   const [timeLeft, setTimeLeft] = useState('');
@@ -63,6 +67,7 @@ const Contracts = () => {
   const {
     rentals,
     updateRental,
+    updateRentalDepositState,
     handoverRental,
     cancelRental,
     recordRentalPayment,
@@ -461,16 +466,23 @@ const Contracts = () => {
     }
   };
 
-  const handleDepositStatusChange = async (depositStatus: NonNullable<Rental['depositStatus']>) => {
+  const handleDepositStatusChange = async (depositState: DepositLifecycleState) => {
     if (
       !selectedDetailRental
-      || depositStatus === (selectedDetailRental.depositStatus ?? 'received')
+      || depositState === depositStateOf(selectedDetailRental)
       || isUpdatingDepositStatus
     ) return;
 
+    if (depositState === 'returned' && !await confirmAction({
+      title: `Xác nhận đã hoàn cọc đơn #${selectedDetailRental.id}?`,
+      content: selectedDetailRental.depositType === 'motorbike'
+        ? 'Hệ thống sẽ ghi nhận xe cọc đã được trả lại cho khách. Thao tác này không thể chuyển ngược.'
+        : 'Hệ thống sẽ ghi nhận hoàn toàn bộ tiền cọc đang giữ cho khách. Thao tác này không thể chuyển ngược.',
+    })) return;
+
     setIsUpdatingDepositStatus(true);
     try {
-      await updateRental(selectedDetailRental.id, { depositStatus });
+      await updateRentalDepositState(selectedDetailRental.id, depositState);
     } finally {
       setIsUpdatingDepositStatus(false);
     }
@@ -1057,13 +1069,14 @@ const Contracts = () => {
                       <label htmlFor="contract-deposit-status" style={{ color: 'var(--text-secondary)' }}>Trạng thái tiền cọc:</label>
                       <select
                         id="contract-deposit-status"
-                        value={selectedDetailRental.depositStatus ?? 'received'}
-                        onChange={e => void handleDepositStatusChange(e.target.value as NonNullable<Rental['depositStatus']>)}
-                        disabled={isUpdatingDepositStatus || selectedDetailRental.status === 'cancelled'}
-                        style={{ minWidth: '150px', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', background: 'white', color: (selectedDetailRental.depositStatus ?? 'received') === 'received' ? '#047857' : '#b45309', fontFamily: 'inherit', fontWeight: 700 }}
+                        value={depositStateOf(selectedDetailRental)}
+                        onChange={e => void handleDepositStatusChange(e.target.value as DepositLifecycleState)}
+                        disabled={isUpdatingDepositStatus || depositStateOf(selectedDetailRental) === 'returned'}
+                        style={{ minWidth: '150px', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', background: 'white', color: depositStateOf(selectedDetailRental) === 'received' ? '#047857' : depositStateOf(selectedDetailRental) === 'returned' ? '#1d4ed8' : '#b45309', fontFamily: 'inherit', fontWeight: 700 }}
                       >
                         <option value="received">Đã cọc</option>
                         <option value="pending">Chưa cọc</option>
+                        <option value="returned">Đã hoàn cọc</option>
                       </select>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>

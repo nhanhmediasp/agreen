@@ -41,6 +41,7 @@ const PAYMENT_TYPES = new Set([
 const PAYMENT_RECORD_STATUSES = new Set(['pending', 'completed', 'void']);
 const DEPOSIT_TYPES = new Set(['cash', 'motorbike']);
 const DEPOSIT_STATUSES = new Set(['pending', 'received']);
+const DEPOSIT_LIFECYCLE_STATES = new Set(['pending', 'received', 'returned']);
 
 const effectiveVehicleStatusSql = (vehicleAlias = 'v') => `CASE
   WHEN EXISTS (
@@ -1433,6 +1434,71 @@ const returnRental = async (id, body, userId = null) => withTransaction(async (c
   return result.rows[0];
 });
 
+const updateRentalDepositState = async (id, body, userId = null) => withTransaction(async (client) => {
+  const currentResult = await client.query('SELECT * FROM rentals WHERE id=$1 FOR UPDATE', [id]);
+  if (currentResult.rowCount === 0) throw new ApiError(404, 'Rental not found');
+  const current = currentResult.rows[0];
+  const depositState = ensureEnum(
+    requiredString(body, ['depositState', 'deposit_state'], { max: 20 }),
+    DEPOSIT_LIFECYCLE_STATES,
+    'depositState',
+  );
+
+  if (current.deposit_returned_at) {
+    if (depositState === 'returned') return current;
+    throw new ApiError(
+      409,
+      'A returned deposit cannot be moved back to an earlier state',
+      'DEPOSIT_ALREADY_RETURNED',
+    );
+  }
+
+  if (depositState !== 'returned') {
+    const result = await client.query(
+      `UPDATE rentals
+       SET deposit_status=$2, updated_at=NOW()
+       WHERE id=$1
+       RETURNING *`,
+      [id, depositState],
+    );
+    return result.rows[0];
+  }
+
+  const returnedAt = optionalDate(body, ['returnedAt', 'returned_at']) ?? new Date().toISOString();
+  const returnNote = optionalString(body, ['note', 'depositReturnNote', 'deposit_return_note'])?.trim()
+    || 'Hoàn cọc thủ công';
+
+  if ((current.deposit_type || 'cash') === 'cash') {
+    const { heldDeposit } = await getHeldCashDeposit(client, id);
+    if (heldDeposit > 0) {
+      await client.query(
+        `INSERT INTO rental_payments
+           (rental_id, payment_type, amount, status, paid_at, note, idempotency_key, created_by)
+         VALUES ($1, 'deposit_refund', $2, 'completed', $3, $4, $5, $6)`,
+        [
+          id,
+          heldDeposit,
+          returnedAt,
+          returnNote,
+          `rental:${id}:manual-deposit-refund`,
+          userId,
+        ],
+      );
+      await syncLegacyPaymentStatus(client, id);
+    }
+  }
+
+  const result = await client.query(
+    `UPDATE rentals
+     SET deposit_status='received', deposit_returned_at=$2,
+         deposit_return_note=$3, updated_at=NOW()
+     WHERE id=$1
+     RETURNING *`,
+    [id, returnedAt, returnNote],
+  );
+  return result.rows[0];
+});
+
 const cancelRental = async (id, body) => withTransaction(async (client) => {
   const reason = requiredString(body, ['reason', 'cancellationReason', 'cancellation_reason'], { max: 2_000 });
   const currentResult = await client.query('SELECT * FROM rentals WHERE id=$1 FOR UPDATE', [id]);
@@ -1484,6 +1550,11 @@ app.post('/api/rentals', requireRole('admin', 'operations', 'staff'), asyncRoute
 
 app.put('/api/rentals/:id', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
   const rental = await updateRental(req.params.id, requireObjectBody(req));
+  res.json({ success: true, data: rental });
+}));
+
+app.put('/api/rentals/:id/deposit-state', requireRole('admin', 'operations', 'accounting', 'staff'), asyncRoute(async (req, res) => {
+  const rental = await updateRentalDepositState(req.params.id, requireObjectBody(req), req.user.id);
   res.json({ success: true, data: rental });
 }));
 

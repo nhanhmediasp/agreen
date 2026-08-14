@@ -10,14 +10,15 @@ import {
   Search,
   WalletCards,
 } from 'lucide-react';
-import { useApp, type Rental } from '../context/AppContext';
+import { useApp, type DepositLifecycleState, type Rental } from '../context/AppContext';
 import { Pagination } from '../components/Pagination';
+import { confirmAction } from '../utils/confirmAction';
 
-type DepositStatusFilter = 'all' | NonNullable<Rental['depositStatus']>;
+type DepositStatusFilter = 'all' | DepositLifecycleState;
 type DepositMethodFilter = 'all' | NonNullable<Rental['depositType']>;
 
-const depositStatusOf = (rental: Rental): NonNullable<Rental['depositStatus']> => (
-  rental.depositStatus ?? 'received'
+const depositStateOf = (rental: Rental): DepositLifecycleState => (
+  rental.depositReturnedAt ? 'returned' : rental.depositStatus ?? 'received'
 );
 
 const depositMethodOf = (rental: Rental): NonNullable<Rental['depositType']> => (
@@ -48,7 +49,7 @@ const depositDescription = (rental: Rental) => {
 };
 
 const Deposits = () => {
-  const { rentals, updateRental } = useApp();
+  const { rentals, updateRentalDepositState } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<DepositStatusFilter>('all');
   const [methodFilter, setMethodFilter] = useState<DepositMethodFilter>('all');
@@ -69,7 +70,7 @@ const Deposits = () => {
         vehicle?.brand,
         vehicle?.model,
       ].some(value => value?.toLocaleLowerCase('vi').includes(keyword));
-      const matchesStatus = statusFilter === 'all' || depositStatusOf(rental) === statusFilter;
+      const matchesStatus = statusFilter === 'all' || depositStateOf(rental) === statusFilter;
       const matchesMethod = methodFilter === 'all' || depositMethodOf(rental) === methodFilter;
       return matchesSearch && matchesStatus && matchesMethod;
     });
@@ -89,18 +90,19 @@ const Deposits = () => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  const receivedCount = rentals.filter(rental => depositStatusOf(rental) === 'received').length;
-  const pendingCount = rentals.filter(rental => depositStatusOf(rental) === 'pending').length;
+  const receivedCount = rentals.filter(rental => depositStateOf(rental) === 'received').length;
+  const pendingCount = rentals.filter(rental => depositStateOf(rental) === 'pending').length;
+  const returnedCount = rentals.filter(rental => depositStateOf(rental) === 'returned').length;
   const heldCash = rentals
     .filter(rental => (
-      depositStatusOf(rental) === 'received'
+      depositStateOf(rental) === 'received'
       && depositMethodOf(rental) === 'cash'
       && !rental.depositReturnedAt
       && rental.status !== 'cancelled'
     ))
     .reduce((sum, rental) => sum + Number(rental.deposit || 0), 0);
   const heldVehicles = rentals.filter(rental => (
-    depositStatusOf(rental) === 'received'
+    depositStateOf(rental) === 'received'
     && depositMethodOf(rental) === 'motorbike'
     && !rental.depositReturnedAt
     && rental.status !== 'cancelled'
@@ -108,43 +110,56 @@ const Deposits = () => {
 
   const updateDepositStatus = async (
     rental: Rental,
-    depositStatus: NonNullable<Rental['depositStatus']>,
+    depositState: DepositLifecycleState,
   ) => {
-    if (depositStatus === depositStatusOf(rental) || savingRentalId) return;
+    if (depositState === depositStateOf(rental) || savingRentalId) return;
+    if (depositState === 'returned' && !await confirmAction({
+      title: `Xác nhận đã hoàn cọc đơn #${rental.id}?`,
+      content: depositMethodOf(rental) === 'cash'
+        ? 'Hệ thống sẽ ghi nhận hoàn toàn bộ tiền cọc đang giữ cho khách. Thao tác này không thể chuyển ngược về trạng thái trước.'
+        : 'Hệ thống sẽ ghi nhận xe cọc đã được trả lại cho khách. Thao tác này không thể chuyển ngược về trạng thái trước.',
+    })) return;
     setSavingRentalId(rental.id);
     try {
-      await updateRental(rental.id, { depositStatus });
+      await updateRentalDepositState(rental.id, depositState);
     } finally {
       setSavingRentalId(null);
     }
   };
 
-  const statusSelect = (rental: Rental) => (
-    <select
+  const statusSelect = (rental: Rental) => {
+    const depositState = depositStateOf(rental);
+    const palette = depositState === 'returned'
+      ? { border: '#bfdbfe', background: '#eff6ff', color: '#1d4ed8' }
+      : depositState === 'received'
+        ? { border: '#a7f3d0', background: '#ecfdf5', color: '#047857' }
+        : { border: '#fde68a', background: '#fffbeb', color: '#b45309' };
+    return <select
       aria-label={`Trạng thái tiền cọc đơn ${rental.id}`}
-      value={depositStatusOf(rental)}
+      value={depositState}
       onChange={event => void updateDepositStatus(
         rental,
-        event.target.value as NonNullable<Rental['depositStatus']>,
+        event.target.value as DepositLifecycleState,
       )}
-      disabled={savingRentalId === rental.id || rental.status === 'cancelled'}
+      disabled={savingRentalId === rental.id || depositState === 'returned'}
       style={{
         minWidth: '124px',
         padding: '7px 10px',
         borderRadius: '8px',
-        border: `1px solid ${depositStatusOf(rental) === 'received' ? '#a7f3d0' : '#fde68a'}`,
-        background: depositStatusOf(rental) === 'received' ? '#ecfdf5' : '#fffbeb',
-        color: depositStatusOf(rental) === 'received' ? '#047857' : '#b45309',
+        border: `1px solid ${palette.border}`,
+        background: palette.background,
+        color: palette.color,
         fontFamily: 'inherit',
         fontSize: '12px',
         fontWeight: 700,
-        cursor: rental.status === 'cancelled' ? 'not-allowed' : 'pointer',
+        cursor: depositState === 'returned' ? 'not-allowed' : 'pointer',
       }}
     >
-      <option value="received">Đã cọc</option>
       <option value="pending">Chưa cọc</option>
+      <option value="received">Đã cọc</option>
+      <option value="returned">Đã hoàn cọc</option>
     </select>
-  );
+  };
 
   return (
     <div className="deposits-page" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -160,14 +175,23 @@ const Deposits = () => {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '16px' }}>
         <Card style={{ borderLeft: '4px solid #059669', borderRadius: 8 }} styles={{ body: { padding: 16 } }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
             <div>
-              <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Đã nhận cọc</div>
+              <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Đang giữ cọc</div>
               <Statistic value={receivedCount} valueStyle={{ fontSize: '25px', fontWeight: 700, color: '#047857' }} />
             </div>
-            <CircleCheck size={22} color="#059669" />
+            <WalletCards size={22} color="#059669" />
+          </div>
+        </Card>
+        <Card style={{ borderLeft: '4px solid #0ea5e9', borderRadius: 8 }} styles={{ body: { padding: 16 } }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+            <div>
+              <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Đã hoàn cọc</div>
+              <Statistic value={returnedCount} valueStyle={{ fontSize: '25px', fontWeight: 700, color: '#0369a1' }} />
+            </div>
+            <CircleCheck size={22} color="#0ea5e9" />
           </div>
         </Card>
         <Card style={{ borderLeft: '4px solid #f59e0b', borderRadius: 8 }} styles={{ body: { padding: 16 } }}>
@@ -214,17 +238,18 @@ const Deposits = () => {
           value={statusFilter}
           onChange={event => setStatusFilter(event.target.value as DepositStatusFilter)}
           aria-label="Lọc trạng thái tiền cọc"
-          style={{ minWidth: '170px', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'white', fontFamily: 'inherit', fontWeight: 600 }}
+          style={{ minWidth: '142px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'white', fontFamily: 'inherit', fontSize: '12px', fontWeight: 600 }}
         >
           <option value="all">Tất cả trạng thái</option>
           <option value="received">Đã cọc</option>
           <option value="pending">Chưa cọc</option>
+          <option value="returned">Đã hoàn cọc</option>
         </select>
         <select
           value={methodFilter}
           onChange={event => setMethodFilter(event.target.value as DepositMethodFilter)}
           aria-label="Lọc phương thức đặt cọc"
-          style={{ minWidth: '180px', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'white', fontFamily: 'inherit', fontWeight: 600 }}
+          style={{ minWidth: '145px', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'white', fontFamily: 'inherit', fontSize: '12px', fontWeight: 600 }}
         >
           <option value="all">Tất cả phương thức</option>
           <option value="cash">Cọc bằng tiền</option>
@@ -305,8 +330,8 @@ const Deposits = () => {
                   <strong className="font-mono">#{rental.id}</strong>
                   <span>{rental.customerName} · {rental.customerPhone}</span>
                 </div>
-                <span className={`entity-mobile-status ${depositStatusOf(rental) === 'received' ? 'success' : 'warning'}`}>
-                  {depositStatusOf(rental) === 'received' ? 'Đã cọc' : 'Chưa cọc'}
+                <span className={`entity-mobile-status ${depositStateOf(rental) === 'received' ? 'success' : depositStateOf(rental) === 'returned' ? 'active' : 'warning'}`}>
+                  {depositStateOf(rental) === 'received' ? 'Đã cọc' : depositStateOf(rental) === 'returned' ? 'Đã hoàn cọc' : 'Chưa cọc'}
                 </span>
               </div>
               <div className="entity-mobile-fields">

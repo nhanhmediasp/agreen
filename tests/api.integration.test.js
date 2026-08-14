@@ -573,6 +573,59 @@ test('rental deposit receipt status can be updated without changing pricing', as
   assert.equal(statements.at(-1).sql, 'COMMIT');
 });
 
+test('marking a cash deposit returned records the refund and completion timestamp', async () => {
+  app.locals.dbQuery = authQuery;
+  const currentRental = {
+    id: 'RNT-RETURN-DEPOSIT',
+    car_id: '51A-123.45',
+    customer_phone: '0900000000',
+    deposit_type: 'cash',
+    deposit_status: 'received',
+    deposit_returned_at: null,
+    total_amount: 2_000_000,
+  };
+  const statements = [];
+  app.locals.getDbClient = async () => transactionClient(async (sql, params = []) => {
+    statements.push({ sql, params });
+    if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return result();
+    if (sql.includes('SELECT * FROM rentals WHERE id=$1 FOR UPDATE')) return result([currentRental]);
+    if (sql.includes('AS held_deposit') && sql.includes('GROUP BY r.id, r.deposit_type')) {
+      return result([{ deposit_type: 'cash', held_deposit: 5_000_000 }]);
+    }
+    if (sql.startsWith('INSERT INTO rental_payments')) return result([{ id: 'payment-1' }]);
+    if (sql.includes('AS applied') && sql.includes('AS held_deposit')) {
+      return result([{ total_amount: 2_000_000, applied: 0, held_deposit: 0 }]);
+    }
+    if (sql.startsWith('UPDATE rentals SET payment_status')) return result([{ id: currentRental.id }]);
+    if (sql.startsWith('UPDATE rentals') && sql.includes("deposit_status='received'")) {
+      return result([{
+        ...currentRental,
+        deposit_returned_at: '2026-08-14T08:00:00.000Z',
+      }]);
+    }
+    throw new Error(`Unexpected returned deposit query: ${sql}`);
+  });
+
+  const response = await jsonRequest('/api/rentals/RNT-RETURN-DEPOSIT/deposit-state', {
+    method: 'PUT',
+    body: {
+      depositState: 'returned',
+      returnedAt: '2026-08-14T08:00:00.000Z',
+      note: 'Đã trả cọc cho khách',
+    },
+  });
+  assert.equal(response.status, 200);
+  const refundInsert = statements.find(({ sql }) => sql.startsWith('INSERT INTO rental_payments'));
+  assert.match(refundInsert.sql, /'deposit_refund'/);
+  assert.equal(refundInsert.params.includes(5_000_000), true);
+  const finalUpdate = statements.find(({ sql }) => (
+    sql.startsWith('UPDATE rentals') && sql.includes("deposit_status='received'")
+  ));
+  assert.match(finalUpdate.sql, /deposit_returned_at/);
+  assert.equal(finalUpdate.params.includes('2026-08-14T08:00:00.000Z'), true);
+  assert.equal(statements.at(-1).sql, 'COMMIT');
+});
+
 test('expense and scheduled service-order PUT endpoints persist editable fields', async () => {
   const expenseStatements = [];
   app.locals.dbQuery = async (sql, params = []) => {

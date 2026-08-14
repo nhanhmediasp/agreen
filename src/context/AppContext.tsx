@@ -111,6 +111,8 @@ export interface Rental {
   conditionImages?: string[];
 }
 
+export type DepositLifecycleState = 'pending' | 'received' | 'returned';
+
 export interface ImageItem {
   id: string;
   url: string;
@@ -208,6 +210,7 @@ interface AppContextType {
   deleteExpense: (id: string) => Promise<boolean>;
   addRental: (rental: Rental) => Promise<boolean>;
   updateRental: (id: string, updatedFields: Partial<Rental>) => Promise<boolean>;
+  updateRentalDepositState: (id: string, depositState: DepositLifecycleState) => Promise<boolean>;
   handoverRental: (id: string, startKm: number, startFuel: string) => Promise<boolean>;
   cancelRental: (id: string, reason: string) => Promise<boolean>;
   recordRentalPayment: (
@@ -1258,6 +1261,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateRentalDepositState = async (
+    id: string,
+    depositState: DepositLifecycleState,
+  ): Promise<boolean> => {
+    try {
+      await apiFetch<Record<string, unknown>>(`/rentals/${id}/deposit-state`, {
+        method: 'PUT',
+        body: JSON.stringify({ depositState }),
+      });
+      await refreshRentalDomain();
+      showToast(
+        depositState === 'returned'
+          ? 'Đã ghi nhận hoàn cọc cho khách!'
+          : 'Đã cập nhật trạng thái tiền cọc!',
+        'success',
+      );
+      return true;
+    } catch (error) {
+      showToast(`Không thể cập nhật trạng thái tiền cọc: ${errorMessage(error)}`, 'error');
+      await refreshRentalDomain().catch((refreshError) => console.error('Failed to reload rental data', refreshError));
+      return false;
+    }
+  };
+
   const handoverRental = async (id: string, startKm: number, startFuel: string): Promise<boolean> => {
     try {
       await apiFetch(`/rentals/${id}/handover`, {
@@ -1596,6 +1623,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteExpense,
       addRental,
       updateRental,
+      updateRentalDepositState,
       handoverRental,
       cancelRental,
       recordRentalPayment,
