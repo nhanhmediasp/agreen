@@ -86,6 +86,65 @@ test('reports summary is read-only and returns the normalized financial sections
   app.locals.dbQuery = async (sql, params = []) => {
     queries.push({ sql, params });
     if (sql.includes('FROM users WHERE id::text')) return result([USER]);
+    if (sql.includes('WITH rental_ledgers')) return result([{
+      booked_value: '1500000',
+      rental_revenue: '1000000',
+      service_revenue: '250000',
+      rental_fee_revenue: '900000',
+      delivery_fee_revenue: '100000',
+      service_base_revenue: '225000',
+      service_extra_revenue: '25000',
+      period_receivables: '300000',
+      total_receivables: '350000',
+      collected_revenue: '950000',
+      cash_received: '1150000',
+      customer_refunds: '50000',
+      deposits_held: '500000',
+      deposit_received: '500000',
+      deposit_refunded: '100000',
+      motorcycle_collateral_held: '1',
+      operating_expenses: '100000',
+      expense_cash_out: '100000',
+      owner_commissions: '200000',
+      owner_payouts_confirmed: '75000',
+      owner_payables: '125000',
+      driver_commissions: '25000',
+      driver_payables: '25000',
+      rental_orders_completed: '1',
+      service_orders_completed: '1',
+    }]);
+    if (sql.includes('WITH rental_ledger_presence')) return result([{
+      bucket: '2026-08-24 00:00:00',
+      revenue: '1250000',
+      operating_expenses: '100000',
+      owner_commissions: '200000',
+      driver_commissions: '25000',
+      cash_received: '1150000',
+      customer_refunds: '50000',
+      deposit_refunded: '100000',
+      owner_payouts: '75000',
+    }]);
+    if (sql.includes('WITH cost_rows')) return result([{ category: 'Maintenance', amount: '100000' }]);
+    if (sql.includes('WITH cash_rows')) return result([{ category: 'Maintenance', amount: '100000' }]);
+    if (sql.includes('WITH customer_rows')) return result([{
+      name: 'Customer A', phone: '0900000000', orders: '2', revenue: '1250000',
+    }]);
+    if (sql.includes('WITH vehicle_counts')) return result([{
+      id: 'owner-1', name: 'Owner A', vehicle_count: '1', rental_count: '1',
+      accrued: '200000', paid: '75000', draft: '0', outstanding: '125000',
+    }]);
+    if (sql.includes('driver_ids AS')) return result([{
+      id: 'driver-1', name: 'Driver A', service_count: '1',
+      accrued: '25000', paid: '0', outstanding: '25000',
+    }]);
+    if (sql.includes('legacy_rentals_without_ledger')) return result([{
+      legacy_rentals_without_ledger: '0',
+      legacy_services_without_ledger: '0',
+      missing_owner_commissions: '0',
+      missing_driver_commissions: '0',
+      draft_owner_payouts: '0',
+      manual_partner_payouts: '0',
+    }]);
     if (sql.includes('WITH rental_payment_totals')) return result([{
       rental_revenue: '1000000',
       service_revenue: '250000',
@@ -114,6 +173,10 @@ test('reports summary is read-only and returns the normalized financial sections
   assert.equal(payload.data.summary.revenue, 1250000);
   assert.equal(payload.data.summary.total_costs, 325000);
   assert.equal(payload.data.summary.profit, 925000);
+  assert.equal(payload.data.summary.owner_commissions, 200000);
+  assert.equal(payload.data.summary.owner_payouts_confirmed, 75000);
+  assert.equal(payload.data.summary.total_receivables, 350000);
+  assert.equal(payload.data.summary.net_cash_flow, 825000);
   assert.equal(payload.data.fleet.total, 3);
   assert.equal(queries.some(({ sql }) => /\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(sql)), false);
 });
