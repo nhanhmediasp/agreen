@@ -80,7 +80,6 @@ export const MoneyInput: React.FC<MoneyInputProps> = ({
       id={id}
       type="text"
       inputMode="numeric"
-      pattern="[0-9]*"
       value={displayValue}
       onChange={handleChange}
       onFocus={handleFocus}

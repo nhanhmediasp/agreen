@@ -13,8 +13,10 @@ import {
   Users,
   WalletCards,
 } from 'lucide-react';
+import { Pagination } from '../components/Pagination';
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
+const VEHICLES_PER_PAGE = 10;
 type TimeRange = 'today' | '7d' | 'month' | 'quarter' | 'year' | 'custom';
 type GroupBy = 'day' | 'week' | 'month';
 
@@ -416,6 +418,7 @@ const Reports = () => {
   const [report, setReport] = useState<ReportData>(emptyReport);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [vehiclePage, setVehiclePage] = useState(1);
 
   const period = useMemo(() => {
     const current = dateKey();
@@ -459,6 +462,7 @@ const Reports = () => {
         const payload = await response.json();
         if (!response.ok || !payload.success) throw new Error(payload.error || 'Không thể tải báo cáo');
         setReport(normalizeReport(payload));
+        setVehiclePage(1);
         setError(null);
       })
       .catch((reason: unknown) => {
@@ -471,6 +475,12 @@ const Reports = () => {
 
   const summary = report.summary;
   const fleet = report.fleet;
+  const vehicleTotalPages = Math.max(1, Math.ceil(report.vehicles.length / VEHICLES_PER_PAGE));
+  const currentVehiclePage = Math.min(vehiclePage, vehicleTotalPages);
+  const paginatedVehicles = report.vehicles.slice(
+    (currentVehiclePage - 1) * VEHICLES_PER_PAGE,
+    currentVehiclePage * VEHICLES_PER_PAGE,
+  );
   const fleetTotal = Math.max(1, fleet.total);
   const averageUtilization = report.vehicles.length
     ? report.vehicles.reduce((sum, vehicle) => sum + vehicle.utilization_rate, 0) / report.vehicles.length
@@ -514,7 +524,6 @@ const Reports = () => {
         <KpiCard label="Doanh thu ghi nhận" value={formatMoney(summary.revenue)} note={`Thuê xe ${formatMoney(summary.rental_revenue)} · Dịch vụ ${formatMoney(summary.service_revenue)}`} color="#047857" icon={<CircleDollarSign size={19} />} />
         <KpiCard label="Tổng chi phí phát sinh" value={formatMoney(summary.total_costs)} note={`Vận hành ${formatMoney(summary.operating_expenses)} · Chủ xe ${formatMoney(summary.owner_commissions)} · Tài xế ${formatMoney(summary.driver_commissions)}`} color="#ea580c" icon={<ArrowUpRight size={19} />} />
         <KpiCard label="Lợi nhuận của cửa hàng" value={formatMoney(summary.profit)} note={`Doanh thu − toàn bộ chi phí · Biên ${summary.profit_margin.toFixed(1)}%`} color={summary.profit < 0 ? '#dc2626' : '#059669'} background={summary.profit < 0 ? '#fff1f2' : '#dcfce7'} icon={<Activity size={19} />} />
-        <KpiCard label="Khách còn nợ đến cuối kỳ" value={formatMoney(summary.total_receivables)} note={`Riêng đơn hoàn thành trong kỳ: ${formatMoney(summary.period_receivables)}`} color="#b91c1c" icon={<WalletCards size={19} />} />
         <KpiCard label="Phải trả đối tác" value={formatMoney(summary.partner_payables)} note={`Chủ xe ${formatMoney(summary.owner_payables)} · Tài xế ${formatMoney(summary.driver_payables)}`} color="#7c3aed" icon={<Users size={19} />} />
         <KpiCard label="Tiền cọc đang giữ" value={formatMoney(summary.deposits_held)} note={`Nhận kỳ này ${formatMoney(summary.deposit_received)} · ${summary.motorcycle_collateral_held} xe máy đang giữ`} color="#6d28d9" icon={<WalletCards size={19} />} />
         <KpiCard label="Giá trị đơn trong kỳ" value={formatMoney(summary.booked_value)} note={`${summary.rental_orders_completed + summary.service_orders_completed} đơn hoàn thành · ${summary.rental_orders_open + summary.service_orders_open} đơn đang mở`} color="#0369a1" icon={<BarChart3 size={19} />} />
@@ -605,8 +614,16 @@ const Reports = () => {
         <div style={{ padding: '18px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><div><h2 style={{ margin: 0, fontSize: 17, display: 'flex', alignItems: 'center', gap: 8 }}><Car size={19} color="var(--primary)" /> Hiệu quả theo xe</h2><p style={{ margin: '5px 0 0', color: '#64748b', fontSize: 12 }}>Chi phí theo xe gồm vận hành, chiết khấu chủ xe và hoa hồng tài xế phát sinh.</p></div><span style={{ color: '#64748b', fontSize: 12 }}>{report.vehicles.length} xe</span></div>
         <div style={{ overflowX: 'auto' }}><table className="data-table" style={{ minWidth: 960 }}>
           <thead><tr><th>Xe</th><th>Số đơn</th><th>Doanh thu</th><th>Vận hành</th><th>Chủ xe</th><th>Tài xế</th><th>Lợi nhuận</th><th>Khai thác</th></tr></thead>
-          <tbody>{report.vehicles.length === 0 ? <tr><td colSpan={8} style={{ textAlign: 'center', padding: 26, color: '#94a3b8' }}>Chưa có dữ liệu xe.</td></tr> : report.vehicles.map((vehicle) => <tr key={vehicle.id}><td><strong>{vehicle.id}</strong><div style={{ color: '#64748b', fontSize: 11 }}>{vehicle.name}</div></td><td>{vehicle.rental_count + vehicle.service_count}</td><td style={{ fontWeight: 700 }}>{formatMoney(vehicle.revenue)}</td><td>{formatMoney(vehicle.operating_expenses)}</td><td>{formatMoney(vehicle.owner_commissions)}</td><td>{formatMoney(vehicle.driver_commissions)}</td><td style={{ fontWeight: 800, color: vehicle.profit < 0 ? '#dc2626' : '#047857' }}>{formatMoney(vehicle.profit)}</td><td><div style={{ minWidth: 110 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}><span>{vehicle.utilization_rate.toFixed(1)}%</span><span style={{ color: '#64748b' }}>{vehicle.utilized_hours.toFixed(1)}h</span></div><div style={{ height: 7, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(100, vehicle.utilization_rate)}%`, background: 'var(--primary)', borderRadius: 99 }} /></div></div></td></tr>)}</tbody>
+          <tbody>{report.vehicles.length === 0 ? <tr><td colSpan={8} style={{ textAlign: 'center', padding: 26, color: '#94a3b8' }}>Chưa có dữ liệu xe.</td></tr> : paginatedVehicles.map((vehicle) => <tr key={vehicle.id}><td><strong>{vehicle.id}</strong><div style={{ color: '#64748b', fontSize: 11 }}>{vehicle.name}</div></td><td>{vehicle.rental_count + vehicle.service_count}</td><td style={{ fontWeight: 700 }}>{formatMoney(vehicle.revenue)}</td><td>{formatMoney(vehicle.operating_expenses)}</td><td>{formatMoney(vehicle.owner_commissions)}</td><td>{formatMoney(vehicle.driver_commissions)}</td><td style={{ fontWeight: 800, color: vehicle.profit < 0 ? '#dc2626' : '#047857' }}>{formatMoney(vehicle.profit)}</td><td><div style={{ minWidth: 110 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}><span>{vehicle.utilization_rate.toFixed(1)}%</span><span style={{ color: '#64748b' }}>{vehicle.utilized_hours.toFixed(1)}h</span></div><div style={{ height: 7, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(100, vehicle.utilization_rate)}%`, background: 'var(--primary)', borderRadius: 99 }} /></div></div></td></tr>)}</tbody>
         </table></div>
+        <Pagination
+          currentPage={currentVehiclePage}
+          totalPages={vehicleTotalPages}
+          totalItems={report.vehicles.length}
+          itemsPerPage={VEHICLES_PER_PAGE}
+          onPageChange={setVehiclePage}
+          unitName="xe"
+        />
       </div>
 
       <div className="grid grid-auto-lg gap-lg">

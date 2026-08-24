@@ -10,6 +10,7 @@ const Expenses = () => {
   const { expenses, addExpense, updateExpense, deleteExpense, cars, rentals, owners, showToast } = useApp();
   const [activeTab, setActiveTab] = useState<'general' | 'incidental' | 'owners'>('general');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isAddingExpense, setIsAddingExpense] = useState(false);
   
   // Operational Forms States
   const [title, setTitle] = useState('');
@@ -59,28 +60,42 @@ const Expenses = () => {
 
   const totalIncidentalAmount = allIncidentalExpenses.reduce((sum, i) => sum + i.amount, 0);
 
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !amount) return;
+  const handleAddExpense = async () => {
+    const normalizedTitle = title.trim();
+    const normalizedAmount = Number(amount);
+    if (!normalizedTitle) {
+      showToast('Vui lòng nhập nội dung chi.', 'error');
+      return;
+    }
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      showToast('Số tiền chi phải lớn hơn 0.', 'error');
+      return;
+    }
+    if (isAddingExpense) return;
 
     const newExpense: Expense = {
       id: Date.now().toString(),
-      title,
-      amount: parseInt(amount) || 0,
+      title: normalizedTitle,
+      amount: normalizedAmount,
       category,
       date,
       ref
     };
 
-    const success = await addExpense(newExpense);
-    if (success) {
-      setShowAddForm(false);
-      showToast('Đã ghi nhận khoản chi phí vận hành mới!', 'success');
-      setTitle('');
-      setAmount('');
-      setCategory('Bảo dưỡng');
-      setDate(new Date().toISOString().split('T')[0]);
-      setRef('');
+    setIsAddingExpense(true);
+    try {
+      const success = await addExpense(newExpense);
+      if (success) {
+        setShowAddForm(false);
+        showToast('Đã ghi nhận khoản chi phí vận hành mới!', 'success');
+        setTitle('');
+        setAmount('');
+        setCategory('Bảo dưỡng');
+        setDate(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }));
+        setRef('');
+      }
+    } finally {
+      setIsAddingExpense(false);
     }
   };
 
@@ -902,8 +917,8 @@ const Expenses = () => {
           </Form.Item>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
-            <button type="button" onClick={() => setShowAddForm(false)} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: 'pointer' }}>Hủy</button>
-            <button type="submit" style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Ghi nhận</button>
+            <button type="button" onClick={() => setShowAddForm(false)} disabled={isAddingExpense} style={{ padding: '8px 16px', background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px', cursor: isAddingExpense ? 'not-allowed' : 'pointer' }}>Hủy</button>
+            <button type="submit" disabled={isAddingExpense} style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: isAddingExpense ? 'not-allowed' : 'pointer', opacity: isAddingExpense ? 0.7 : 1 }}>{isAddingExpense ? 'Đang ghi nhận...' : 'Ghi nhận'}</button>
           </div>
         </Form>
       </Modal>
