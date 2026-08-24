@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Upload, Save, RefreshCw, ShieldCheck, ShieldAlert, Lock, Trash2, Key, CheckCircle2 } from 'lucide-react';
+import { Upload, Save, RefreshCw, ShieldCheck, ShieldAlert, Lock, Trash2, Key, CheckCircle2, History, Sparkles, Wrench, Bug, CalendarClock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getSecurityLogs, clearSecurityLogs, type SecurityLog } from '../auth/clientAuth';
 import { ImageGallery } from '../components/ImageGallery';
 import { confirmAction } from '../utils/confirmAction';
+import { APP_VERSION, CHANGELOG, type ChangeKind } from '../data/changelog';
 
 const isImageUrl = (url: string) => {
   if (!url || url === 'Auto') return false;
@@ -16,7 +17,7 @@ const isImageUrl = (url: string) => {
 
 const SettingsPage = () => {
   const { settings, updateSettings, rollbackLogo, showToast } = useApp();
-  const [activeTab, setActiveTab] = useState<'interface' | 'contract' | 'security'>('interface');
+  const [activeTab, setActiveTab] = useState<'interface' | 'security' | 'changelog'>('interface');
   
   // Local state for settings preview before saving
   const [localColor, setLocalColor] = useState(settings.primaryColor);
@@ -30,6 +31,21 @@ const SettingsPage = () => {
 
   // Security State
   const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>(() => getSecurityLogs());
+  const buildTime = new Date(__APP_BUILD_TIME__).toLocaleString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+  const changeMeta: Record<ChangeKind, { label: string; color: string; background: string }> = {
+    new: { label: 'Mới', color: '#047857', background: '#d1fae5' },
+    improved: { label: 'Cải tiến', color: '#1d4ed8', background: '#dbeafe' },
+    fixed: { label: 'Sửa lỗi', color: '#c2410c', background: '#ffedd5' },
+    security: { label: 'An toàn', color: '#7e22ce', background: '#f3e8ff' },
+  };
 
   const colors = [
     { name: 'Xanh Lá Vận Tải', hex: '#006837' },
@@ -119,7 +135,7 @@ const SettingsPage = () => {
       </div>
 
       {/* Tabs */}
-      <div className="settings-tabs" style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border-light)' }}>
+      <div className="settings-tabs" style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border-light)', flexWrap: 'wrap' }}>
         <button 
           onClick={() => setActiveTab('interface')}
           style={{ padding: '12px 16px', borderBottom: activeTab === 'interface' ? '2px solid var(--primary)' : 'none', color: activeTab === 'interface' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600 }}
@@ -132,6 +148,13 @@ const SettingsPage = () => {
         >
           <ShieldCheck size={17} style={{ color: activeTab === 'security' ? '#006837' : 'inherit' }} />
           Bảo mật & Anti-Spam
+        </button>
+        <button
+          onClick={() => setActiveTab('changelog')}
+          style={{ padding: '12px 16px', borderBottom: activeTab === 'changelog' ? '2px solid var(--primary)' : 'none', color: activeTab === 'changelog' ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <History size={17} style={{ color: activeTab === 'changelog' ? '#006837' : 'inherit' }} />
+          Nhật ký cập nhật
         </button>
       </div>
 
@@ -450,6 +473,59 @@ const SettingsPage = () => {
                 </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: NHẬT KÝ CẬP NHẬT */}
+        {activeTab === 'changelog' && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(240px, .8fr)', gap: 16, marginBottom: 28 }}>
+              <div style={{ padding: 20, borderRadius: 14, color: '#fff', background: 'linear-gradient(135deg, #006837 0%, #059669 100%)', position: 'relative', overflow: 'hidden' }}>
+                <div aria-hidden="true" style={{ position: 'absolute', width: 145, height: 145, borderRadius: '50%', background: 'rgba(255,255,255,.09)', top: -70, right: -35 }} />
+                <div style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 750, opacity: .9 }}><Sparkles size={16} /> PHIÊN BẢN ĐANG CHẠY</div>
+                  <strong style={{ display: 'block', fontSize: 32, marginTop: 9, letterSpacing: '-.04em' }}>v{APP_VERSION}</strong>
+                  <p style={{ margin: '6px 0 0', fontSize: 13, lineHeight: 1.55, opacity: .9 }}>{CHANGELOG[0].summary}</p>
+                </div>
+              </div>
+              <div style={{ padding: 20, borderRadius: 14, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 12, fontWeight: 750 }}><CalendarClock size={17} color="var(--primary)" /> LẦN BUILD GẦN NHẤT</div>
+                <strong style={{ display: 'block', color: '#0f172a', fontSize: 16, marginTop: 12 }}>{buildTime}</strong>
+                <p style={{ color: '#64748b', fontSize: 12, lineHeight: 1.55, margin: '7px 0 0' }}>Thời gian này tự cập nhật mỗi khi chạy bản build mới trên máy chủ.</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {CHANGELOG.map((release, releaseIndex) => (
+                <section key={release.version} style={{ display: 'grid', gridTemplateColumns: '112px minmax(0,1fr)', gap: 18 }}>
+                  <div style={{ paddingTop: 3 }}>
+                    <strong style={{ color: releaseIndex === 0 ? 'var(--primary)' : '#334155', fontSize: 15 }}>v{release.version}</strong>
+                    <div style={{ color: '#94a3b8', fontSize: 11.5, marginTop: 5 }}>{new Date(`${release.releasedAt}T00:00:00+07:00`).toLocaleDateString('vi-VN')}</div>
+                    {releaseIndex === 0 && <span style={{ display: 'inline-block', marginTop: 8, padding: '3px 7px', borderRadius: 99, background: '#dcfce7', color: '#15803d', fontSize: 10.5, fontWeight: 800 }}>MỚI NHẤT</span>}
+                  </div>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 13, padding: '17px 18px', background: '#fff' }}>
+                    <h2 style={{ color: '#0f172a', fontSize: 17, margin: 0 }}>{release.title}</h2>
+                    <p style={{ color: '#64748b', fontSize: 12.5, lineHeight: 1.55, margin: '5px 0 15px' }}>{release.summary}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                      {release.changes.map((change, changeIndex) => {
+                        const meta = changeMeta[change.kind];
+                        const ChangeIcon = change.kind === 'new' ? Sparkles : change.kind === 'fixed' ? Bug : change.kind === 'security' ? ShieldCheck : Wrench;
+                        return (
+                          <div key={`${release.version}-${changeIndex}`} style={{ display: 'grid', gridTemplateColumns: '76px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
+                            <span style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 7, color: meta.color, background: meta.background, fontSize: 10.5, fontWeight: 800 }}><ChangeIcon size={11} /> {meta.label}</span>
+                            <span style={{ color: '#334155', fontSize: 12.5, lineHeight: 1.5 }}>{change.text}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 22, borderRadius: 10, padding: '12px 14px', background: '#eff6ff', color: '#1e40af', fontSize: 12, lineHeight: 1.6 }}>
+              Khi phát hành code mới, thêm phiên bản lên đầu file <strong>src/data/changelog.ts</strong> rồi chạy <strong>npm run build</strong>. Phiên bản và nội dung mới sẽ tự xuất hiện tại đây.
             </div>
           </div>
         )}

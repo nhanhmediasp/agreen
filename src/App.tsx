@@ -25,6 +25,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import Login from './pages/Login';
 import { checkLogin, doLogout, updateAdminCredentials, type AuthUser } from './auth/clientAuth';
 import { ImageGallery } from './components/ImageGallery';
+import { APP_VERSION } from './data/changelog';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const PublicStatus = lazy(() => import('./pages/PublicStatus'));
@@ -184,7 +185,7 @@ function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
           >
             <LogOut size={15} />
             <span style={{ flex: 1 }}>Đăng xuất</span>
-            <span style={{ fontSize: '10px', opacity: 0.5 }}>v2.5</span>
+            <span style={{ fontSize: '10px', opacity: 0.5 }}>v{APP_VERSION}</span>
           </button>
         </div>
       </aside>
