@@ -1713,6 +1713,432 @@ app.post('/api/rentals/:id/payments', requireRole('admin', 'accounting'), asyncR
   res.status(201).json({ success: true, data: payment });
 }));
 
+app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(async (req, res) => {
+  const start = optionalDate(req.query, ['start']);
+  const end = optionalDate(req.query, ['end']);
+  if (!start || !end) throw new ApiError(400, 'start and end are required');
+  if (Date.parse(end) <= Date.parse(start)) {
+    throw new ApiError(400, 'end must be after start');
+  }
+  const groupBy = ensureEnum(
+    optionalString(req.query, ['groupBy']),
+    new Set(['day', 'week', 'month']),
+    'groupBy',
+  ) ?? 'day';
+
+  const [overview, series, expenseBreakdown, vehicles, customers, fleet] = await Promise.all([
+    query(
+      `WITH rental_payment_totals AS (
+         SELECT rental_id,
+                COALESCE(SUM(CASE
+                  WHEN status='completed' AND payment_type IN ('balance','surcharge','deposit_application') THEN amount
+                  WHEN status='completed' AND payment_type='refund' THEN -amount
+                  ELSE 0
+                END), 0) AS applied
+         FROM rental_payments
+         WHERE paid_at < $2::timestamptz
+         GROUP BY rental_id
+       ),
+       service_payment_totals AS (
+         SELECT service_order_id,
+                COALESCE(SUM(CASE
+                  WHEN status='completed' AND payment_type='payment' THEN amount
+                  WHEN status='completed' AND payment_type='refund' THEN -amount
+                  ELSE 0
+                END), 0) AS applied
+         FROM service_order_payments
+         WHERE paid_at < $2::timestamptz
+         GROUP BY service_order_id
+       ),
+       scoped_rentals AS (
+         SELECT r.*, COALESCE(p.applied, 0) AS applied
+         FROM rentals r
+         LEFT JOIN rental_payment_totals p ON p.rental_id=r.id
+         WHERE r.status='completed'
+           AND COALESCE(r.returned_at,r.created_at) >= $1::timestamptz
+           AND COALESCE(r.returned_at,r.created_at) < $2::timestamptz
+       ),
+       scoped_services AS (
+         SELECT s.*, COALESCE(p.applied, 0) AS applied
+         FROM service_orders s
+         LEFT JOIN service_payment_totals p ON p.service_order_id=s.id
+         WHERE s.status='completed'
+           AND COALESCE(s.completed_at,s.created_at) >= $1::timestamptz
+           AND COALESCE(s.completed_at,s.created_at) < $2::timestamptz
+       )
+       SELECT
+         COALESCE((SELECT SUM(total_amount) FROM scoped_rentals), 0) AS rental_revenue,
+         COALESCE((SELECT SUM(total_amount) FROM scoped_services), 0) AS service_revenue,
+         COALESCE((SELECT SUM(GREATEST(total_amount-applied,0)) FROM scoped_rentals), 0)
+           + COALESCE((SELECT SUM(GREATEST(total_amount-applied,0)) FROM scoped_services), 0) AS receivables,
+         COALESCE((
+           SELECT SUM(CASE
+             WHEN status='completed' AND payment_type IN ('balance','surcharge','deposit_application') THEN amount
+             WHEN status='completed' AND payment_type='refund' THEN -amount
+             ELSE 0
+           END)
+           FROM rental_payments
+           WHERE paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+         ), 0)
+           + COALESCE((
+             SELECT SUM(CASE
+               WHEN status='completed' AND payment_type='payment' THEN amount
+               WHEN status='completed' AND payment_type='refund' THEN -amount
+               ELSE 0
+             END)
+             FROM service_order_payments
+             WHERE paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+           ), 0) AS collected_revenue,
+         COALESCE((
+           SELECT SUM(CASE
+             WHEN status='completed' AND payment_type IN ('deposit','balance','surcharge') THEN amount
+             WHEN status='completed' AND payment_type IN ('deposit_refund','refund') THEN -amount
+             ELSE 0
+           END)
+           FROM rental_payments
+           WHERE paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+         ), 0)
+           + COALESCE((
+             SELECT SUM(CASE
+               WHEN status='completed' AND payment_type='payment' THEN amount
+               WHEN status='completed' AND payment_type='refund' THEN -amount
+               ELSE 0
+             END)
+             FROM service_order_payments
+             WHERE paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+           ), 0) AS cash_in,
+         COALESCE((
+           SELECT SUM(CASE
+             WHEN status='completed' AND payment_type='deposit' THEN amount
+             WHEN status='completed' AND payment_type IN ('deposit_refund','deposit_application') THEN -amount
+             ELSE 0
+           END)
+           FROM rental_payments
+           WHERE status='completed' AND paid_at < $2::timestamptz
+         ), 0) AS deposits_held,
+         COALESCE((
+           SELECT SUM(amount)
+           FROM rental_payments
+           WHERE status='completed' AND payment_type='deposit_refund'
+             AND paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+         ), 0) AS deposit_refunded,
+         COALESCE((
+           SELECT COUNT(*)
+           FROM rentals
+           WHERE deposit_type='motorbike'
+             AND deposit_status='received'
+             AND deposit_returned_at IS NULL
+             AND created_at < $2::timestamptz
+         ), 0) AS motorcycle_collateral_held,
+         COALESCE((
+           SELECT SUM(amount)
+           FROM expenses
+           WHERE expense_date >= (($1::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+             AND expense_date < (($2::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+         ), 0) AS operating_expenses,
+         COALESCE((
+           SELECT SUM(total_amount)
+           FROM owner_payouts
+           WHERE status='confirmed' AND paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+         ), 0) AS owner_payouts,
+         COALESCE((SELECT SUM(driver_commission_amount) FROM scoped_services), 0) AS driver_commissions` ,
+      [start, end],
+    ),
+    query(
+      `WITH events AS (
+         SELECT date_trunc($3, COALESCE(returned_at,created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh') AS bucket,
+                SUM(total_amount) AS revenue, SUM(total_amount) AS rental_revenue, 0::numeric AS service_revenue,
+                0::numeric AS collected_revenue, 0::numeric AS cash_in, 0::numeric AS operating_expenses,
+                0::numeric AS owner_payouts, 0::numeric AS driver_commissions
+         FROM rentals
+         WHERE status='completed'
+           AND COALESCE(returned_at,created_at) >= $1::timestamptz
+           AND COALESCE(returned_at,created_at) < $2::timestamptz
+         GROUP BY 1
+         UNION ALL
+         SELECT date_trunc($3, COALESCE(completed_at,created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+                SUM(total_amount), 0::numeric, SUM(total_amount),
+                0::numeric, 0::numeric, 0::numeric, 0::numeric, 0::numeric
+         FROM service_orders
+         WHERE status='completed'
+           AND COALESCE(completed_at,created_at) >= $1::timestamptz
+           AND COALESCE(completed_at,created_at) < $2::timestamptz
+         GROUP BY 1
+         UNION ALL
+         SELECT date_trunc($3, paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+                0::numeric, 0::numeric, 0::numeric,
+                SUM(CASE
+                  WHEN payment_type IN ('balance','surcharge','deposit_application') THEN amount
+                  WHEN payment_type='refund' THEN -amount
+                  ELSE 0
+                END),
+                SUM(CASE
+                  WHEN payment_type IN ('deposit','balance','surcharge') THEN amount
+                  WHEN payment_type IN ('deposit_refund','refund') THEN -amount
+                  ELSE 0
+                END),
+                0::numeric, 0::numeric, 0::numeric
+         FROM rental_payments
+         WHERE status='completed' AND paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+         GROUP BY 1
+         UNION ALL
+         SELECT date_trunc($3, paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+                0::numeric, 0::numeric, 0::numeric,
+                SUM(CASE WHEN payment_type='payment' THEN amount WHEN payment_type='refund' THEN -amount ELSE 0 END),
+                SUM(CASE WHEN payment_type='payment' THEN amount WHEN payment_type='refund' THEN -amount ELSE 0 END),
+                0::numeric, 0::numeric, 0::numeric
+         FROM service_order_payments
+         WHERE status='completed' AND paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+         GROUP BY 1
+         UNION ALL
+         SELECT date_trunc($3, expense_date::timestamp),
+                0::numeric, 0::numeric, 0::numeric, 0::numeric, 0::numeric,
+                SUM(amount), 0::numeric, 0::numeric
+         FROM expenses
+         WHERE expense_date >= (($1::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+           AND expense_date < (($2::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+         GROUP BY 1
+         UNION ALL
+         SELECT date_trunc($3, paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+                0::numeric, 0::numeric, 0::numeric, 0::numeric, 0::numeric, 0::numeric,
+                SUM(total_amount), 0::numeric
+         FROM owner_payouts
+         WHERE status='confirmed' AND paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+         GROUP BY 1
+         UNION ALL
+         SELECT date_trunc($3, COALESCE(completed_at,created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+                0::numeric, 0::numeric, 0::numeric, 0::numeric, 0::numeric, 0::numeric, 0::numeric,
+                SUM(driver_commission_amount)
+         FROM service_orders
+         WHERE status='completed'
+           AND COALESCE(completed_at,created_at) >= $1::timestamptz
+           AND COALESCE(completed_at,created_at) < $2::timestamptz
+         GROUP BY 1
+       )
+       SELECT bucket,
+              COALESCE(SUM(revenue),0) AS revenue,
+              COALESCE(SUM(rental_revenue),0) AS rental_revenue,
+              COALESCE(SUM(service_revenue),0) AS service_revenue,
+              COALESCE(SUM(collected_revenue),0) AS collected_revenue,
+              COALESCE(SUM(cash_in),0) AS cash_in,
+              COALESCE(SUM(operating_expenses),0) AS operating_expenses,
+              COALESCE(SUM(owner_payouts),0) AS owner_payouts,
+              COALESCE(SUM(driver_commissions),0) AS driver_commissions
+       FROM events
+       GROUP BY bucket
+       ORDER BY bucket`,
+      [start, end, groupBy],
+    ),
+    query(
+      `SELECT category, SUM(amount) AS amount
+       FROM expenses
+       WHERE expense_date >= (($1::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+         AND expense_date < (($2::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+       GROUP BY category
+       UNION ALL
+       SELECT 'Chi trả chủ xe' AS category, COALESCE(SUM(total_amount),0) AS amount
+       FROM owner_payouts
+       WHERE status='confirmed' AND paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+       UNION ALL
+       SELECT 'Hoa hồng tài xế' AS category, COALESCE(SUM(driver_commission_amount),0) AS amount
+       FROM service_orders
+       WHERE status='completed'
+         AND COALESCE(completed_at,created_at) >= $1::timestamptz
+         AND COALESCE(completed_at,created_at) < $2::timestamptz
+       ORDER BY amount DESC`,
+      [start, end],
+    ),
+    query(
+      `WITH rental_metrics AS (
+         SELECT car_id,
+                COALESCE(SUM(total_amount) FILTER (WHERE status='completed'
+                  AND COALESCE(returned_at,created_at) >= $1::timestamptz
+                  AND COALESCE(returned_at,created_at) < $2::timestamptz),0) AS rental_revenue,
+                COUNT(*) FILTER (WHERE status='completed'
+                  AND COALESCE(returned_at,created_at) >= $1::timestamptz
+                  AND COALESCE(returned_at,created_at) < $2::timestamptz) AS rental_count,
+                COALESCE(SUM(EXTRACT(EPOCH FROM (
+                  LEAST(COALESCE(returned_at,end_date),$2::timestamptz)
+                  - GREATEST(COALESCE(delivered_at,start_date),$1::timestamptz)
+                )) / 3600) FILTER (
+                  WHERE status IN ('active','completed')
+                    AND COALESCE(delivered_at,start_date) < $2::timestamptz
+                    AND COALESCE(returned_at,end_date) > $1::timestamptz
+                ),0) AS utilized_hours
+         FROM rentals
+         GROUP BY car_id
+       ), service_metrics AS (
+         SELECT car_id,
+                COALESCE(SUM(total_amount) FILTER (WHERE status='completed'
+                  AND COALESCE(completed_at,created_at) >= $1::timestamptz
+                  AND COALESCE(completed_at,created_at) < $2::timestamptz),0) AS service_revenue,
+                COALESCE(SUM(driver_commission_amount) FILTER (WHERE status='completed'
+                  AND COALESCE(completed_at,created_at) >= $1::timestamptz
+                  AND COALESCE(completed_at,created_at) < $2::timestamptz),0) AS driver_commissions,
+                COUNT(*) FILTER (WHERE status='completed'
+                  AND COALESCE(completed_at,created_at) >= $1::timestamptz
+                  AND COALESCE(completed_at,created_at) < $2::timestamptz) AS service_count
+         FROM service_orders
+         GROUP BY car_id
+       ), expense_metrics AS (
+         SELECT v.id AS vehicle_id, COALESCE(SUM(e.amount),0) AS operating_expenses
+         FROM vehicles v
+         LEFT JOIN expenses e ON (e.vehicle_id=v.id OR e.ref=v.plate_number)
+           AND e.expense_date >= (($1::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+           AND e.expense_date < (($2::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+         GROUP BY v.id
+       ), payout_metrics AS (
+         SELECT r.car_id, COALESCE(SUM(i.amount),0) AS owner_payouts
+         FROM owner_payout_items i
+         JOIN owner_payouts p ON p.id=i.payout_id
+         JOIN rentals r ON r.id=i.rental_id
+         WHERE p.status='confirmed' AND p.paid_at >= $1::timestamptz AND p.paid_at < $2::timestamptz
+         GROUP BY r.car_id
+       )
+       SELECT v.plate_number AS id,
+              concat_ws(' ', v.brand, v.model) AS name,
+              COALESCE(r.rental_revenue,0) + COALESCE(s.service_revenue,0) AS revenue,
+              COALESCE(e.operating_expenses,0) AS operating_expenses,
+              COALESCE(p.owner_payouts,0) AS owner_payouts,
+              COALESCE(s.driver_commissions,0) AS driver_commissions,
+              COALESCE(r.rental_count,0) AS rental_count,
+              COALESCE(s.service_count,0) AS service_count,
+              COALESCE(r.utilized_hours,0) AS utilized_hours,
+              LEAST(100, ROUND((COALESCE(r.utilized_hours,0) / NULLIF(EXTRACT(EPOCH FROM ($2::timestamptz-$1::timestamptz))/3600,0) * 100)::numeric, 1)) AS utilization_rate
+       FROM vehicles v
+       LEFT JOIN rental_metrics r ON r.car_id=v.plate_number
+       LEFT JOIN service_metrics s ON s.car_id=v.plate_number
+       LEFT JOIN expense_metrics e ON e.vehicle_id=v.id
+       LEFT JOIN payout_metrics p ON p.car_id=v.plate_number
+       ORDER BY revenue DESC, v.plate_number`,
+      [start, end],
+    ),
+    query(
+      `WITH customers AS (
+         SELECT customer_name AS name, customer_phone AS phone, COUNT(*) AS orders, SUM(total_amount) AS revenue
+         FROM rentals
+         WHERE status='completed'
+           AND COALESCE(returned_at,created_at) >= $1::timestamptz
+           AND COALESCE(returned_at,created_at) < $2::timestamptz
+         GROUP BY customer_name, customer_phone
+         UNION ALL
+         SELECT NULLIF(customer_name,''), NULLIF(customer_phone,''), COUNT(*), SUM(total_amount)
+         FROM service_orders
+         WHERE status='completed'
+           AND COALESCE(completed_at,created_at) >= $1::timestamptz
+           AND COALESCE(completed_at,created_at) < $2::timestamptz
+         GROUP BY customer_name, customer_phone
+       )
+       SELECT COALESCE(name,'Khách lẻ') AS name, COALESCE(phone,'') AS phone,
+              SUM(orders)::int AS orders, SUM(revenue) AS revenue
+       FROM customers
+       GROUP BY name, phone
+       ORDER BY revenue DESC, orders DESC
+       LIMIT 5`,
+      [start, end],
+    ),
+    query(
+      `WITH vehicle_statuses AS (
+         SELECT ${effectiveVehicleStatusSql('v')} AS status
+         FROM vehicles v
+       )
+       SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE status='Available')::int AS available,
+              COUNT(*) FILTER (WHERE status='Reserved')::int AS reserved,
+              COUNT(*) FILTER (WHERE status='Rented')::int AS rented,
+              COUNT(*) FILTER (WHERE status='Maintenance')::int AS maintenance,
+              COUNT(*) FILTER (WHERE status='Suspended')::int AS suspended
+       FROM vehicle_statuses`,
+    ),
+  ]);
+
+  const row = overview.rows[0] || {};
+  const rentalRevenue = Number(row.rental_revenue) || 0;
+  const serviceRevenue = Number(row.service_revenue) || 0;
+  const revenue = rentalRevenue + serviceRevenue;
+  const operatingExpenses = Number(row.operating_expenses) || 0;
+  const ownerPayouts = Number(row.owner_payouts) || 0;
+  const driverCommissions = Number(row.driver_commissions) || 0;
+  const totalCosts = operatingExpenses + ownerPayouts + driverCommissions;
+  const profit = revenue - totalCosts;
+  const cashIn = Number(row.cash_in) || 0;
+
+  const breakdownMap = new Map();
+  for (const item of expenseBreakdown.rows) {
+    const category = item.category || 'Khác';
+    breakdownMap.set(category, (breakdownMap.get(category) || 0) + (Number(item.amount) || 0));
+  }
+  const fleetRow = fleet.rows[0] || {};
+  const fleetData = {
+    total: Number(fleetRow.total) || 0,
+    available: Number(fleetRow.available) || 0,
+    reserved: Number(fleetRow.reserved) || 0,
+    rented: Number(fleetRow.rented) || 0,
+    maintenance: Number(fleetRow.maintenance) || 0,
+    suspended: Number(fleetRow.suspended) || 0,
+  };
+
+  res.json({
+    success: true,
+    data: {
+      period: { start, end, group_by: groupBy },
+      summary: {
+        revenue,
+        rental_revenue: rentalRevenue,
+        service_revenue: serviceRevenue,
+        collected_revenue: Number(row.collected_revenue) || 0,
+        cash_in: cashIn,
+        operating_expenses: operatingExpenses,
+        owner_payouts: ownerPayouts,
+        driver_commissions: driverCommissions,
+        total_costs: totalCosts,
+        profit,
+        profit_margin: revenue > 0 ? (profit / revenue) * 100 : 0,
+        receivables: Number(row.receivables) || 0,
+        deposits_held: Number(row.deposits_held) || 0,
+        deposit_refunded: Number(row.deposit_refunded) || 0,
+        motorcycle_collateral_held: Number(row.motorcycle_collateral_held) || 0,
+        net_cash_flow: cashIn - operatingExpenses - ownerPayouts,
+      },
+      series: series.rows.map((item) => ({
+        bucket: item.bucket,
+        revenue: Number(item.revenue) || 0,
+        rental_revenue: Number(item.rental_revenue) || 0,
+        service_revenue: Number(item.service_revenue) || 0,
+        collected_revenue: Number(item.collected_revenue) || 0,
+        cash_in: Number(item.cash_in) || 0,
+        operating_expenses: Number(item.operating_expenses) || 0,
+        owner_payouts: Number(item.owner_payouts) || 0,
+        driver_commissions: Number(item.driver_commissions) || 0,
+      })),
+      expense_breakdown: Array.from(breakdownMap.entries()).map(([category, amount]) => ({ category, amount })),
+      vehicles: vehicles.rows.map((item) => ({
+        id: item.id,
+        name: item.name || item.id,
+        revenue: Number(item.revenue) || 0,
+        operating_expenses: Number(item.operating_expenses) || 0,
+        owner_payouts: Number(item.owner_payouts) || 0,
+        driver_commissions: Number(item.driver_commissions) || 0,
+        rental_count: Number(item.rental_count) || 0,
+        service_count: Number(item.service_count) || 0,
+        utilized_hours: Number(item.utilized_hours) || 0,
+        utilization_rate: Number(item.utilization_rate) || 0,
+        profit: (Number(item.revenue) || 0)
+          - (Number(item.operating_expenses) || 0)
+          - (Number(item.owner_payouts) || 0)
+          - (Number(item.driver_commissions) || 0),
+      })),
+      customers: customers.rows.map((item) => ({
+        name: item.name || 'Khách lẻ',
+        phone: item.phone || '',
+        orders: Number(item.orders) || 0,
+        revenue: Number(item.revenue) || 0,
+      })),
+      fleet: fleetData,
+    },
+  });
+}));
+
 app.get('/api/finance/summary', requireRole('admin', 'accounting'), asyncRoute(async (req, res) => {
   const start = optionalDate(req.query, ['start']);
   const end = optionalDate(req.query, ['end']);

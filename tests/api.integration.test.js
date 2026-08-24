@@ -81,6 +81,43 @@ test('unauthenticated administrative API request returns 401', async () => {
   });
 });
 
+test('reports summary is read-only and returns the normalized financial sections', async () => {
+  const queries = [];
+  app.locals.dbQuery = async (sql, params = []) => {
+    queries.push({ sql, params });
+    if (sql.includes('FROM users WHERE id::text')) return result([USER]);
+    if (sql.includes('WITH rental_payment_totals')) return result([{
+      rental_revenue: '1000000',
+      service_revenue: '250000',
+      receivables: '300000',
+      collected_revenue: '950000',
+      cash_in: '1150000',
+      deposits_held: '500000',
+      deposit_refunded: '0',
+      motorcycle_collateral_held: '1',
+      operating_expenses: '100000',
+      owner_payouts: '200000',
+      driver_commissions: '25000',
+    }]);
+    if (sql.includes('WITH events')) return result([{ bucket: '2026-08-24 00:00:00', revenue: '1250000' }]);
+    if (sql.includes('SELECT category, SUM(amount)')) return result([{ category: 'Bảo dưỡng', amount: '100000' }]);
+    if (sql.includes('WITH rental_metrics')) return result([{ id: '51A-123.45', name: 'Toyota Vios', revenue: '1250000', utilization_rate: '42.5', profit: '925000' }]);
+    if (sql.includes('WITH customers')) return result([{ name: 'Nguyễn Văn A', phone: '0900000000', orders: '2', revenue: '1250000' }]);
+    if (sql.includes('WITH vehicle_statuses')) return result([{ total: '3', available: '1', reserved: '1', rented: '1', maintenance: '0', suspended: '0' }]);
+    throw new Error(`Unexpected reports query: ${sql}`);
+  };
+
+  const response = await jsonRequest('/api/reports/summary?start=2026-08-01T00:00:00.000Z&end=2026-09-01T00:00:00.000Z&groupBy=day');
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.success, true);
+  assert.equal(payload.data.summary.revenue, 1250000);
+  assert.equal(payload.data.summary.total_costs, 325000);
+  assert.equal(payload.data.summary.profit, 925000);
+  assert.equal(payload.data.fleet.total, 3);
+  assert.equal(queries.some(({ sql }) => /\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(sql)), false);
+});
+
 test('public lookup rejects enumeration input and uses exact approved-field lookup', async () => {
   let queryCount = 0;
   app.locals.dbQuery = async (sql, params) => {
