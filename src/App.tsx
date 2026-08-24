@@ -38,6 +38,7 @@ const Contracts = lazy(() => import('./pages/Contracts'));
 const Owners = lazy(() => import('./pages/Owners'));
 const ServiceOrders = lazy(() => import('./pages/ServiceOrders'));
 const Deposits = lazy(() => import('./pages/Deposits'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 const RouteFallback = () => (
   <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>Đang tải…</div>
@@ -426,7 +427,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { isLoading, loadError } = useApp();
   const location = useLocation();
-  const pageTitle = PAGE_TITLES[location.pathname] || 'Dashboard';
+  const pageTitle = PAGE_TITLES[location.pathname] || 'Không tìm thấy trang';
 
   // Close sidebar on route change (mobile)
   useEffect(() => { setIsMobileOpen(false); }, [location.pathname]);
@@ -568,6 +569,7 @@ function App() {
             <Route path="/expenses" element={<AdminLayout><Expenses /></AdminLayout>} />
             <Route path="/reports" element={<AdminLayout><Reports /></AdminLayout>} />
             <Route path="/settings" element={<AdminLayout><SettingsPage /></AdminLayout>} />
+            <Route path="*" element={<AdminLayout><NotFound /></AdminLayout>} />
           </Routes>
         </Suspense>
         <ToastContainer />
