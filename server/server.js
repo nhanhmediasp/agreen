@@ -2044,7 +2044,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
                 0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,
                 SUM(CASE WHEN p.payment_type='payment' THEN p.amount ELSE 0 END),
                 SUM(CASE WHEN p.payment_type='refund' THEN p.amount ELSE 0 END),
-                0::numeric,0::numeric,0::numeric,0::numeric
+                0::numeric,0::numeric,0::numeric
          FROM service_order_payments p
          WHERE p.status='completed' AND p.paid_at >= $1::timestamptz AND p.paid_at < $2::timestamptz
          GROUP BY 1

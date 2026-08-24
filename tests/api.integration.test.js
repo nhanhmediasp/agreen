@@ -22,6 +22,32 @@ let originalQuery;
 let originalGetClient;
 
 const result = (rows = []) => ({ rows, rowCount: rows.length });
+const topLevelSelectColumnCount = (selectSql) => {
+  const selectStart = selectSql.indexOf('SELECT');
+  assert.notEqual(selectStart, -1);
+  let depth = 0;
+  let quoted = false;
+  let columns = 1;
+
+  for (let index = selectStart + 'SELECT'.length; index < selectSql.length; index += 1) {
+    const character = selectSql[index];
+    if (character === "'") {
+      if (quoted && selectSql[index + 1] === "'") {
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+    if (quoted) continue;
+    if (character === '(') depth += 1;
+    if (character === ')') depth -= 1;
+    if (depth === 0 && character === ',') columns += 1;
+    if (depth === 0 && /^FROM\b/.test(selectSql.slice(index))) return columns;
+  }
+
+  throw new Error('Unable to find the top-level FROM clause');
+};
 const authCookie = () => (
   `agreen_session=${encodeURIComponent(authTestHelpers.signToken(USER))}; `
   + `agreen_csrf=${encodeURIComponent(CSRF_TOKEN)}`
@@ -185,6 +211,11 @@ test('reports summary is read-only and returns the normalized financial sections
   assert.match(overviewSql, /item->>'amount'.*~ /s);
   assert.match(seriesSql, /date_trunc\(\$3::text/);
   assert.match(vehicleSql, /e\.vehicle_id::text=v\.id::text/);
+  const eventBranches = seriesSql
+    .slice(seriesSql.indexOf('), events AS (') + '), events AS ('.length, seriesSql.indexOf('), totals AS ('))
+    .split(/\n\s+UNION ALL\n/);
+  assert.equal(eventBranches.length, 10);
+  assert.deepEqual(eventBranches.map(topLevelSelectColumnCount), Array(10).fill(12));
   assert.deepEqual(payload.data.data_quality.report_query_failures, []);
   assert.equal(queries.some(({ sql }) => /\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(sql)), false);
 });
