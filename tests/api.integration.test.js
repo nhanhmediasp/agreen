@@ -178,7 +178,45 @@ test('reports summary is read-only and returns the normalized financial sections
   assert.equal(payload.data.summary.total_receivables, 350000);
   assert.equal(payload.data.summary.net_cash_flow, 825000);
   assert.equal(payload.data.fleet.total, 3);
+  const overviewSql = queries.find(({ sql }) => sql.includes('WITH rental_ledgers'))?.sql || '';
+  const seriesSql = queries.find(({ sql }) => sql.includes('WITH rental_ledger_presence'))?.sql || '';
+  const vehicleSql = queries.find(({ sql }) => sql.includes('WITH rental_metrics'))?.sql || '';
+  assert.match(overviewSql, /jsonb_typeof/);
+  assert.match(overviewSql, /item->>'amount'.*~ /s);
+  assert.match(seriesSql, /date_trunc\(\$3::text/);
+  assert.match(vehicleSql, /e\.vehicle_id::text=v\.id::text/);
+  assert.deepEqual(payload.data.data_quality.report_query_failures, []);
   assert.equal(queries.some(({ sql }) => /\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(sql)), false);
+});
+
+test('reports summary keeps core totals available when an optional section fails', async () => {
+  app.locals.dbQuery = async (sql) => {
+    if (sql.includes('FROM users WHERE id::text')) return result([USER]);
+    if (sql.includes('WITH rental_ledgers')) return result([{
+      rental_revenue: '1000000',
+      service_revenue: '0',
+      operating_expenses: '200000',
+      owner_commissions: '100000',
+      driver_commissions: '0',
+    }]);
+    if (sql.includes('WITH customer_rows')) throw new Error('synthetic customer report failure');
+    return result([]);
+  };
+
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  try {
+    const response = await jsonRequest('/api/reports/summary?start=2026-08-01T00:00:00.000Z&end=2026-09-01T00:00:00.000Z&groupBy=day');
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.data.summary.revenue, 1000000);
+    assert.equal(payload.data.summary.total_costs, 300000);
+    assert.equal(payload.data.summary.profit, 700000);
+    assert.deepEqual(payload.data.customers, []);
+    assert.deepEqual(payload.data.data_quality.report_query_failures, ['customers']);
+  } finally {
+    console.error = originalConsoleError;
+  }
 });
 
 test('public lookup rejects enumeration input and uses exact approved-field lookup', async () => {

@@ -1757,18 +1757,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
   const expenseKind = reportExpenseKindSql('e');
   const ownerCommission = reportOwnerCommissionSql('r', 'o');
   const driverCommission = reportDriverCommissionSql('s');
-  const [
-    overview,
-    series,
-    expenseBreakdown,
-    cashOutBreakdown,
-    vehicles,
-    customers,
-    fleet,
-    owners,
-    drivers,
-    dataQuality,
-  ] = await Promise.all([
+  const reportResults = await Promise.allSettled([
     query(
       `WITH rental_ledgers AS (
          SELECT rental_id,
@@ -1811,8 +1800,19 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
                 COALESCE(l.deposit_entries,0) AS deposit_entries,
                 ${ownerCommission} AS effective_owner_commission,
                 COALESCE((
-                  SELECT SUM(COALESCE((item->>'amount')::numeric,0))
-                  FROM jsonb_array_elements(COALESCE(r.violations,'[]'::jsonb)) item
+                  SELECT SUM(CASE
+                    WHEN COALESCE(item->>'amount','')
+                      ~ '^[[:space:]]*[+-]?[0-9]+([.][0-9]+)?[[:space:]]*$'
+                      THEN (item->>'amount')::numeric
+                    ELSE 0
+                  END)
+                  FROM jsonb_array_elements(
+                    CASE
+                      WHEN jsonb_typeof(COALESCE(r.violations,'[]'::jsonb))='array'
+                        THEN COALESCE(r.violations,'[]'::jsonb)
+                      ELSE '[]'::jsonb
+                    END
+                  ) item
                   WHERE COALESCE(item->>'status','') <> 'void'
                 ),0) AS violation_amount
          FROM rentals r
@@ -1985,15 +1985,15 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
                 ($2::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh') AS end_local
        ), buckets AS (
          SELECT generate_series(
-           date_trunc($3,start_local),
-           date_trunc($3,end_local - interval '1 microsecond'),
-           CASE $3 WHEN 'month' THEN interval '1 month'
+           date_trunc($3::text,start_local),
+           date_trunc($3::text,end_local - interval '1 microsecond'),
+           CASE $3::text WHEN 'month' THEN interval '1 month'
                    WHEN 'week' THEN interval '1 week'
                    ELSE interval '1 day' END
          ) AS bucket
          FROM bounds
        ), events AS (
-         SELECT date_trunc($3,COALESCE(r.returned_at,r.created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh') AS bucket,
+         SELECT date_trunc($3::text,COALESCE(r.returned_at,r.created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh') AS bucket,
                 SUM(r.total_amount) AS revenue, SUM(r.total_amount) AS rental_revenue,
                 0::numeric AS service_revenue, 0::numeric AS operating_expenses,
                 SUM(${ownerCommission}) AS owner_commissions,
@@ -2007,7 +2007,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
            AND COALESCE(r.returned_at,r.created_at) < $2::timestamptz
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,COALESCE(s.completed_at,s.created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+         SELECT date_trunc($3::text,COALESCE(s.completed_at,s.created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh'),
                 SUM(s.total_amount),0::numeric,SUM(s.total_amount),0::numeric,0::numeric,
                 SUM(${driverCommission}),0::numeric,0::numeric,0::numeric,0::numeric,0::numeric
          FROM service_orders s
@@ -2015,7 +2015,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
            AND COALESCE(s.completed_at,s.created_at) < $2::timestamptz
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,e.expense_date::timestamp),0::numeric,0::numeric,0::numeric,
+         SELECT date_trunc($3::text,e.expense_date::timestamp),0::numeric,0::numeric,0::numeric,
                 SUM(e.amount) FILTER (WHERE ${expenseKind}='operating'),0::numeric,0::numeric,
                 0::numeric,0::numeric,0::numeric,SUM(e.amount),0::numeric
          FROM expenses e
@@ -2023,14 +2023,14 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
            AND e.expense_date < (($2::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,p.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+         SELECT date_trunc($3::text,p.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
                 0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,
                 0::numeric,0::numeric,0::numeric,0::numeric,SUM(p.total_amount)
          FROM owner_payouts p
          WHERE p.status='confirmed' AND p.paid_at >= $1::timestamptz AND p.paid_at < $2::timestamptz
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,p.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+         SELECT date_trunc($3::text,p.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
                 0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,
                 SUM(CASE WHEN p.payment_type IN ('deposit','balance','surcharge') THEN p.amount ELSE 0 END),
                 SUM(CASE WHEN p.payment_type='refund' THEN p.amount ELSE 0 END),
@@ -2040,7 +2040,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
          WHERE p.status='completed' AND p.paid_at >= $1::timestamptz AND p.paid_at < $2::timestamptz
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,p.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+         SELECT date_trunc($3::text,p.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
                 0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,
                 SUM(CASE WHEN p.payment_type='payment' THEN p.amount ELSE 0 END),
                 SUM(CASE WHEN p.payment_type='refund' THEN p.amount ELSE 0 END),
@@ -2049,7 +2049,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
          WHERE p.status='completed' AND p.paid_at >= $1::timestamptz AND p.paid_at < $2::timestamptz
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,COALESCE(r.returned_at,r.created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+         SELECT date_trunc($3::text,COALESCE(r.returned_at,r.created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh'),
                 0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,
                 SUM(r.total_amount),0::numeric,0::numeric,0::numeric,0::numeric
          FROM rentals r
@@ -2059,7 +2059,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
            AND COALESCE(r.returned_at,r.created_at) < $2::timestamptz
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,COALESCE(s.completed_at,s.created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+         SELECT date_trunc($3::text,COALESCE(s.completed_at,s.created_at) AT TIME ZONE 'Asia/Ho_Chi_Minh'),
                 0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,
                 SUM(s.total_amount),0::numeric,0::numeric,0::numeric,0::numeric
          FROM service_orders s
@@ -2069,7 +2069,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
            AND COALESCE(s.completed_at,s.created_at) < $2::timestamptz
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,r.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+         SELECT date_trunc($3::text,r.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
                 0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,
                 SUM(r.deposit),0::numeric,0::numeric,0::numeric,0::numeric
          FROM rentals r
@@ -2079,7 +2079,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
            AND r.created_at >= $1::timestamptz AND r.created_at < $2::timestamptz
          GROUP BY 1
          UNION ALL
-         SELECT date_trunc($3,r.deposit_returned_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+         SELECT date_trunc($3::text,r.deposit_returned_at AT TIME ZONE 'Asia/Ho_Chi_Minh'),
                 0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,0::numeric,
                 0::numeric,0::numeric,SUM(r.deposit),0::numeric,0::numeric
          FROM rentals r
@@ -2216,7 +2216,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
          GROUP BY s.car_id
        ), expense_metrics AS (
          SELECT v.id AS vehicle_id, COALESCE(SUM(e.amount),0) AS operating_expenses
-         FROM vehicles v LEFT JOIN expenses e ON (e.vehicle_id=v.id OR e.ref=v.plate_number)
+         FROM vehicles v LEFT JOIN expenses e ON (e.vehicle_id::text=v.id::text OR e.ref=v.plate_number)
            AND ${expenseKind}='operating'
            AND e.expense_date >= (($1::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
            AND e.expense_date < (($2::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
@@ -2412,6 +2412,45 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
     ),
   ]);
 
+  const reportSectionNames = [
+    'overview',
+    'series',
+    'expense_breakdown',
+    'cash_out_breakdown',
+    'vehicles',
+    'customers',
+    'fleet',
+    'owners',
+    'drivers',
+    'data_quality',
+  ];
+  const failedReportSections = reportResults
+    .map((result, index) => ({ result, name: reportSectionNames[index] }))
+    .filter(({ result }) => result.status === 'rejected');
+
+  failedReportSections.forEach(({ result, name }) => {
+    console.error(`[Reports] Query section "${name}" failed`, result.reason);
+  });
+
+  if (reportResults[0].status === 'rejected') throw reportResults[0].reason;
+
+  const emptyReportResult = { rows: [], rowCount: 0 };
+  const reportResult = (index) => (
+    reportResults[index].status === 'fulfilled'
+      ? reportResults[index].value
+      : emptyReportResult
+  );
+  const overview = reportResult(0);
+  const series = reportResult(1);
+  const expenseBreakdown = reportResult(2);
+  const cashOutBreakdown = reportResult(3);
+  const vehicles = reportResult(4);
+  const customers = reportResult(5);
+  const fleet = reportResult(6);
+  const owners = reportResult(7);
+  const drivers = reportResult(8);
+  const dataQuality = reportResult(9);
+
   const row = overview.rows[0] || {};
   const number = (value) => Number(value) || 0;
   const rentalRevenue = number(row.rental_revenue);
@@ -2572,6 +2611,7 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
         missing_driver_commissions: number(dataQuality.rows[0]?.missing_driver_commissions),
         draft_owner_payouts: number(dataQuality.rows[0]?.draft_owner_payouts),
         manual_partner_payouts: number(dataQuality.rows[0]?.manual_partner_payouts),
+        report_query_failures: failedReportSections.map(({ name }) => name),
       },
     },
   });

@@ -129,6 +129,7 @@ type DataQuality = {
   missing_driver_commissions: number;
   draft_owner_payouts: number;
   manual_partner_payouts: number;
+  report_query_failures: string[];
 };
 
 type ReportData = {
@@ -181,7 +182,10 @@ const emptyQuality: DataQuality = {
   missing_driver_commissions: 0,
   draft_owner_payouts: 0,
   manual_partner_payouts: 0,
+  report_query_failures: [],
 };
+const qualityNumberKeys = Object.keys(emptyQuality)
+  .filter((key) => key !== 'report_query_failures') as Array<Exclude<keyof DataQuality, 'report_query_failures'>>;
 const emptyReport: ReportData = {
   summary: emptySummary,
   series: [],
@@ -290,9 +294,14 @@ const normalizeReport = (payload: any): ReportData => {
       maintenance: numberValue(source.fleet?.maintenance),
       suspended: numberValue(source.fleet?.suspended),
     },
-    data_quality: Object.fromEntries(
-      Object.keys(emptyQuality).map((key) => [key, numberValue(qualitySource[key])]),
-    ) as DataQuality,
+    data_quality: {
+      ...Object.fromEntries(
+        qualityNumberKeys.map((key) => [key, numberValue(qualitySource[key])]),
+      ),
+      report_query_failures: Array.isArray(qualitySource.report_query_failures)
+        ? qualitySource.report_query_failures.map(String)
+        : [],
+    } as DataQuality,
   };
 };
 
@@ -469,7 +478,10 @@ const Reports = () => {
   const periodLabel = `${new Date(isoStart(period.startKey)).toLocaleDateString('vi-VN')} – ${new Date(isoStart(shiftDateKey(period.endKey, -1))).toLocaleDateString('vi-VN')}`;
   const businessCashOut = summary.expense_cash_out + summary.owner_payouts_confirmed;
   const refundCashOut = summary.customer_refunds + summary.deposit_refunded;
-  const qualityWarnings = Object.values(report.data_quality).reduce((sum, value) => sum + value, 0);
+  const qualityWarnings = qualityNumberKeys.reduce(
+    (sum, key) => sum + report.data_quality[key],
+    report.data_quality.report_query_failures.length,
+  );
 
   return (
     <div className="reports-page" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -621,6 +633,7 @@ const Reports = () => {
           {report.data_quality.missing_driver_commissions > 0 && <div>• {report.data_quality.missing_driver_commissions} đơn dịch vụ trong kỳ có tỷ lệ tài xế nhưng hoa hồng bằng 0.</div>}
           {report.data_quality.draft_owner_payouts > 0 && <div>• {report.data_quality.draft_owner_payouts} payout chủ xe đang ở trạng thái nháp, chưa tính là tiền đã chi.</div>}
           {report.data_quality.manual_partner_payouts > 0 && <div>• {report.data_quality.manual_partner_payouts} phiếu chi đối tác được tạo theo luồng cũ; nếu đồng thời xác nhận payout mới cần kiểm tra trùng.</div>}
+          {report.data_quality.report_query_failures.length > 0 && <div>• Một số bảng chi tiết chưa tải được ({report.data_quality.report_query_failures.join(', ')}); các số tổng chính vẫn được giữ và lỗi chi tiết đã ghi vào log máy chủ.</div>}
         </div></div>
       </div></div>}
 
