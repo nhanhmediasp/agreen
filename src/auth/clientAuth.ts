@@ -12,7 +12,7 @@ export function csrfHeaders(): Record<string, string> {
 
 export interface SecurityLog {
   id: string;
-  type: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOCKOUT' | 'PASSWORD_CHANGE';
+  type: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOCKOUT' | 'PASSWORD_CHANGE' | 'PROFILE_UPDATE';
   message: string;
   timestamp: string;
   username: string;
@@ -95,8 +95,10 @@ export async function updateAdminCredentials(
       return { success: false, error: data.error || 'Đổi mật khẩu thất bại' };
     }
     logSecurityEvent(
-      'PASSWORD_CHANGE',
-      `Tài khoản '${username}' đã đổi mật khẩu thành công.`,
+      newPassword ? 'PASSWORD_CHANGE' : 'PROFILE_UPDATE',
+      newPassword
+        ? `Tài khoản '${username}' đã cập nhật thông tin đăng nhập thành công.`
+        : `Tài khoản đã đổi tên đăng nhập thành '${username}'.`,
       username,
     );
     return { success: true };

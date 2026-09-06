@@ -230,11 +230,12 @@ function AccountDropdown() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUsername.trim()) return;
-    
-    // Only attempt to change password if they enter a new one
-    if (editPassword.trim()) {
+
+    const usernameChanged = editUsername.trim() !== currentUsername;
+    const credentialsChanged = usernameChanged || Boolean(editPassword.trim());
+    if (credentialsChanged) {
       if (!editOldPassword.trim()) {
-        setSaveMsg('Vui lòng nhập mật khẩu cũ để đổi mật khẩu!');
+        setSaveMsg('Vui lòng nhập mật khẩu hiện tại để cập nhật tài khoản!');
         return;
       }
       const res = await updateAdminCredentials(editUsername.trim(), editOldPassword.trim(), editPassword.trim());
@@ -242,6 +243,7 @@ function AccountDropdown() {
         setSaveMsg(res.error || 'Đổi mật khẩu thất bại!');
         return;
       }
+      localStorage.setItem('agreen_admin_username', editUsername.trim());
     }
     
     localStorage.setItem('agreen_admin_avatar', editAvatar);
@@ -551,7 +553,7 @@ function App() {
   }
 
   return (
-    <AppProvider>
+    <AppProvider currentUser={authUser}>
       <Router>
         <Suspense fallback={<RouteFallback />}>
           <Routes>

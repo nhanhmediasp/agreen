@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { generate500DemoDataset } from '../utils/generateDemoData';
 import { mapRentalFromDB } from './rentalMapper';
-import { csrfHeaders } from '../auth/clientAuth';
+import { csrfHeaders, type AuthUser } from '../auth/clientAuth';
 
 export interface Car {
   id: string; // License plate
@@ -15,6 +15,7 @@ export interface Car {
   timeRemaining?: string;
   km: number;
   customer?: string;
+  ownerId?: string;
   ownerPhone: string;
   expiryRegistration: string; // Đăng kiểm
   expiryInsurance: string; // Bảo hiểm
@@ -45,7 +46,11 @@ export interface Owner {
   id: string;
   name: string;
   phone: string;
+  email?: string;
   address: string;
+  idCard?: string;
+  bankAccount?: string;
+  bankName?: string;
   notes: string;
   image: string; // Chủ xe Avatar
   commissionRate?: number; // Tỷ lệ chiết khấu chủ xe được hưởng (tùy chọn)
@@ -104,12 +109,15 @@ export interface Rental {
   fileUrl?: string;
   fileName?: string;
   ownerCommissionAmount?: number;
+  ownerCommissionManual?: boolean;
   violations?: Violation[];
   createdAt?: string;
   deliveredAt?: string;
   returnedAt?: string;
   conditionImages?: string[];
 }
+
+export type NewCustomerInput = Pick<Customer, 'name' | 'phone' | 'license' | 'cccd' | 'address' | 'classification' | 'notes' | 'image'>;
 
 export type DepositLifecycleState = 'pending' | 'received' | 'returned';
 
@@ -176,6 +184,7 @@ export interface AppSettings {
 }
 
 interface AppContextType {
+  currentUserRole: string;
   isLoading: boolean;
   loadError: string | null;
   cars: Car[];
@@ -189,14 +198,14 @@ interface AppContextType {
   settings: AppSettings;
   toasts: Toast[];
   showToast: (message: string, type?: Toast['type']) => void;
-  addCar: (car: Car) => Promise<boolean>;
+  addCar: (car: Car, newOwner?: Owner) => Promise<boolean>;
   updateCar: (id: string, updatedFields: Partial<Car>) => Promise<boolean>;
   deleteCar: (id: string) => Promise<boolean>;
   updateCarStatus: (id: string, status: Car['status'], customer?: string, timeRemaining?: string) => Promise<boolean>;
   addCustomer: (customer: Customer) => Promise<boolean>;
   updateCustomer: (id: string, updatedFields: Partial<Customer>) => Promise<boolean>;
   deleteCustomer: (id: string) => Promise<boolean>;
-  addOwner: (owner: Owner) => Promise<boolean>;
+  addOwner: (owner: Owner) => Promise<Owner | null>;
   updateOwner: (id: string, updatedFields: Partial<Owner>) => Promise<boolean>;
   deleteOwner: (id: string) => Promise<boolean>;
   createOwnerPayout: (
@@ -208,7 +217,7 @@ interface AppContextType {
   addExpense: (expense: Expense) => Promise<boolean>;
   updateExpense: (id: string, updatedFields: Partial<Expense>) => Promise<boolean>;
   deleteExpense: (id: string) => Promise<boolean>;
-  addRental: (rental: Rental) => Promise<boolean>;
+  addRental: (rental: Rental, newCustomer?: NewCustomerInput) => Promise<boolean>;
   updateRental: (id: string, updatedFields: Partial<Rental>) => Promise<boolean>;
   updateRentalDepositState: (id: string, depositState: DepositLifecycleState) => Promise<boolean>;
   handoverRental: (id: string, startKm: number, startFuel: string) => Promise<boolean>;
@@ -574,6 +583,7 @@ function mapCarFromDB(db: Record<string, unknown>): Car {
     color: db.color as string || 'Trắng',
     image: db.image_url as string || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
     km: Number(db.current_mileage) || 0,
+    ownerId: db.owner_id as string || undefined,
     ownerPhone: db.owner_phone as string || '',
     customer: db.active_customer_name as string || undefined,
     expiryRegistration: db.registration_expiry ? (db.registration_expiry as string).split('T')[0] : '',
@@ -614,7 +624,11 @@ function mapOwnerFromDB(db: Record<string, unknown>): Owner {
     id: db.id as string,
     name: db.name as string || '',
     phone: db.phone as string || '',
+    email: db.email as string || '',
     address: db.address as string || '',
+    idCard: db.id_card as string || '',
+    bankAccount: db.bank_account as string || '',
+    bankName: db.bank_name as string || '',
     notes: db.notes as string || '',
     image: db.image_url as string || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
     commissionRate: Number(db.commission_rate) || 0,
@@ -679,7 +693,7 @@ function mapDriverFromDB(db: Record<string, unknown>): Driver {
   };
 }
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AppProvider: React.FC<{ children: React.ReactNode; currentUser?: AuthUser | null }> = ({ children, currentUser }) => {
   // PostgreSQL is the source of truth for all business data.
   // Start with empty arrays – they'll be populated from the API on mount.
   const [cars, setCars] = useState<Car[]>([]);
@@ -899,9 +913,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   // CAR ACTIONS – đồng bộ với PostgreSQL
   // ============================================================
-  const addCar = async (car: Car): Promise<boolean> => {
+  const addCar = async (car: Car, newOwner?: Owner): Promise<boolean> => {
     const ownerObj = owners.find(o => o.phone === car.ownerPhone);
-    const ownerId = ownerObj ? ownerObj.id : null;
+    const ownerId = car.ownerId || ownerObj?.id || null;
 
     try {
       const res = await apiFetch<Record<string, unknown>>('/vehicles', {
@@ -923,12 +937,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           license_expiry: car.expiryLicense || null,
           image_url: car.image,
           gallery_urls: car.images || [],
-          owner_id: ownerId,
+          owner_id: newOwner ? undefined : ownerId,
+          ...(newOwner ? { newOwner } : {}),
           notes: ''
         }),
       });
       if (res.success && res.data) {
-        await refreshCars();
+        await Promise.all([refreshCars(), ...(newOwner ? [refreshOwners()] : [])]);
         if (car.image && !images.some(img => img.url === car.image)) {
           setImages(prev => [{ id: Date.now().toString(), url: car.image, usedIn: `Xe ${car.id}` }, ...prev]);
         }
@@ -939,7 +954,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
     } catch (error) {
-      showToast(`Lỗi kết nối máy chủ khi lưu xe: ${errorMessage(error)}`, 'error');
+      const message = error instanceof ApiRequestError && error.code === 'OWNER_DUPLICATE'
+        ? 'Chủ xe đã tồn tại. Hãy chọn hồ sơ chủ xe có sẵn.'
+        : errorMessage(error);
+      showToast(`Không thể lưu xe: ${message}`, 'error');
       return false;
     }
   };
@@ -1048,28 +1066,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
     } catch (error) {
-      showToast(`Lỗi mạng khi lưu khách hàng: ${errorMessage(error)}`, 'error');
+      const message = error instanceof ApiRequestError && error.code === 'CUSTOMER_DUPLICATE'
+        ? 'Khách hàng đã tồn tại với số điện thoại, CCCD hoặc email này.'
+        : errorMessage(error);
+      showToast(`Không thể lưu khách hàng: ${message}`, 'error');
       return false;
     }
   };
 
   const updateCustomer = async (id: string, updatedFields: Partial<Customer>): Promise<boolean> => {
     const dbFields: Record<string, unknown> = {};
-    if (updatedFields.name) dbFields.full_name = updatedFields.name;
-    if (updatedFields.phone) dbFields.phone = updatedFields.phone;
-    if (updatedFields.cccd) dbFields.id_card = updatedFields.cccd;
-    if (updatedFields.license) dbFields.driver_license = updatedFields.license;
-    if (updatedFields.address) dbFields.address = updatedFields.address;
+    if (updatedFields.name !== undefined) dbFields.full_name = updatedFields.name;
+    if (updatedFields.phone !== undefined) dbFields.phone = updatedFields.phone;
+    if (updatedFields.cccd !== undefined) dbFields.id_card = updatedFields.cccd;
+    if (updatedFields.license !== undefined) dbFields.driver_license = updatedFields.license;
+    if (updatedFields.address !== undefined) dbFields.address = updatedFields.address;
     if (updatedFields.classification) { dbFields.classification = updatedFields.classification; dbFields.status = updatedFields.classification === 'vip' ? 'VIP' : updatedFields.classification === 'warning' ? 'Blacklisted' : 'Active'; }
     if (updatedFields.notes !== undefined) dbFields.notes = updatedFields.notes;
+    if (updatedFields.image !== undefined) dbFields.image_url = updatedFields.image;
     if (Object.keys(dbFields).length === 0) return true;
     try {
       await apiFetch(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) });
-      await refreshCustomers();
+      await refreshRentalDomain();
       showToast('Đã đồng bộ cập nhật khách hàng lên CSDL!', 'success');
       return true;
     } catch (error) {
-      showToast(`Lỗi cập nhật khách hàng: ${errorMessage(error)}`, 'error');
+      const message = error instanceof ApiRequestError && error.code === 'CUSTOMER_DUPLICATE'
+        ? 'Số điện thoại, CCCD hoặc email đang thuộc khách hàng khác.'
+        : errorMessage(error);
+      showToast(`Lỗi cập nhật khách hàng: ${message}`, 'error');
       await refreshCustomers().catch((refreshError) => console.error('Failed to reload customers', refreshError));
       return false;
     }
@@ -1090,46 +1115,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   // OWNER ACTIONS
   // ============================================================
-  const addOwner = async (owner: Owner): Promise<boolean> => {
+  const addOwner = async (owner: Owner): Promise<Owner | null> => {
     try {
       const res = await apiFetch<Record<string, unknown>>('/owners', {
         method: 'POST',
         body: JSON.stringify({
-          name: owner.name, phone: owner.phone, address: owner.address,
+          name: owner.name, phone: owner.phone, email: owner.email || '', address: owner.address,
+          id_card: owner.idCard || '', bank_account: owner.bankAccount || '', bank_name: owner.bankName || '',
           notes: owner.notes, commission_rate: owner.commissionRate || 0,
           image_url: owner.image
         }),
       });
       if (res.success && res.data) {
-        await refreshOwners();
+        const createdOwner = mapOwnerFromDB(res.data);
+        setOwners((previous) => [createdOwner, ...previous.filter((item) => item.id !== createdOwner.id)]);
         showToast('Đã thêm chủ xe vào CSDL!', 'success');
-        return true;
+        return createdOwner;
       } else {
         showToast(`Lỗi thêm chủ xe: ${res.error}`, 'error');
-        return false;
+        return null;
       }
     } catch (error) {
-      showToast(`Lỗi mạng khi lưu chủ xe: ${errorMessage(error)}`, 'error');
-      return false;
+      const message = error instanceof ApiRequestError && error.code === 'OWNER_DUPLICATE'
+        ? 'Chủ xe đã tồn tại với số điện thoại, CCCD hoặc email này.'
+        : errorMessage(error);
+      showToast(`Không thể lưu chủ xe: ${message}`, 'error');
+      return null;
     }
   };
 
   const updateOwner = async (id: string, updatedFields: Partial<Owner>): Promise<boolean> => {
     const dbFields: Record<string, unknown> = {};
-    if (updatedFields.name) dbFields.name = updatedFields.name;
-    if (updatedFields.phone) dbFields.phone = updatedFields.phone;
-    if (updatedFields.address) dbFields.address = updatedFields.address;
+    if (updatedFields.name !== undefined) dbFields.name = updatedFields.name;
+    if (updatedFields.phone !== undefined) dbFields.phone = updatedFields.phone;
+    if (updatedFields.email !== undefined) dbFields.email = updatedFields.email;
+    if (updatedFields.address !== undefined) dbFields.address = updatedFields.address;
+    if (updatedFields.idCard !== undefined) dbFields.id_card = updatedFields.idCard;
+    if (updatedFields.bankAccount !== undefined) dbFields.bank_account = updatedFields.bankAccount;
+    if (updatedFields.bankName !== undefined) dbFields.bank_name = updatedFields.bankName;
     if (updatedFields.notes !== undefined) dbFields.notes = updatedFields.notes;
+    if (updatedFields.image !== undefined) dbFields.image_url = updatedFields.image;
     if (updatedFields.commissionRate !== undefined) dbFields.commission_rate = updatedFields.commissionRate;
     
     if (Object.keys(dbFields).length === 0) return true;
     try {
       await apiFetch(`/owners/${id}`, { method: 'PUT', body: JSON.stringify(dbFields) });
-      await refreshOwners();
+      await Promise.all([refreshOwners(), refreshCars()]);
       showToast('Đã đồng bộ thông tin chủ xe!', 'success');
       return true;
     } catch (error) {
-      showToast(`Lỗi cập nhật chủ xe: ${errorMessage(error)}`, 'error');
+      const message = error instanceof ApiRequestError && error.code === 'OWNER_DUPLICATE'
+        ? 'Số điện thoại, CCCD hoặc email đang thuộc chủ xe khác.'
+        : errorMessage(error);
+      showToast(`Lỗi cập nhật chủ xe: ${message}`, 'error');
       return false;
     }
   };
@@ -1153,9 +1191,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     rentalIds: string[],
   ): Promise<boolean> => {
     try {
+      const params = new URLSearchParams({ ownerId, periodStart, periodEnd });
+      const candidates = await apiFetch<Array<{ id: string }>>(`/owner-payouts/candidates?${params.toString()}`);
+      const requestedIds = new Set(rentalIds);
+      const eligibleRentalIds = candidates.data
+        .map((rental) => String(rental.id))
+        .filter((rentalId) => requestedIds.has(rentalId));
+      if (eligibleRentalIds.length === 0) {
+        showToast('Không còn hợp đồng đủ điều kiện để tạo payout trong kỳ này.', 'error');
+        return false;
+      }
       await apiFetch('/owner-payouts', {
         method: 'POST',
-        body: JSON.stringify({ ownerId, periodStart, periodEnd, rentalIds }),
+        body: JSON.stringify({ ownerId, periodStart, periodEnd, rentalIds: eligibleRentalIds }),
       });
       showToast('Đã tạo payout nháp. Kế toán cần kiểm tra và xác nhận trước khi chi tiền.', 'success');
       return true;
@@ -1224,19 +1272,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   // RENTAL ACTIONS – dữ liệu quan trọng nhất, lưu ngay vào DB
   // ============================================================
-  const addRental = async (rental: Rental): Promise<boolean> => {
+  const addRental = async (rental: Rental, newCustomer?: NewCustomerInput): Promise<boolean> => {
     try {
       await apiFetch<Record<string, unknown>>('/rentals', {
         method: 'POST',
-        body: JSON.stringify(rental),
+        body: JSON.stringify({ ...rental, ...(newCustomer ? { newCustomer } : {}) }),
       });
       await refreshRentalDomain();
       showToast('Tạo đơn thuê xe thành công!', 'success');
       return true;
     } catch (error) {
-      const message = error instanceof ApiRequestError && error.status === 409
-        ? 'Xe đã có đơn thuê trùng khoảng thời gian này.'
-        : errorMessage(error);
+      const message = error instanceof ApiRequestError && error.code === 'CUSTOMER_DUPLICATE'
+        ? 'Khách hàng đã tồn tại. Hãy chọn khách hàng có sẵn thay vì tạo mới.'
+        : error instanceof ApiRequestError && error.code === 'RENTAL_OVERLAP'
+          ? 'Xe đã có đơn thuê trùng khoảng thời gian này.'
+          : errorMessage(error);
       showToast(`Lỗi tạo đơn thuê: ${message}`, 'error');
       return false;
     }
@@ -1252,7 +1302,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Đã cập nhật đơn thuê!', 'success');
       return true;
     } catch (error) {
-      const message = error instanceof ApiRequestError && error.status === 409
+      const message = error instanceof ApiRequestError && error.code === 'RENTAL_OVERLAP'
         ? 'Xe đã có đơn thuê trùng khoảng thời gian này.'
         : errorMessage(error);
       showToast(`Lỗi cập nhật đơn thuê: ${message}`, 'error');
@@ -1594,6 +1644,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
+      currentUserRole: currentUser?.role || '',
       isLoading: !dbLoaded,
       loadError,
       cars,

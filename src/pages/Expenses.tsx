@@ -7,7 +7,17 @@ import { Pagination } from '../components/Pagination';
 import { confirmAction } from '../utils/confirmAction';
 
 const Expenses = () => {
-  const { expenses, addExpense, updateExpense, deleteExpense, cars, rentals, owners, showToast } = useApp();
+  const {
+    expenses,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    createOwnerPayout,
+    cars,
+    rentals,
+    owners,
+    showToast,
+  } = useApp();
   const [activeTab, setActiveTab] = useState<'general' | 'incidental' | 'owners'>('general');
   const [showAddForm, setShowAddForm] = useState(false);
   const [isAddingExpense, setIsAddingExpense] = useState(false);
@@ -181,7 +191,7 @@ const Expenses = () => {
   });
 
   const filteredPayoutOwners = owners.filter(owner => {
-    const ownerCars = cars.filter(car => car.ownerPhone === owner.phone);
+    const ownerCars = cars.filter(car => car.ownerId === owner.id || (!car.ownerId && car.ownerPhone === owner.phone));
     const carPlates = ownerCars.map(car => car.id).join(' ');
     const keyword = ownerSearch.toLowerCase();
     return owner.name.toLowerCase().includes(keyword) ||
@@ -190,7 +200,7 @@ const Expenses = () => {
   });
 
   const getOwnerPayoutSummary = (owner: Owner) => {
-    const ownerCars = cars.filter(car => car.ownerPhone === owner.phone);
+    const ownerCars = cars.filter(car => car.ownerId === owner.id || (!car.ownerId && car.ownerPhone === owner.phone));
     const ownerCarIds = ownerCars.map(car => car.id);
     const completedRentals = rentals.filter(
       rental => ownerCarIds.includes(rental.carId) && rental.status === 'completed',
@@ -205,23 +215,37 @@ const Expenses = () => {
     };
   };
 
-  const handleCreateOwnerExpense = async (owner: Owner) => {
-    const { ownerCars, payoutTotal } = getOwnerPayoutSummary(owner);
-    if (payoutTotal <= 0) {
-      showToast('Chủ xe này chưa có số tiền chi trả cần thanh toán!', 'error');
+  const handleCreateOwnerPayout = async (owner: Owner) => {
+    const { ownerCars } = getOwnerPayoutSummary(owner);
+    const ownerCarIds = ownerCars.map((car) => car.id);
+    const now = new Date();
+    const vietnamParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: 'numeric',
+    }).formatToParts(now);
+    const year = Number(vietnamParts.find((part) => part.type === 'year')?.value);
+    const month = Number(vietnamParts.find((part) => part.type === 'month')?.value);
+    const periodStart = new Date(Date.UTC(year, month - 1, 1) - 7 * 3_600_000);
+    const periodEnd = new Date(Date.UTC(year, month, 1) - 7 * 3_600_000);
+    const eligibleRentals = rentals.filter((rental) => {
+      const completedAt = new Date(rental.returnedAt ?? rental.endDate);
+      return ownerCarIds.includes(rental.carId)
+        && rental.status === 'completed'
+        && (rental.ownerCommissionAmount ?? 0) > 0
+        && completedAt >= periodStart
+        && completedAt < periodEnd;
+    });
+    if (eligibleRentals.length === 0) {
+      showToast('Không có hợp đồng hoàn thành trong tháng hiện tại để tạo payout.', 'error');
       return;
     }
-    const success = await addExpense({
-      id: Date.now().toString(),
-      title: `Thanh toán chi trả cho chủ xe ${owner.name}`,
-      amount: payoutTotal,
-      category: 'Chiết khấu chủ xe',
-      date: new Date().toISOString().split('T')[0],
-      ref: ownerCars[0]?.id || '',
-    });
-    if (success) {
-      showToast(`Đã tạo phiếu chi ${payoutTotal.toLocaleString()} ₫ cho chủ xe ${owner.name}!`, 'success');
-    }
+    await createOwnerPayout(
+      owner.id,
+      periodStart.toISOString(),
+      periodEnd.toISOString(),
+      eligibleRentals.map((rental) => rental.id),
+    );
   };
 
   return (
@@ -746,7 +770,7 @@ const Expenses = () => {
                   <th style={{ padding: '16px 20px', fontWeight: 600 }}>Số điện thoại</th>
                   <th style={{ padding: '16px 20px', fontWeight: 600 }}>Xe sở hữu</th>
                   <th style={{ padding: '16px 20px', fontWeight: 600 }}>Doanh số xe phát sinh</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Tổng tiền chi trả trực tiếp (₫)</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>Tổng chi trả phát sinh (₫)</th>
                   <th style={{ padding: '16px 20px', fontWeight: 600, textAlign: 'right' }}>Hành động</th>
                 </tr>
               </thead>
@@ -795,11 +819,11 @@ const Expenses = () => {
                             </td>
                             <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                               <button 
-                                onClick={() => handleCreateOwnerExpense(owner)}
+                                onClick={() => handleCreateOwnerPayout(owner)}
                                 className="btn-primary"
                                 style={{ padding: '6px 12px', fontSize: '12px' }}
                               >
-                                <Receipt size={14} /> Tạo phiếu chi
+                                <Receipt size={14} /> Tạo payout tháng này
                               </button>
                             </td>
                           </tr>
@@ -848,8 +872,8 @@ const Expenses = () => {
                         <div><span>Tiền chi trả</span><strong className="entity-mobile-amount">{payoutTotal.toLocaleString()} ₫</strong></div>
                       </div>
                       <div className="entity-mobile-actions">
-                        <button type="button" onClick={() => handleCreateOwnerExpense(owner)}>
-                          <Receipt size={14} /> Tạo phiếu chi
+                        <button type="button" onClick={() => handleCreateOwnerPayout(owner)}>
+                          <Receipt size={14} /> Tạo payout tháng này
                         </button>
                       </div>
                     </article>

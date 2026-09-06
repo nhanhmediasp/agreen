@@ -69,6 +69,8 @@ const RENTAL_EDITABLE_FINANCIAL_FIELDS = new Set([
   'discount_amount',
   'extra_fee',
   'violations',
+  'owner_commission_amount',
+  'owner_commission_manual',
 ]);
 const RENTAL_EDITABLE_DEPOSIT_FIELDS = new Set(['deposit_status']);
 
@@ -157,6 +159,76 @@ const ensureEnum = (value, allowed, field) => {
     throw new ApiError(400, `${field} has an invalid value`);
   }
   return value;
+};
+
+const normalizePhoneNumber = (value) => {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('84')) return `0${digits.slice(2)}`;
+  return digits;
+};
+
+const normalizeIdentityText = (value) => String(value ?? '')
+  .normalize('NFKC')
+  .replace(/\s+/g, '')
+  .toLowerCase();
+
+const normalizedPhoneSql = (column = 'phone') => {
+  const digits = `regexp_replace(COALESCE(${column},''), '[^0-9]', '', 'g')`;
+  return `(CASE WHEN length(${digits})=11 AND ${digits} LIKE '84%' THEN '0' || substring(${digits} FROM 3) ELSE ${digits} END)`;
+};
+
+const lockIdentityKeys = async (client, keys) => {
+  for (const key of [...new Set(keys.filter(Boolean))].sort()) {
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+  }
+};
+
+const assertIdentityAvailable = async (client, {
+  table,
+  currentId,
+  phone,
+  idCard,
+  email,
+  code,
+  label,
+}) => {
+  const normalizedPhone = normalizePhoneNumber(phone);
+  const normalizedIdCard = normalizeIdentityText(idCard);
+  const normalizedEmail = normalizeIdentityText(email);
+  await lockIdentityKeys(client, [
+    normalizedPhone && `${table}:phone:${normalizedPhone}`,
+    normalizedIdCard && `${table}:id-card:${normalizedIdCard}`,
+    normalizedEmail && `${table}:email:${normalizedEmail}`,
+  ]);
+
+  const values = [];
+  const conditions = [];
+  if (normalizedPhone) {
+    values.push(normalizedPhone);
+    conditions.push(`${normalizedPhoneSql('phone')}=$${values.length}`);
+  }
+  if (normalizedIdCard) {
+    values.push(normalizedIdCard);
+    conditions.push(`lower(regexp_replace(COALESCE(id_card,''), '\\s+', '', 'g'))=$${values.length}`);
+  }
+  if (normalizedEmail) {
+    values.push(normalizedEmail);
+    conditions.push(`lower(regexp_replace(COALESCE(email,''), '\\s+', '', 'g'))=$${values.length}`);
+  }
+  if (conditions.length === 0) return;
+
+  let excludeCurrent = '';
+  if (currentId) {
+    values.push(currentId);
+    excludeCurrent = ` AND id::text<>$${values.length}`;
+  }
+  const duplicate = await client.query(
+    `SELECT id FROM ${table} WHERE (${conditions.join(' OR ')})${excludeCurrent} LIMIT 1`,
+    values,
+  );
+  if (duplicate.rowCount > 0) {
+    throw new ApiError(409, `${label} đã tồn tại với số điện thoại, CCCD hoặc email này`, code);
+  }
 };
 
 const executeQuery = (db, text, params) => (
@@ -632,33 +704,51 @@ app.get('/api/vehicles', asyncRoute(async (_req, res) => {
 
 app.post('/api/vehicles', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
   const body = requireObjectBody(req);
-  const plate = requiredString(body, ['plate_number', 'plateNumber'], { max: 20 });
+  const plate = requiredString(body, ['plate_number', 'plateNumber'], { max: 20 }).toUpperCase();
   const fields = vehicleFields(body);
   const brand = requiredString(body, ['brand'], { max: 50 });
   const model = requiredString(body, ['model'], { max: 50 });
-  if (!fields.owner_id) throw new ApiError(400, 'ownerId is required');
+  const newOwner = firstDefined(body, ['newOwner', 'new_owner']);
+  if (newOwner !== undefined && (!newOwner || typeof newOwner !== 'object' || Array.isArray(newOwner))) {
+    throw new ApiError(400, 'newOwner must be an object');
+  }
+  if (fields.owner_id && newOwner) throw new ApiError(400, 'Provide ownerId or newOwner, not both');
+  if (!fields.owner_id && !newOwner) throw new ApiError(400, 'ownerId or newOwner is required');
   const requestedStatus = fields.status ?? 'Available';
   if (!VEHICLE_OPERATIONAL_STATUSES.has(requestedStatus)) {
     throw new ApiError(400, 'Reserved and Rented are controlled by rental workflow');
   }
-  const result = await query(
-    `INSERT INTO vehicles
-       (plate_number, brand, model, year, color, seats, transmission, fuel_type,
-        daily_rate, hourly_rate, weekly_rate, owner_id, status, operational_status, current_mileage,
-        registration_expiry, insurance_expiry, license_expiry, image_url, gallery_urls, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13,$14,$15,$16,$17,$18,$19,$20)
-     RETURNING *`,
-    [
-      plate, brand, model, fields.year ?? 2024, fields.color ?? 'Trắng', fields.seats ?? 4,
-      fields.transmission ?? 'Automatic', fields.fuel_type ?? 'Gasoline',
-      fields.daily_rate ?? 0, fields.hourly_rate ?? 0, fields.weekly_rate ?? 0,
-      fields.owner_id, requestedStatus, fields.current_mileage ?? 0,
-      fields.registration_expiry ?? null, fields.insurance_expiry ?? null,
-      fields.license_expiry ?? null, fields.image_url ?? '', fields.gallery_urls ?? '[]',
-      fields.notes ?? '',
-    ],
-  );
-  res.status(201).json({ success: true, data: result.rows[0] });
+  const vehicle = await withTransaction(async (client) => {
+    let ownerId;
+    if (newOwner) {
+      ownerId = (await createOwnerRecord(client, newOwner)).id;
+    } else {
+      const existingOwner = await client.query('SELECT id FROM owners WHERE id::text=$1', [fields.owner_id]);
+      if (existingOwner.rowCount === 0) {
+        throw new ApiError(400, 'Owner does not exist', 'OWNER_NOT_FOUND');
+      }
+      ownerId = existingOwner.rows[0].id;
+    }
+    const result = await client.query(
+      `INSERT INTO vehicles
+         (plate_number, brand, model, year, color, seats, transmission, fuel_type,
+          daily_rate, hourly_rate, weekly_rate, owner_id, status, operational_status, current_mileage,
+          registration_expiry, insurance_expiry, license_expiry, image_url, gallery_urls, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13,$14,$15,$16,$17,$18,$19,$20)
+       RETURNING *`,
+      [
+        plate, brand, model, fields.year ?? 2024, fields.color ?? 'Trắng', fields.seats ?? 4,
+        fields.transmission ?? 'Automatic', fields.fuel_type ?? 'Gasoline',
+        fields.daily_rate ?? 0, fields.hourly_rate ?? 0, fields.weekly_rate ?? 0,
+        ownerId, requestedStatus, fields.current_mileage ?? 0,
+        fields.registration_expiry ?? null, fields.insurance_expiry ?? null,
+        fields.license_expiry ?? null, fields.image_url ?? '', fields.gallery_urls ?? '[]',
+        fields.notes ?? '',
+      ],
+    );
+    return result.rows[0];
+  });
+  res.status(201).json({ success: true, data: vehicle });
 }));
 
 const rentalDerivedVehicleStatus = (openRentals) => {
@@ -778,26 +868,62 @@ app.post('/api/customers', requireRole('admin', 'operations', 'staff'), asyncRou
   const body = requireObjectBody(req);
   const fields = customerFields(body);
   const fullName = requiredString(body, ['full_name', 'fullName', 'name'], { max: 100 });
-  const phone = requiredString(body, ['phone'], { max: 20 });
-  const result = await query(
-    `INSERT INTO customers
-       (full_name, phone, email, id_card, driver_license, address, city,
-        classification, status, notes, image_url)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-     RETURNING *`,
-    [
-      fullName, phone, fields.email ?? '', fields.id_card ?? '', fields.driver_license ?? '',
-      fields.address ?? '', fields.city ?? '', fields.classification ?? 'normal',
-      fields.status ?? 'Active', fields.notes ?? '', fields.image_url ?? '',
-    ],
-  );
-  res.status(201).json({ success: true, data: result.rows[0] });
+  const phone = normalizePhoneNumber(requiredString(body, ['phone'], { max: 20 }));
+  if (!phone) throw new ApiError(400, 'phone must contain digits');
+  const customer = await withTransaction(async (client) => {
+    await assertIdentityAvailable(client, {
+      table: 'customers',
+      phone,
+      idCard: fields.id_card,
+      email: fields.email,
+      code: 'CUSTOMER_DUPLICATE',
+      label: 'Khách hàng',
+    });
+    const result = await client.query(
+      `INSERT INTO customers
+         (full_name, phone, email, id_card, driver_license, address, city,
+          classification, status, notes, image_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING *`,
+      [
+        fullName, phone, fields.email?.trim() ?? '', fields.id_card?.trim() ?? '', fields.driver_license?.trim() ?? '',
+        fields.address?.trim() ?? '', fields.city?.trim() ?? '', fields.classification ?? 'normal',
+        fields.status ?? 'Active', fields.notes?.trim() ?? '', fields.image_url?.trim() ?? '',
+      ],
+    );
+    return result.rows[0];
+  });
+  res.status(201).json({ success: true, data: customer });
 }));
 
 app.put('/api/customers/:id', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
-  const result = await updateByFields(query, 'customers', 'id::text', req.params.id, customerFields(requireObjectBody(req)));
-  if (result.rowCount === 0) throw new ApiError(404, 'Customer not found');
-  res.json({ success: true, data: result.rows[0] });
+  const fields = customerFields(requireObjectBody(req));
+  const customer = await withTransaction(async (client) => {
+    const current = await client.query('SELECT * FROM customers WHERE id::text=$1 FOR UPDATE', [req.params.id]);
+    if (current.rowCount === 0) throw new ApiError(404, 'Customer not found');
+    if (fields.full_name !== undefined) {
+      fields.full_name = fields.full_name.trim();
+      if (!fields.full_name) throw new ApiError(400, 'full_name is required');
+    }
+    if (fields.phone !== undefined) {
+      fields.phone = normalizePhoneNumber(fields.phone);
+      if (!fields.phone) throw new ApiError(400, 'phone must contain digits');
+    }
+    for (const key of ['email', 'id_card', 'driver_license', 'address', 'city', 'notes', 'image_url']) {
+      if (fields[key] !== undefined) fields[key] = fields[key].trim();
+    }
+    await assertIdentityAvailable(client, {
+      table: 'customers',
+      currentId: req.params.id,
+      phone: fields.phone ?? current.rows[0].phone,
+      idCard: fields.id_card ?? current.rows[0].id_card,
+      email: fields.email ?? current.rows[0].email,
+      code: 'CUSTOMER_DUPLICATE',
+      label: 'Khách hàng',
+    });
+    return updateByFields(client, 'customers', 'id::text', req.params.id, fields);
+  });
+  res.json({ success: true, data: customer.rows[0] });
 }));
 
 app.delete('/api/customers/:id', requireRole('admin'), asyncRoute(async (req, res) => {
@@ -819,6 +945,33 @@ const ownerFields = (body) => ({
   image_url: optionalString(body, ['image_url', 'imageUrl', 'image'], { max: 2048 }),
 });
 
+async function createOwnerRecord(client, body) {
+  const fields = ownerFields(body);
+  const name = requiredString(body, ['name'], { max: 100 });
+  const phone = normalizePhoneNumber(requiredString(body, ['phone'], { max: 20 }));
+  if (!phone) throw new ApiError(400, 'phone must contain digits');
+  await assertIdentityAvailable(client, {
+    table: 'owners',
+    phone,
+    idCard: fields.id_card,
+    email: fields.email,
+    code: 'OWNER_DUPLICATE',
+    label: 'Chủ xe',
+  });
+  const result = await client.query(
+    `INSERT INTO owners
+       (name, phone, email, address, id_card, bank_account, bank_name, commission_rate, notes, image_url)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING *`,
+    [
+      name, phone, fields.email?.trim() ?? '', fields.address?.trim() ?? '', fields.id_card?.trim() ?? '',
+      fields.bank_account?.trim() ?? '', fields.bank_name?.trim() ?? '', fields.commission_rate ?? 0,
+      fields.notes?.trim() ?? '', fields.image_url?.trim() ?? '',
+    ],
+  );
+  return result.rows[0];
+}
+
 app.get('/api/owners', asyncRoute(async (_req, res) => {
   const result = await query('SELECT * FROM owners ORDER BY created_at DESC');
   res.json({ success: true, data: result.rows });
@@ -826,27 +979,38 @@ app.get('/api/owners', asyncRoute(async (_req, res) => {
 
 app.post('/api/owners', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
   const body = requireObjectBody(req);
-  const fields = ownerFields(body);
-  const name = requiredString(body, ['name'], { max: 100 });
-  const phone = requiredString(body, ['phone'], { max: 20 });
-  const result = await query(
-    `INSERT INTO owners
-       (name, phone, email, address, id_card, bank_account, bank_name, commission_rate, notes, image_url)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-     RETURNING *`,
-    [
-      name, phone, fields.email ?? '', fields.address ?? '', fields.id_card ?? '',
-      fields.bank_account ?? '', fields.bank_name ?? '', fields.commission_rate ?? 0,
-      fields.notes ?? '', fields.image_url ?? '',
-    ],
-  );
-  res.status(201).json({ success: true, data: result.rows[0] });
+  const owner = await withTransaction((client) => createOwnerRecord(client, body));
+  res.status(201).json({ success: true, data: owner });
 }));
 
 app.put('/api/owners/:id', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
-  const result = await updateByFields(query, 'owners', 'id::text', req.params.id, ownerFields(requireObjectBody(req)));
-  if (result.rowCount === 0) throw new ApiError(404, 'Owner not found');
-  res.json({ success: true, data: result.rows[0] });
+  const fields = ownerFields(requireObjectBody(req));
+  const owner = await withTransaction(async (client) => {
+    const current = await client.query('SELECT * FROM owners WHERE id::text=$1 FOR UPDATE', [req.params.id]);
+    if (current.rowCount === 0) throw new ApiError(404, 'Owner not found');
+    if (fields.name !== undefined) {
+      fields.name = fields.name.trim();
+      if (!fields.name) throw new ApiError(400, 'name is required');
+    }
+    if (fields.phone !== undefined) {
+      fields.phone = normalizePhoneNumber(fields.phone);
+      if (!fields.phone) throw new ApiError(400, 'phone must contain digits');
+    }
+    for (const key of ['email', 'address', 'id_card', 'bank_account', 'bank_name', 'notes', 'image_url']) {
+      if (fields[key] !== undefined) fields[key] = fields[key].trim();
+    }
+    await assertIdentityAvailable(client, {
+      table: 'owners',
+      currentId: req.params.id,
+      phone: fields.phone ?? current.rows[0].phone,
+      idCard: fields.id_card ?? current.rows[0].id_card,
+      email: fields.email ?? current.rows[0].email,
+      code: 'OWNER_DUPLICATE',
+      label: 'Chủ xe',
+    });
+    return updateByFields(client, 'owners', 'id::text', req.params.id, fields);
+  });
+  res.json({ success: true, data: owner.rows[0] });
 }));
 
 app.delete('/api/owners/:id', requireRole('admin'), asyncRoute(async (req, res) => {
@@ -911,6 +1075,7 @@ const rentalFields = (body, { requireCore = false } = {}) => {
     file_url: optionalString(body, ['fileUrl', 'file_url'], { max: 2048 }),
     file_name: optionalString(body, ['fileName', 'file_name'], { max: 255 }),
     owner_commission_amount: optionalNumber(body, ['ownerCommissionAmount', 'owner_commission_amount'], { min: 0 }),
+    owner_commission_manual: optionalBoolean(body, ['ownerCommissionManual', 'owner_commission_manual']),
     condition_images: (() => {
       const images = optionalArray(body, ['conditionImages', 'condition_images']);
       return images === undefined ? undefined : JSON.stringify(images);
@@ -951,6 +1116,45 @@ const lockVehicle = async (client, carId) => {
 const lockCustomer = async (client, phone) => {
   const result = await client.query('SELECT id, phone FROM customers WHERE phone=$1 FOR UPDATE', [phone]);
   if (result.rowCount === 0) throw new ApiError(400, 'Customer does not exist');
+};
+
+const createInlineRentalCustomer = async (client, body, rentalFieldsToUpdate) => {
+  const input = firstDefined(body, ['newCustomer', 'new_customer']);
+  if (input === undefined) return;
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new ApiError(400, 'newCustomer must be an object');
+  }
+
+  const fields = customerFields(input);
+  const fullName = requiredString(input, ['full_name', 'fullName', 'name'], { max: 100 });
+  const phone = normalizePhoneNumber(requiredString(input, ['phone'], { max: 20 }));
+  if (!phone) throw new ApiError(400, 'newCustomer.phone must contain digits');
+  if (normalizePhoneNumber(rentalFieldsToUpdate.customer_phone) !== phone) {
+    throw new ApiError(400, 'newCustomer.phone must match customerPhone');
+  }
+
+  await assertIdentityAvailable(client, {
+    table: 'customers',
+    phone,
+    idCard: fields.id_card,
+    email: fields.email,
+    code: 'CUSTOMER_DUPLICATE',
+    label: 'Khách hàng',
+  });
+  const result = await client.query(
+    `INSERT INTO customers
+       (full_name, phone, email, id_card, driver_license, address, city,
+        classification, status, notes, image_url)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING *`,
+    [
+      fullName, phone, fields.email?.trim() ?? '', fields.id_card?.trim() ?? '', fields.driver_license?.trim() ?? '',
+      fields.address?.trim() ?? '', fields.city?.trim() ?? '', fields.classification ?? 'normal',
+      fields.status ?? 'Active', fields.notes?.trim() ?? '', fields.image_url?.trim() ?? '',
+    ],
+  );
+  rentalFieldsToUpdate.customer_name = result.rows[0].full_name;
+  rentalFieldsToUpdate.customer_phone = result.rows[0].phone;
 };
 
 const assertRentalDates = (startDate, endDate) => {
@@ -1067,9 +1271,17 @@ const syncVehicleFromRentals = async (client, carId, endKm) => {
   );
 };
 
-const createRental = async (body, userId) => withTransaction(async (client) => {
+const createRental = async (body, userId, userRole) => withTransaction(async (client) => {
   const fields = rentalFields(body, { requireCore: true });
   const requestedRentalFee = fields.rental_fee;
+  const requestedOwnerCommission = fields.owner_commission_amount;
+  const requestedManualOwnerCommission = fields.owner_commission_manual === true;
+  if (requestedManualOwnerCommission && userRole !== 'admin') {
+    throw new ApiError(403, 'Only administrators can set owner payout manually', 'OWNER_COMMISSION_FORBIDDEN');
+  }
+  if (requestedManualOwnerCommission && requestedOwnerCommission === undefined) {
+    throw new ApiError(400, 'ownerCommissionAmount is required for a manual owner payout');
+  }
   const id = optionalString(body, ['id'], { max: 50 })?.trim() || `RNT-${crypto.randomUUID()}`;
   const hasDepositInput = firstDefined(body, [
     'deposit',
@@ -1107,7 +1319,6 @@ const createRental = async (body, userId) => withTransaction(async (client) => {
   fields.deposit_vehicle_color ??= '';
   fields.deposit_vehicle_note ??= '';
   fields.deposit_return_note ??= '';
-  fields.owner_commission_amount ??= 0;
   fields.condition_images ??= '[]';
   fields.violations ??= '[]';
   fields.notes ??= '';
@@ -1129,9 +1340,11 @@ const createRental = async (body, userId) => withTransaction(async (client) => {
   fields.pricing_days = pricing.pricingDays;
   fields.rental_fee = pricing.rentalFee;
   fields.total_amount = pricing.totalAmount;
-  fields.owner_commission_amount = Math.round(
-    pricing.rentalFee * Number(vehicle.owner_commission_rate) / 100,
-  );
+  fields.owner_commission_manual = requestedManualOwnerCommission;
+  fields.owner_commission_amount = requestedManualOwnerCommission
+    ? requestedOwnerCommission
+    : Math.round(pricing.rentalFee * Number(vehicle.owner_commission_rate) / 100);
+  await createInlineRentalCustomer(client, body, fields);
   await lockCustomer(client, fields.customer_phone);
   await assertNoRentalOverlap(client, {
     id,
@@ -1184,7 +1397,7 @@ const createRental = async (body, userId) => withTransaction(async (client) => {
   return result.rows[0];
 });
 
-const updateRental = async (id, body) => withTransaction(async (client) => {
+const updateRental = async (id, body, userRole) => withTransaction(async (client) => {
   const currentResult = await client.query('SELECT * FROM rentals WHERE id=$1 FOR UPDATE', [id]);
   if (currentResult.rowCount === 0) throw new ApiError(404, 'Rental not found');
   const current = currentResult.rows[0];
@@ -1200,6 +1413,27 @@ const updateRental = async (id, body) => withTransaction(async (client) => {
   const providedKeys = Object.entries(fields)
     .filter(([, value]) => value !== undefined)
     .map(([key]) => key);
+  const hasOwnerCommissionInput = providedKeys.some((key) => (
+    key === 'owner_commission_amount' || key === 'owner_commission_manual'
+  ));
+  if (hasOwnerCommissionInput && userRole !== 'admin') {
+    throw new ApiError(403, 'Only administrators can set owner payout manually', 'OWNER_COMMISSION_FORBIDDEN');
+  }
+  if (hasOwnerCommissionInput) {
+    const includedPayout = await client.query(
+      `SELECT 1 FROM owner_payout_items
+       WHERE rental_id=$1 AND status='included'
+       LIMIT 1`,
+      [id],
+    );
+    if (includedPayout.rowCount > 0) {
+      throw new ApiError(
+        409,
+        'Không thể sửa tiền chủ xe vì đơn đã được đưa vào một payout',
+        'OWNER_COMMISSION_LOCKED',
+      );
+    }
+  }
   if (current.status !== 'pending') {
     const unsafeKey = providedKeys.find((key) => (
       !RENTAL_SAFE_DOCUMENT_FIELDS.has(key)
@@ -1228,6 +1462,8 @@ const updateRental = async (id, body) => withTransaction(async (client) => {
       'discount_amount',
       'extra_fee',
       'violations',
+      'owner_commission_amount',
+      'owner_commission_manual',
       ...RENTAL_EDITABLE_DEPOSIT_FIELDS,
       ...RENTAL_SAFE_DOCUMENT_FIELDS,
     ]);
@@ -1284,9 +1520,22 @@ const updateRental = async (id, body) => withTransaction(async (client) => {
     fields.pricing_days = pricing.pricingDays;
     fields.rental_fee = pricing.rentalFee;
     fields.total_amount = pricing.totalAmount;
-    fields.owner_commission_amount = Math.round(
+    const automaticOwnerCommission = Math.round(
       pricing.rentalFee * Number(targetVehicle.owner_commission_rate) / 100,
     );
+    if (hasOwnerCommissionInput) {
+      const useManualAmount = fields.owner_commission_manual !== false;
+      if (useManualAmount && fields.owner_commission_amount === undefined) {
+        throw new ApiError(400, 'ownerCommissionAmount is required for a manual owner payout');
+      }
+      fields.owner_commission_manual = useManualAmount;
+      fields.owner_commission_amount = useManualAmount
+        ? fields.owner_commission_amount
+        : automaticOwnerCommission;
+    } else if (!current.owner_commission_manual) {
+      fields.owner_commission_manual = false;
+      fields.owner_commission_amount = automaticOwnerCommission;
+    }
     if (fields.car_id !== undefined) fields.start_km = Number(targetVehicle.current_mileage);
   }
   const result = await updateByFields(client, 'rentals', 'id', id, fields);
@@ -1423,7 +1672,9 @@ const returnRental = async (id, body, userId = null) => withTransaction(async (c
       pricing.pricingDays,
       pricing.rentalFee,
       pricing.totalAmount,
-      Math.round(pricing.rentalFee * Number(vehicle.owner_commission_rate) / 100),
+      current.owner_commission_manual
+        ? Number(current.owner_commission_amount)
+        : Math.round(pricing.rentalFee * Number(vehicle.owner_commission_rate) / 100),
       returnDeposit === true,
       depositReturnNote,
     ],
@@ -1544,12 +1795,12 @@ app.get('/api/rentals', asyncRoute(async (req, res) => {
 }));
 
 app.post('/api/rentals', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
-  const rental = await createRental(requireObjectBody(req), req.user.id);
+  const rental = await createRental(requireObjectBody(req), req.user.id, req.user.role);
   res.status(201).json({ success: true, data: rental });
 }));
 
 app.put('/api/rentals/:id', requireRole('admin', 'operations', 'staff'), asyncRoute(async (req, res) => {
-  const rental = await updateRental(req.params.id, requireObjectBody(req));
+  const rental = await updateRental(req.params.id, requireObjectBody(req), req.user.role);
   res.json({ success: true, data: rental });
 }));
 
@@ -1726,6 +1977,8 @@ const reportExpenseKindSql = (alias) => `CASE
 END`;
 
 const reportOwnerCommissionSql = (rentalAlias, ownerAlias) => `CASE
+  WHEN COALESCE(${rentalAlias}.owner_commission_manual,FALSE)
+    THEN COALESCE(${rentalAlias}.owner_commission_amount,0)
   WHEN COALESCE(${rentalAlias}.owner_commission_amount,0) > 0
     THEN ${rentalAlias}.owner_commission_amount
   WHEN ${ownerAlias}.id IS NOT NULL AND COALESCE(${ownerAlias}.commission_rate,0) > 0
@@ -2393,7 +2646,9 @@ app.get('/api/reports/summary', requireRole('admin', 'accounting'), asyncRoute(a
            AS legacy_services_without_ledger,
          (SELECT COUNT(*)::int FROM rentals r JOIN vehicles v ON v.plate_number=r.car_id
            JOIN owners o ON o.id=v.owner_id
-           WHERE r.status='completed' AND o.commission_rate>0 AND r.owner_commission_amount=0
+           WHERE r.status='completed' AND o.commission_rate>0
+             AND NOT COALESCE(r.owner_commission_manual,FALSE)
+             AND r.owner_commission_amount=0
              AND COALESCE(r.returned_at,r.created_at) >= $1::timestamptz
              AND COALESCE(r.returned_at,r.created_at) < $2::timestamptz)
            AS missing_owner_commissions,
@@ -3176,13 +3431,14 @@ app.get('/api/owner-payouts/candidates', requireRole('admin', 'accounting'), asy
      JOIN vehicles v ON v.plate_number=r.car_id
      WHERE v.owner_id::text=$1
        AND r.status='completed'
-       AND r.returned_at >= $2
-       AND r.returned_at < $3
+       AND r.owner_commission_amount > 0
+       AND COALESCE(r.returned_at,r.end_date,r.created_at) >= $2
+       AND COALESCE(r.returned_at,r.end_date,r.created_at) < $3
        AND NOT EXISTS (
          SELECT 1 FROM owner_payout_items i
          WHERE i.rental_id=r.id AND i.status='included'
        )
-     ORDER BY r.returned_at, r.id`,
+     ORDER BY COALESCE(r.returned_at,r.end_date,r.created_at), r.id`,
     [ownerId, periodStart, periodEnd],
   );
   res.json({ success: true, data: result.rows });
@@ -3207,8 +3463,9 @@ app.post('/api/owner-payouts', requireRole('admin', 'accounting'), asyncRoute(as
        WHERE r.id = ANY($1::varchar[])
          AND v.owner_id::text=$2
          AND r.status='completed'
-         AND r.returned_at >= $3
-         AND r.returned_at < $4
+         AND r.owner_commission_amount > 0
+         AND COALESCE(r.returned_at,r.end_date,r.created_at) >= $3
+         AND COALESCE(r.returned_at,r.end_date,r.created_at) < $4
          AND NOT EXISTS (
            SELECT 1 FROM owner_payout_items i
            WHERE i.rental_id=r.id AND i.status='included'

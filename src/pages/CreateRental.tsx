@@ -2,16 +2,24 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Steps } from 'antd';
 import { Image as ImageIcon, Receipt, CheckCircle, Search, User, Plus, X, Upload, Trash } from 'lucide-react';
-import { useApp, type Rental, type Car } from '../context/AppContext';
+import { useApp, type Rental, type Car, type NewCustomerInput } from '../context/AppContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { MoneyInput, MoneyInputLeft } from '../components/MoneyInput';
 import { uploadFile, uploadFiles } from '../utils/upload';
 import { hasBookingConflict, isVehicleSelectableForPeriod } from '../utils/rentalAvailability';
 
+const normalizePhone = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  return digits.length === 11 && digits.startsWith('84') ? `0${digits.slice(2)}` : digits;
+};
+
+const normalizeIdentity = (value: string) => value.normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+const normalizePlateIdentity = (value: string) => value.trim().toUpperCase().replace(/[-.\s]/g, '');
+
 const CreateRental = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { cars, addCar, addRental, handoverRental, customers, addCustomer, owners, showToast, rentals } = useApp();
+  const { cars, addCar, addRental, handoverRental, customers, owners, showToast, rentals, currentUserRole } = useApp();
   
   const queryParams = new URLSearchParams(location.search);
   const preselectedCarId = queryParams.get('car') || '';
@@ -39,6 +47,11 @@ const CreateRental = () => {
   const [quickPriceHour, setQuickPriceHour] = useState('100000');
   const [quickPriceDay, setQuickPriceDay] = useState('800000');
   const [quickPriceWeek, setQuickPriceWeek] = useState('5000000');
+  const [quickOwnerMode, setQuickOwnerMode] = useState<'select' | 'create'>('select');
+  const [quickOwnerName, setQuickOwnerName] = useState('');
+  const [quickOwnerPhone, setQuickOwnerPhone] = useState('');
+  const [quickOwnerAddress, setQuickOwnerAddress] = useState('');
+  const [quickOwnerCommissionRate, setQuickOwnerCommissionRate] = useState('75');
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -158,6 +171,7 @@ const CreateRental = () => {
   const [deliveryFee, setDeliveryFee] = useState('0');
   const [paymentStatus, setPaymentStatus] = useState<Rental['paymentStatus']>('deposit');
   const [rentalFeeOverride, setRentalFeeOverride] = useState<string | null>(null);
+  const [ownerCommissionOverride, setOwnerCommissionOverride] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Contract Source Selection & Receipt View State
@@ -178,6 +192,7 @@ const CreateRental = () => {
 
   useEffect(() => {
     setRentalFeeOverride(null);
+    setOwnerCommissionOverride(null);
   }, [selectedCarId]);
 
   useEffect(() => {
@@ -258,10 +273,15 @@ const CreateRental = () => {
   const totalAmount = rentalFee + delFeeNum;
 
   // Car owner commission calculations
-  const carOwnerObj = selectedCarObj ? owners.find(o => o.phone === selectedCarObj.ownerPhone) : null;
+  const carOwnerObj = selectedCarObj
+    ? owners.find((owner) => owner.id === selectedCarObj.ownerId)
+      || owners.find((owner) => owner.phone === selectedCarObj.ownerPhone)
+    : null;
   const ownerCommissionRate = carOwnerObj?.commissionRate ?? 75;
   const computedOwnerCommission = Math.round((rentalFee * ownerCommissionRate) / 100);
-  const ownerCommissionAmount = computedOwnerCommission;
+  const ownerCommissionAmount = ownerCommissionOverride === null
+    ? computedOwnerCommission
+    : parseInt(ownerCommissionOverride, 10) || 0;
 
   const getOwnerNameByPhone = (phone: string) => {
     const match = owners.find(o => o.phone === phone);
@@ -310,16 +330,20 @@ const CreateRental = () => {
       return;
     }
 
-    // If Mode is Create Customer, add it globally
+    let newCustomer: NewCustomerInput | undefined;
     if (customerMode === 'create') {
-      const existingCustomer = customers.find(c => c.phone === customerPhone);
+      const existingCustomer = customers.find((customer) => (
+        normalizePhone(customer.phone) === normalizePhone(customerPhone)
+        || (
+          normalizeIdentity(customerCccd) !== ''
+          && normalizeIdentity(customer.cccd) === normalizeIdentity(customerCccd)
+        )
+      ));
       if (existingCustomer) {
-        showToast('Số điện thoại khách hàng đã tồn tại! Vui lòng chọn khách hàng có sẵn.', 'error');
+        showToast('Khách hàng đã tồn tại theo số điện thoại hoặc CCCD. Vui lòng chọn hồ sơ có sẵn.', 'error');
         return;
       }
-      setIsSubmitting(true);
-      const success = await addCustomer({
-        id: Date.now().toString(),
+      newCustomer = {
         name: customerName,
         phone: customerPhone,
         license: `GPLX: ${customerLicense || 'Chưa cập nhật'}`,
@@ -327,17 +351,8 @@ const CreateRental = () => {
         address: customerAddress || 'Chưa cập nhật',
         classification: 'normal',
         notes: 'Khách hàng tạo mới từ Hợp đồng.',
-        activeRentals: 1,
-        totalRentals: 1,
-        status: 'verified',
-        statusText: 'Đã xác minh',
         image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
-      });
-      
-      if (!success) {
-        setIsSubmitting(false);
-        return;
-      }
+      };
     }
 
     const rentalToAdd: Rental = {
@@ -370,13 +385,14 @@ const CreateRental = () => {
       fileUrl: contractSource === 'uploaded' ? uploadedFileUrl : undefined,
       fileName: contractSource === 'uploaded' ? (uploadedFileName || 'Hop_Dong_Luu_Tru.pdf') : undefined,
       ownerCommissionAmount,
+      ownerCommissionManual: ownerCommissionOverride !== null && currentUserRole === 'admin',
       conditionImages: carImages,
       createdAt: new Date().toISOString()
     };
 
     setIsSubmitting(true);
     try {
-      const success = await addRental(rentalToAdd);
+      const success = await addRental(rentalToAdd, newCustomer);
       if (!success) return;
 
       if (initialRentalStatus === 'active') {
@@ -401,13 +417,47 @@ const CreateRental = () => {
 
   const handleQuickAddCarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickPlate || !quickName || !quickColor || !quickKm || !quickPhone) {
+    if (!quickPlate || !quickName || !quickColor || !quickKm) {
       showToast('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'error');
       return;
     }
 
+    const normalizedQuickPlate = quickPlate.trim().toUpperCase();
+    if (cars.some((car) => normalizePlateIdentity(car.id) === normalizePlateIdentity(normalizedQuickPlate))) {
+      showToast(`Biển số xe "${normalizedQuickPlate}" đã tồn tại trong hệ thống.`, 'error');
+      return;
+    }
+
+    let ownerId: string | undefined;
+    let ownerPhone = quickPhone;
+    let newOwner: Parameters<typeof addCar>[1];
+    if (quickOwnerMode === 'create') {
+      if (!quickOwnerName.trim() || !quickOwnerPhone.trim()) {
+        showToast('Vui lòng nhập tên và số điện thoại chủ xe mới!', 'error');
+        return;
+      }
+      newOwner = {
+        id: '',
+        name: quickOwnerName.trim(),
+        phone: quickOwnerPhone.trim(),
+        address: quickOwnerAddress.trim() || 'Chưa cập nhật',
+        notes: 'Chủ xe tạo mới từ màn hình Tạo đơn',
+        image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+        commissionRate: Number.isFinite(Number(quickOwnerCommissionRate)) ? Number(quickOwnerCommissionRate) : 75,
+      };
+      ownerPhone = newOwner.phone;
+    } else {
+      const selectedOwner = owners.find((owner) => owner.phone === quickPhone);
+      if (!selectedOwner) {
+        showToast('Vui lòng chọn chủ xe cho xe mới!', 'error');
+        return;
+      }
+      ownerId = selectedOwner.id;
+      ownerPhone = selectedOwner.phone;
+    }
+
     const carToAdd: Car = {
-      id: quickPlate,
+      id: normalizedQuickPlate,
       name: quickName,
       brand: quickBrand || 'Khác',
       year: quickYear || '2022',
@@ -415,7 +465,8 @@ const CreateRental = () => {
       color: quickColor,
       status: 'ready',
       km: parseInt(quickKm) || 0,
-      ownerPhone: quickPhone,
+      ownerId,
+      ownerPhone,
       image: quickImage || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
       expiryRegistration: '',
       expiryInsurance: '',
@@ -425,7 +476,7 @@ const CreateRental = () => {
       pricePerWeek: parseInt(quickPriceWeek) || 5000000
     };
 
-    const success = await addCar(carToAdd);
+    const success = await addCar(carToAdd, newOwner);
     if (success) {
       setSelectedCarId(carToAdd.id);
       setShowQuickAddCarModal(false);
@@ -439,6 +490,11 @@ const CreateRental = () => {
       setQuickColor('');
       setQuickKm('');
       setQuickPhone('');
+      setQuickOwnerMode('select');
+      setQuickOwnerName('');
+      setQuickOwnerPhone('');
+      setQuickOwnerAddress('');
+      setQuickOwnerCommissionRate('75');
       setQuickImage('');
       setQuickPriceDay('800000');
       setQuickPriceHour('100000');
@@ -1279,16 +1335,25 @@ const CreateRental = () => {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ color: 'var(--status-available-text)', fontWeight: 600, fontSize: '12px' }}>Chi trả chủ xe (Admin):</span>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                  {selectedCarObj ? `Gợi ý (${ownerCommissionRate}%): ${computedOwnerCommission.toLocaleString('vi-VN')}₫` : 'Chưa chọn xe'}
+                  {selectedCarObj
+                    ? `${ownerCommissionOverride === null ? 'Tự động' : 'Đang nhập thủ công'} · Gợi ý (${ownerCommissionRate}%): ${computedOwnerCommission.toLocaleString('vi-VN')}₫`
+                    : 'Chưa chọn xe'}
                 </span>
               </div>
-              <MoneyInput
-                value={computedOwnerCommission}
-                onChange={() => undefined}
-                disabled
-                placeholder={computedOwnerCommission ? computedOwnerCommission.toString() : '0'}
-                style={{ width: '120px', padding: '5px 8px', fontSize: '12px', fontWeight: 700, color: 'var(--status-available-text)', border: '1px solid var(--status-available-border)', background: 'white' }}
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+                <MoneyInput
+                  value={ownerCommissionOverride ?? computedOwnerCommission}
+                  onChange={setOwnerCommissionOverride}
+                  disabled={!selectedCarObj || currentUserRole !== 'admin'}
+                  placeholder={computedOwnerCommission ? computedOwnerCommission.toString() : '0'}
+                  style={{ width: '140px', padding: '5px 8px', fontSize: '12px', fontWeight: 700, color: 'var(--status-available-text)', border: '1px solid var(--status-available-border)', background: 'white' }}
+                />
+                {ownerCommissionOverride !== null && currentUserRole === 'admin' && (
+                  <button type="button" onClick={() => setOwnerCommissionOverride(null)} style={{ color: 'var(--primary)', fontSize: '10px', fontWeight: 700, textDecoration: 'underline' }}>
+                    Dùng lại mức tự động
+                  </button>
+                )}
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1402,22 +1467,34 @@ const CreateRental = () => {
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Số KM ban đầu *</label>
                 <input type="number" placeholder="VD: 15000" value={quickKm} onChange={e => setQuickKm(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} required />
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Chọn Chủ xe gốc *</label>
-                <select 
-                  value={quickPhone} 
-                  onChange={e => setQuickPhone(e.target.value)} 
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', background: '#FFF' }} 
+            </div>
+
+            <div style={{ padding: '14px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 700 }}>Chủ xe gốc *</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button type="button" onClick={() => setQuickOwnerMode('select')} className={quickOwnerMode === 'select' ? 'btn-primary' : 'btn-secondary'} style={{ padding: '5px 10px', fontSize: '12px' }}>Chọn có sẵn</button>
+                  <button type="button" onClick={() => setQuickOwnerMode('create')} className={quickOwnerMode === 'create' ? 'btn-primary' : 'btn-secondary'} style={{ padding: '5px 10px', fontSize: '12px' }}>+ Tạo chủ xe</button>
+                </div>
+              </div>
+              {quickOwnerMode === 'select' ? (
+                <select
+                  value={quickPhone}
+                  onChange={e => setQuickPhone(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', background: '#FFF' }}
                   required
                 >
                   <option value="">-- Chọn Chủ xe --</option>
-                  {owners.map(o => (
-                    <option key={o.id} value={o.phone}>
-                      {o.name} - {o.phone}
-                    </option>
-                  ))}
+                  {owners.map(o => <option key={o.id} value={o.phone}>{o.name} - {o.phone}</option>)}
                 </select>
-              </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
+                  <input type="text" value={quickOwnerName} onChange={e => setQuickOwnerName(e.target.value)} placeholder="Tên chủ xe *" required style={{ padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)' }} />
+                  <input type="tel" value={quickOwnerPhone} onChange={e => setQuickOwnerPhone(e.target.value)} placeholder="Số điện thoại *" required style={{ padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)' }} />
+                  <input type="text" value={quickOwnerAddress} onChange={e => setQuickOwnerAddress(e.target.value)} placeholder="Địa chỉ" style={{ padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)' }} />
+                  <input type="number" min="0" max="100" value={quickOwnerCommissionRate} onChange={e => setQuickOwnerCommissionRate(e.target.value)} placeholder="Tỷ lệ chi trả (%)" style={{ padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)' }} />
+                </div>
+              )}
             </div>
 
             <div>

@@ -60,6 +60,7 @@ export function mapRentalFromDB(db: Record<string, unknown>): Rental {
     fileUrl: db.file_url as string || undefined,
     fileName: db.file_name as string || undefined,
     ownerCommissionAmount: Number(db.owner_commission_amount) || 0,
+    ownerCommissionManual: db.owner_commission_manual === true,
     conditionImages,
     violations,
     deliveredAt: db.delivered_at as string || undefined,

@@ -15,6 +15,21 @@ export type ChangelogEntry = {
 // Trang Cài đặt sẽ tự lấy phần tử đầu tiên làm phiên bản hiện tại.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.7.0',
+    releasedAt: '2026-09-06',
+    title: 'Tạo đơn và quản lý chủ xe ổn định hơn',
+    summary: 'Chuẩn hóa dữ liệu tài khoản, khách hàng và chủ xe; đồng thời hoàn thiện luồng tạo đơn và chi trả chủ xe.',
+    changes: [
+      { kind: 'fixed', text: 'Chặn tạo trùng chủ xe và khách hàng theo số điện thoại, CCCD hoặc email đã chuẩn hóa.' },
+      { kind: 'fixed', text: 'Chặn tên đăng nhập trùng không phân biệt chữ hoa/thường và chỉ cho phép đổi thông tin tài khoản đang đăng nhập.' },
+      { kind: 'fixed', text: 'Tạo khách hàng mới cùng đơn thuê trong một giao dịch; đơn lỗi sẽ không để lại khách hàng rác.' },
+      { kind: 'fixed', text: 'Tạo chủ xe mới cùng xe trong một giao dịch tại màn hình tạo đơn và quản lý đội xe.' },
+      { kind: 'fixed', text: 'Admin có thể nhập thủ công tiền chi trả chủ xe; số tiền được giữ nguyên khi cập nhật, trả xe và lập báo cáo.' },
+      { kind: 'improved', text: 'Bổ sung đầy đủ email, CCCD và thông tin ngân hàng trong hồ sơ chủ xe.' },
+      { kind: 'improved', text: 'Chuẩn hóa tạo payout theo hợp đồng đủ điều kiện, tránh lập phiếu chi lặp cho cùng đơn thuê.' },
+    ],
+  },
+  {
     version: '2.6.0',
     releasedAt: '2026-08-24',
     title: 'Báo cáo tài chính và trải nghiệm hệ thống',

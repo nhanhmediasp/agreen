@@ -63,7 +63,7 @@ const SpeedometerCountdown = ({ endDateStr }: { endDateStr: string }) => (
 );
 
 const FleetManagement = () => {
-  const { cars, addCar, updateCar, deleteCar, rentals, completeRental, customers, owners, addOwner, showToast, expenses, addExpense } = useApp();
+  const { cars, addCar, updateCar, deleteCar, rentals, completeRental, customers, owners, showToast, expenses, addExpense } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCarId = searchParams.get('id');
   const setSelectedCarId = (id: string | null) => {
@@ -137,7 +137,6 @@ const FleetManagement = () => {
   const [newSeats, setNewSeats] = useState(5);
   const [newColor, setNewColor] = useState('');
   const [newKm, setNewKm] = useState('');
-  const [newPhone, setNewPhone] = useState('');
   const [newImage, setNewImage] = useState('');
   const [newPriceDay, setNewPriceDay] = useState('800000');
   const [newPriceHour, setNewPriceHour] = useState('100000');
@@ -217,24 +216,27 @@ const FleetManagement = () => {
     e.preventDefault();
 
     let finalOwnerPhone = '';
+    let finalOwnerId: string | undefined;
+    let ownerToCreate: Parameters<typeof addCar>[1];
 
     if (ownerOptionMode === 'create') {
       if (!newOwnerName || !newOwnerPhone) {
         showToast('Vui lòng nhập Tên và Số điện thoại chủ xe mới!', 'error');
         return;
       }
-      const success = await addOwner({
-        id: Date.now().toString(),
-        name: newOwnerName,
-        phone: newOwnerPhone,
+      ownerToCreate = {
+        id: '',
+        name: newOwnerName.trim(),
+        phone: newOwnerPhone.trim(),
         address: newOwnerAddress || 'Chưa cập nhật',
         notes: 'Chủ xe mới tạo từ Quản lý Đội xe',
-        image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
-      });
-      if (!success) return;
-      finalOwnerPhone = newOwnerPhone;
+        image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+        commissionRate: 75,
+      };
+      finalOwnerPhone = ownerToCreate.phone;
     } else {
-      finalOwnerPhone = selectedOwnerPhone || owners[0]?.phone || newPhone;
+      finalOwnerPhone = selectedOwnerPhone;
+      finalOwnerId = owners.find((owner) => owner.phone === finalOwnerPhone)?.id;
       if (!finalOwnerPhone) {
         showToast('Vui lòng chọn hoặc tạo mới chủ xe!', 'error');
         return;
@@ -246,14 +248,14 @@ const FleetManagement = () => {
       return;
     }
 
-    const cleanPlate = newPlate.trim();
+    const cleanPlate = newPlate.trim().toUpperCase();
     if (cars.some(c => normalizePlate(c.id) === normalizePlate(cleanPlate))) {
       showToast(`Biển số xe "${cleanPlate}" đã tồn tại trong hệ thống! Vui lòng kiểm tra lại.`, 'error');
       return;
     }
 
     const carToAdd: Car = {
-      id: newPlate,
+      id: cleanPlate,
       name: newName,
       brand: newBrand || 'Khác',
       year: newYear || '2022',
@@ -261,6 +263,7 @@ const FleetManagement = () => {
       color: newColor,
       status: 'ready',
       km: parseInt(newKm) || 0,
+      ownerId: finalOwnerId,
       ownerPhone: finalOwnerPhone,
       image: newImage || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80',
       expiryRegistration: '',
@@ -272,7 +275,7 @@ const FleetManagement = () => {
       images: newGalleryImages
     };
 
-    const success = await addCar(carToAdd);
+    const success = await addCar(carToAdd, ownerToCreate);
     if (success) {
       setShowAddForm(false);
       showToast('Thêm xe mới vào đội xe thành công!', 'success');
@@ -290,7 +293,6 @@ const FleetManagement = () => {
       setNewGalleryImages([]);
       setNewOwnerPhone('');
       setNewOwnerAddress('');
-      setNewPhone('');
       setNewImage('');
       setNewPriceDay('800000');
       setNewPriceHour('100000');

@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS rentals (
     file_url TEXT DEFAULT '',
     file_name VARCHAR(255) DEFAULT '',
     owner_commission_amount NUMERIC(12,2) DEFAULT 0,
+    owner_commission_manual BOOLEAN NOT NULL DEFAULT FALSE,
     condition_images TEXT DEFAULT '[]',
     violations JSONB NOT NULL DEFAULT '[]'::jsonb,
     notes TEXT DEFAULT '',

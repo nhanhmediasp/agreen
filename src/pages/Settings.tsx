@@ -429,7 +429,8 @@ const SettingsPage = () => {
                           LOGIN_SUCCESS: { bg: '#DCFCE7', color: '#15803D', text: '✅ Đăng nhập thành công' },
                           LOGIN_FAILED: { bg: '#FEE2E2', color: '#991B1B', text: '⚠️ Đăng nhập sai' },
                           LOCKOUT: { bg: '#FEF3C7', color: '#B45309', text: '🔒 Khóa Brute-force' },
-                          PASSWORD_CHANGE: { bg: '#DBEAFE', color: '#1E40AF', text: '🔑 Đổi mật khẩu' }
+                          PASSWORD_CHANGE: { bg: '#DBEAFE', color: '#1E40AF', text: '🔑 Đổi mật khẩu' },
+                          PROFILE_UPDATE: { bg: '#E0F2FE', color: '#0369A1', text: '👤 Cập nhật tài khoản' }
                         };
                         const badgeInfo = badges[log.type] || badges.LOGIN_SUCCESS;
 
@@ -456,6 +457,7 @@ const SettingsPage = () => {
                       LOGIN_FAILED: { className: 'warning', text: 'Đăng nhập sai' },
                       LOCKOUT: { className: 'warning', text: 'Khóa Brute-force' },
                       PASSWORD_CHANGE: { className: 'active', text: 'Đổi mật khẩu' },
+                      PROFILE_UPDATE: { className: 'active', text: 'Cập nhật tài khoản' },
                     };
                     const badgeInfo = badges[log.type] || badges.LOGIN_SUCCESS;
                     return (

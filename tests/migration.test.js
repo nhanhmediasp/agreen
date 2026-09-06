@@ -64,6 +64,21 @@ test('deposit status migration is additive and indexed for the management page',
   assert.doesNotMatch(sql, /\bDELETE\s+FROM\b/i);
 });
 
+test('owner identity and manual commission migration is additive', async () => {
+  const sql = await fs.readFile(
+    new URL('../database/migrations/20260906_owner_identity_and_manual_commission.sql', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS owner_commission_manual/i);
+  assert.match(sql, /idx_owners_phone_normalized/i);
+  assert.match(sql, /idx_customers_phone_normalized/i);
+  assert.match(sql, /idx_owners_email_normalized/i);
+  assert.match(sql, /idx_customers_email_normalized/i);
+  assert.doesNotMatch(sql, /\bDELETE\s+FROM\b/i);
+  assert.doesNotMatch(sql, /\bTRUNCATE\b/i);
+});
+
 test('migration ledger applies a file once and rejects a changed checksum', async () => {
   const ledger = new Map();
   let migrationExecutions = 0;

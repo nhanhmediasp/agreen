@@ -499,6 +499,7 @@ test('login upgrades legacy SHA-256 and admin can change password with the old p
   const legacyHash = crypto.createHash('sha256').update(legacyPassword).digest('hex');
   let storedHash = legacyHash;
   let changedHash = '';
+  let changedUsername = '';
 
   app.locals.dbQuery = async (sql, params = []) => {
     if (sql.includes('FROM users WHERE username = $1')) {
@@ -508,12 +509,16 @@ test('login upgrades legacy SHA-256 and admin can change password with the old p
       storedHash = params[0];
       return result([USER]);
     }
-    if (sql.includes('SELECT id, password_hash FROM users')) {
-      return result([{ id: USER.id, password_hash: storedHash }]);
+    if (sql.includes('SELECT id, username, password_hash FROM users')) {
+      return result([{ id: USER.id, username: USER.username, password_hash: storedHash }]);
+    }
+    if (sql.includes('lower(username)=lower($1)')) {
+      return params[0] === 'existing-admin' ? result([{ id: 'user-2' }]) : result([]);
     }
     if (sql.includes('FROM users WHERE id::text = $1')) return result([USER]);
-    if (sql.includes('WHERE username = $2 RETURNING id')) {
-      changedHash = params[0];
+    if (sql.includes('UPDATE users SET username = $1')) {
+      changedUsername = params[0];
+      changedHash = params[1];
       return result([{ id: USER.id }]);
     }
     throw new Error(`Unexpected auth query: ${sql}`);
@@ -536,17 +541,31 @@ test('login upgrades legacy SHA-256 and admin can change password with the old p
 
   const sessionValue = setCookie.match(/agreen_session=([^;,]+)/)?.[1];
   const loginCookie = `agreen_session=${sessionValue}; agreen_csrf=${loginPayload.data.csrfToken}`;
+  const duplicateResponse = await jsonRequest('/api/auth/change-password', {
+    method: 'POST',
+    cookie: loginCookie,
+    csrfToken: loginPayload.data.csrfToken,
+    body: {
+      username: 'existing-admin',
+      oldPassword: legacyPassword,
+    },
+  });
+  assert.equal(duplicateResponse.status, 409);
+  assert.equal((await duplicateResponse.json()).code, 'ACCOUNT_DUPLICATE');
+  assert.equal(changedUsername, '');
+
   const changeResponse = await jsonRequest('/api/auth/change-password', {
     method: 'POST',
     cookie: loginCookie,
     csrfToken: loginPayload.data.csrfToken,
     body: {
-      username: USER.username,
+      username: 'admin-renamed',
       oldPassword: legacyPassword,
       newPassword: nextPassword,
     },
   });
   assert.equal(changeResponse.status, 200);
+  assert.equal(changedUsername, 'admin-renamed');
   assert.equal(await bcrypt.compare(nextPassword, changedHash), true);
   assert.match(changeResponse.headers.get('set-cookie'), /Max-Age=0/);
   assert.equal(passwordValidationError('weak'), 'Mật khẩu mới phải có ít nhất 12 ký tự');
@@ -617,6 +636,8 @@ test('return and cancel rental synchronize vehicle mileage/status and customer c
     start_km: 50_000,
     end_km: null,
     violations: [{ amount: 200_000 }],
+    owner_commission_amount: 345_678,
+    owner_commission_manual: true,
   };
 
   const completeStatements = [];
@@ -651,6 +672,7 @@ test('return and cancel rental synchronize vehicle mileage/status and customer c
   assert.equal(completeResponse.status, 200);
   const updateRentalStatement = completeStatements.find(({ sql }) => sql.startsWith('UPDATE rentals'));
   assert.equal(updateRentalStatement.params.includes(1_350_000), true);
+  assert.equal(updateRentalStatement.params.includes(345_678), true);
   assert.equal(completeStatements.some(({ sql }) => sql.startsWith('UPDATE vehicles')), true);
   assert.equal(completeStatements.some(({ sql }) => sql.startsWith('UPDATE customers')), true);
   assert.equal(completeStatements.at(-1).sql, 'COMMIT');
@@ -925,6 +947,185 @@ test('rental pricing accepts a custom rental fee and includes it in the total', 
   assert.equal(pricing.pricingDays, 2);
   assert.equal(pricing.rentalFee, 750_000);
   assert.equal(pricing.totalAmount, 900_000);
+});
+
+test('owner creation rejects normalized duplicate identity data', async () => {
+  const statements = [];
+  app.locals.dbQuery = authQuery;
+  app.locals.getDbClient = async () => transactionClient(async (sql) => {
+    statements.push(sql);
+    if (sql === 'BEGIN' || sql === 'ROLLBACK') return result();
+    if (sql.startsWith('SELECT pg_advisory_xact_lock')) return result();
+    if (sql.includes('SELECT id FROM owners WHERE')) return result([{ id: 'owner-existing' }]);
+    throw new Error(`Unexpected owner query: ${sql}`);
+  });
+
+  const response = await jsonRequest('/api/owners', {
+    method: 'POST',
+    body: { name: 'Chủ xe trùng', phone: '+84 901 234 567' },
+  });
+  assert.equal(response.status, 409);
+  const payload = await response.json();
+  assert.equal(payload.code, 'OWNER_DUPLICATE');
+  assert.equal(statements.at(-1), 'ROLLBACK');
+  assert.equal(statements.some((sql) => sql.startsWith('INSERT INTO owners')), false);
+});
+
+test('vehicle and inline owner are created in one transaction', async () => {
+  const statements = [];
+  app.locals.dbQuery = authQuery;
+  app.locals.getDbClient = async () => transactionClient(async (sql) => {
+    statements.push(sql);
+    if (sql === 'BEGIN' || sql === 'COMMIT') return result();
+    if (sql.startsWith('SELECT pg_advisory_xact_lock')) return result();
+    if (sql.includes('SELECT id FROM owners WHERE')) return result();
+    if (sql.includes('INSERT INTO owners')) {
+      return result([{ id: 'owner-new', name: 'Chủ xe mới', phone: '0901234567' }]);
+    }
+    if (sql.includes('INSERT INTO vehicles')) {
+      return result([{ id: 'vehicle-new', plate_number: '51A-999.99', owner_id: 'owner-new' }]);
+    }
+    throw new Error(`Unexpected vehicle/owner query: ${sql}`);
+  });
+
+  const response = await jsonRequest('/api/vehicles', {
+    method: 'POST',
+    body: {
+      plate_number: '51A-999.99',
+      brand: 'Toyota',
+      model: 'Vios',
+      newOwner: { name: 'Chủ xe mới', phone: '0901234567', commissionRate: 75 },
+    },
+  });
+  assert.equal(response.status, 201);
+  assert.equal(statements.some((sql) => sql.includes('INSERT INTO owners')), true);
+  assert.equal(statements.some((sql) => sql.includes('INSERT INTO vehicles')), true);
+  assert.equal(statements.at(-1), 'COMMIT');
+});
+
+test('admin manual owner payout is persisted instead of recalculated', async () => {
+  let insertedRental;
+  app.locals.dbQuery = authQuery;
+  app.locals.getDbClient = async () => transactionClient(async (sql, params = []) => {
+    if (sql === 'BEGIN' || sql === 'COMMIT') return result();
+    if (sql.includes('FROM vehicles v') && sql.includes('FOR UPDATE OF v')) {
+      return result([{
+        id: 'vehicle-1', plate_number: '51A-123.45', operational_status: 'Available',
+        current_mileage: 1000, daily_rate: 500000, owner_commission_rate: 70,
+      }]);
+    }
+    if (sql.includes('FROM customers WHERE phone=$1 FOR UPDATE')) {
+      return result([{ id: 'customer-1', phone: '0900000000' }]);
+    }
+    if (sql.startsWith('SELECT id FROM rentals')) return result();
+    if (sql.includes('INSERT INTO rentals')) {
+      const columns = sql.match(/INSERT INTO rentals \(id, ([^)]+)\)/)?.[1]
+        .split(',')
+        .map((column) => column.trim()) || [];
+      insertedRental = Object.fromEntries([
+        ['id', params[0]],
+        ...columns.map((column, index) => [column, params[index + 1]]),
+      ]);
+      return result([insertedRental]);
+    }
+    if (sql.startsWith('SELECT status FROM rentals')) return result();
+    if (sql.startsWith('UPDATE vehicles') || sql.startsWith('UPDATE customers')) return result();
+    throw new Error(`Unexpected manual payout query: ${sql}`);
+  });
+
+  const response = await jsonRequest('/api/rentals', {
+    method: 'POST',
+    body: {
+      id: 'RNT-manual-owner',
+      carId: '51A-123.45',
+      customerName: 'Khách A',
+      customerPhone: '0900000000',
+      startDate: '2026-09-10T08:00:00.000Z',
+      endDate: '2026-09-12T08:00:00.000Z',
+      rentalFee: 1000000,
+      ownerCommissionAmount: 345678,
+      ownerCommissionManual: true,
+    },
+  });
+  assert.equal(response.status, 201);
+  assert.equal(insertedRental.owner_commission_amount, 345678);
+  assert.equal(insertedRental.owner_commission_manual, true);
+});
+
+test('owner payout amount cannot change after the rental is included in a payout', async () => {
+  const statements = [];
+  app.locals.dbQuery = authQuery;
+  app.locals.getDbClient = async () => transactionClient(async (sql) => {
+    statements.push(sql);
+    if (sql === 'BEGIN' || sql === 'ROLLBACK') return result();
+    if (sql.includes('SELECT * FROM rentals WHERE id=$1 FOR UPDATE')) {
+      return result([{
+        id: 'RNT-paid-owner',
+        status: 'completed',
+        car_id: '51A-123.45',
+        customer_phone: '0900000000',
+        start_date: '2026-09-01T08:00:00.000Z',
+        end_date: '2026-09-02T08:00:00.000Z',
+      }]);
+    }
+    if (sql.includes('FROM owner_payout_items')) return result([{ '?column?': 1 }]);
+    throw new Error(`Unexpected locked payout query: ${sql}`);
+  });
+
+  const response = await jsonRequest('/api/rentals/RNT-paid-owner', {
+    method: 'PUT',
+    body: { ownerCommissionAmount: 100000, ownerCommissionManual: true },
+  });
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, 'OWNER_COMMISSION_LOCKED');
+  assert.equal(statements.at(-1), 'ROLLBACK');
+});
+
+test('inline customer creation rolls back when rental creation fails', async () => {
+  const statements = [];
+  app.locals.dbQuery = authQuery;
+  app.locals.getDbClient = async () => transactionClient(async (sql) => {
+    statements.push(sql);
+    if (sql === 'BEGIN' || sql === 'ROLLBACK') return result();
+    if (sql.includes('FROM vehicles v') && sql.includes('FOR UPDATE OF v')) {
+      return result([{
+        id: 'vehicle-1', plate_number: '51A-123.45', operational_status: 'Available',
+        current_mileage: 1000, daily_rate: 500000, owner_commission_rate: 70,
+      }]);
+    }
+    if (sql.startsWith('SELECT pg_advisory_xact_lock')) return result();
+    if (sql.includes('SELECT id FROM customers WHERE')) return result();
+    if (sql.includes('INSERT INTO customers')) {
+      return result([{ id: 'customer-new', full_name: 'Khách mới', phone: '0909999999' }]);
+    }
+    if (sql.includes('FROM customers WHERE phone=$1 FOR UPDATE')) {
+      return result([{ id: 'customer-new', phone: '0909999999' }]);
+    }
+    if (sql.startsWith('SELECT id FROM rentals')) return result([{ id: 'RNT-conflict' }]);
+    throw new Error(`Unexpected inline customer query: ${sql}`);
+  });
+
+  const response = await jsonRequest('/api/rentals', {
+    method: 'POST',
+    body: {
+      id: 'RNT-inline-customer',
+      carId: '51A-123.45',
+      customerName: 'Khách mới',
+      customerPhone: '0909999999',
+      startDate: '2026-09-10T08:00:00.000Z',
+      endDate: '2026-09-12T08:00:00.000Z',
+      newCustomer: {
+        name: 'Khách mới',
+        phone: '0909999999',
+        cccd: '079123456789',
+        license: 'GPLX-1',
+      },
+    },
+  });
+  assert.equal(response.status, 409);
+  assert.equal(statements.some((sql) => sql.includes('INSERT INTO customers')), true);
+  assert.equal(statements.some((sql) => sql.includes('INSERT INTO rentals')), false);
+  assert.equal(statements.at(-1), 'ROLLBACK');
 });
 
 test('server entrypoint detection supports direct Node and PM2 execution', () => {

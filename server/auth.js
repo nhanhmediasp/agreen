@@ -294,12 +294,17 @@ export const registerAuthRoutes = (app, {
       if (!oldPassword) {
         return res.status(400).json({ success: false, error: 'Mật khẩu hiện tại là bắt buộc' });
       }
-      const validationError = passwordValidationError(newPassword);
-      if (validationError) return res.status(400).json({ success: false, error: validationError });
+      if (targetUsername.length > 50) {
+        return res.status(400).json({ success: false, error: 'Tên tài khoản không được vượt quá 50 ký tự' });
+      }
+      if (newPassword) {
+        const validationError = passwordValidationError(newPassword);
+        if (validationError) return res.status(400).json({ success: false, error: validationError });
+      }
 
       try {
         const actorResult = await requestQuery(req)(
-          'SELECT id, password_hash FROM users WHERE id::text = $1 AND is_active = TRUE',
+          'SELECT id, username, password_hash FROM users WHERE id::text = $1 AND is_active = TRUE',
           [req.user.id],
         );
         const actor = actorResult.rows[0];
@@ -310,13 +315,25 @@ export const registerAuthRoutes = (app, {
           return res.status(403).json({ success: false, error: 'Mật khẩu hiện tại không đúng' });
         }
 
-        const passwordHash = await bcrypt.hash(newPassword, 12);
+        const duplicate = await requestQuery(req)(
+          'SELECT id FROM users WHERE lower(username)=lower($1) AND id::text<>$2 LIMIT 1',
+          [targetUsername, req.user.id],
+        );
+        if (duplicate.rowCount > 0) {
+          return res.status(409).json({
+            success: false,
+            error: 'Tên tài khoản đã tồn tại',
+            code: 'ACCOUNT_DUPLICATE',
+          });
+        }
+
+        const passwordHash = newPassword ? await bcrypt.hash(newPassword, 12) : actor.password_hash;
         const updateResult = await requestQuery(req)(
-          'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE username = $2 RETURNING id',
-          [passwordHash, targetUsername],
+          'UPDATE users SET username = $1, password_hash = $2, updated_at = NOW() WHERE id::text = $3 RETURNING id, username',
+          [targetUsername, passwordHash, req.user.id],
         );
         if (updateResult.rowCount === 0) {
-          return res.status(404).json({ success: false, error: 'Không tìm thấy tài khoản cần đổi mật khẩu' });
+          return res.status(404).json({ success: false, error: 'Không tìm thấy tài khoản cần cập nhật' });
         }
 
         clearAuthCookies(res);

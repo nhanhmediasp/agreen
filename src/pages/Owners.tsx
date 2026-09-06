@@ -37,6 +37,10 @@ const Owners = () => {
 
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newIdCard, setNewIdCard] = useState('');
+  const [newBankAccount, setNewBankAccount] = useState('');
+  const [newBankName, setNewBankName] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newImage, setNewImage] = useState('');
@@ -45,6 +49,10 @@ const Owners = () => {
   // Edit Form State
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editIdCard, setEditIdCard] = useState('');
+  const [editBankAccount, setEditBankAccount] = useState('');
+  const [editBankName, setEditBankName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [editImage, setEditImage] = useState('');
@@ -58,7 +66,7 @@ const Owners = () => {
 
   // Get cars owned by this owner
   const ownerCars = activeOwner 
-    ? cars.filter(c => c.ownerPhone === activeOwner.phone)
+    ? cars.filter(c => c.ownerId === activeOwner.id || (!c.ownerId && c.ownerPhone === activeOwner.phone))
     : [];
 
   const ownerCarIds = ownerCars.map(c => c.id);
@@ -101,10 +109,14 @@ const Owners = () => {
       id: Date.now().toString(),
       name: newName,
       phone: newPhone,
+      email: newEmail,
+      idCard: newIdCard,
+      bankAccount: newBankAccount,
+      bankName: newBankName,
       address: newAddress || 'Chưa cập nhật',
       notes: newNotes || 'Không có ghi chú.',
       image: newImage || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      commissionRate: parseInt(newCommissionRate) || 75
+      commissionRate: Number(newCommissionRate)
     };
 
     const success = await addOwner(ownerToAdd);
@@ -114,6 +126,10 @@ const Owners = () => {
       // Clear
       setNewName('');
       setNewPhone('');
+      setNewEmail('');
+      setNewIdCard('');
+      setNewBankAccount('');
+      setNewBankName('');
       setNewAddress('');
       setNewNotes('');
       setNewImage('');
@@ -125,6 +141,10 @@ const Owners = () => {
     if (!activeOwner) return;
     setEditName(activeOwner.name);
     setEditPhone(activeOwner.phone);
+    setEditEmail(activeOwner.email || '');
+    setEditIdCard(activeOwner.idCard || '');
+    setEditBankAccount(activeOwner.bankAccount || '');
+    setEditBankName(activeOwner.bankName || '');
     setEditAddress(activeOwner.address);
     setEditNotes(activeOwner.notes);
     setEditImage(activeOwner.image);
@@ -139,10 +159,14 @@ const Owners = () => {
     const success = await updateOwner(selectedOwnerId, {
       name: editName,
       phone: editPhone,
+      email: editEmail,
+      idCard: editIdCard,
+      bankAccount: editBankAccount,
+      bankName: editBankName,
       address: editAddress,
       notes: editNotes,
       image: editImage,
-      commissionRate: parseInt(editCommissionRate) || 75
+      commissionRate: Number(editCommissionRate)
     });
 
     if (success) {
@@ -165,7 +189,9 @@ const Owners = () => {
     const periodEnd = new Date(Date.UTC(year, month, 1) - 7 * 3_600_000);
     const eligibleRentals = completedOwnerRentals.filter((rental) => {
       const completedAt = new Date(rental.returnedAt ?? rental.endDate);
-      return completedAt >= periodStart && completedAt < periodEnd;
+      return (rental.ownerCommissionAmount ?? 0) > 0
+        && completedAt >= periodStart
+        && completedAt < periodEnd;
     });
     if (eligibleRentals.length === 0) {
       showToast('Không có hợp đồng hoàn thành trong tháng hiện tại để tạo payout.', 'error');
@@ -280,6 +306,9 @@ const Owners = () => {
                   <MapPin size={16} color="var(--primary)" style={{ marginTop: '2px' }} />
                   <span>Địa chỉ: <strong>{activeOwner.address}</strong></span>
                 </div>
+                <div><span>Email: <strong>{activeOwner.email || 'Chưa cập nhật'}</strong></span></div>
+                <div><span>CCCD: <strong>{activeOwner.idCard || 'Chưa cập nhật'}</strong></span></div>
+                <div><span>Tài khoản nhận tiền: <strong>{activeOwner.bankAccount || 'Chưa cập nhật'}{activeOwner.bankName ? ` · ${activeOwner.bankName}` : ''}</strong></span></div>
               </div>
 
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
@@ -613,7 +642,7 @@ const Owners = () => {
                     const paginatedOwners = filteredOwners.slice(startIndex, startIndex + itemsPerPage);
 
                     return paginatedOwners.map((o, idx) => {
-                      const oCars = cars.filter(c => c.ownerPhone === o.phone);
+                      const oCars = cars.filter(c => c.ownerId === o.id || (!c.ownerId && c.ownerPhone === o.phone));
                       const oCarIds = oCars.map(c => c.id);
                       const oRentals = rentals.filter(
                         (rental) => oCarIds.includes(rental.carId) && rental.status === 'completed',
@@ -710,7 +739,7 @@ const Owners = () => {
               filteredOwners
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map(owner => {
-                  const ownerCarsForCard = cars.filter(car => car.ownerPhone === owner.phone);
+                  const ownerCarsForCard = cars.filter(car => car.ownerId === owner.id || (!car.ownerId && car.ownerPhone === owner.phone));
                   const ownerCarIdsForCard = ownerCarsForCard.map(car => car.id);
                   const ownerPayoutTotal = rentals
                     .filter(rental => ownerCarIdsForCard.includes(rental.carId) && rental.status === 'completed')
@@ -805,9 +834,31 @@ const Owners = () => {
               <input type="tel" placeholder="VD: 0901234567" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }} required />
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Email</label>
+                <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>CCCD</label>
+                <input type="text" value={newIdCard} onChange={e => setNewIdCard(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }} />
+              </div>
+            </div>
+
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Địa chỉ</label>
               <input type="text" placeholder="Nhập địa chỉ" value={newAddress} onChange={e => setNewAddress(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số tài khoản</label>
+                <input type="text" value={newBankAccount} onChange={e => setNewBankAccount(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ngân hàng</label>
+                <input type="text" value={newBankName} onChange={e => setNewBankName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }} />
+              </div>
             </div>
 
             <div>
@@ -859,7 +910,7 @@ const Owners = () => {
       {/* Edit Owner Modal */}
       {showEditForm && activeOwner && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <form className="card" onSubmit={handleUpdateOwner} style={{ width: '500px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form className="card" onSubmit={handleUpdateOwner} style={{ width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h2 style={{ fontSize: '20px', margin: 0 }}>Chỉnh sửa thông tin đối tác</h2>
               <button type="button" onClick={() => setShowEditForm(false)} style={{ color: 'var(--text-secondary)' }}>
@@ -877,9 +928,31 @@ const Owners = () => {
               <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontFamily: 'inherit' }} required />
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Email</label>
+                <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>CCCD</label>
+                <input type="text" value={editIdCard} onChange={e => setEditIdCard(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }} />
+              </div>
+            </div>
+
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Địa chỉ</label>
               <input type="text" value={editAddress} onChange={e => setEditAddress(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', fontFamily: 'inherit' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Số tài khoản</label>
+                <input type="text" value={editBankAccount} onChange={e => setEditBankAccount(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Ngân hàng</label>
+                <input type="text" value={editBankName} onChange={e => setEditBankName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }} />
+              </div>
             </div>
 
             <div>
