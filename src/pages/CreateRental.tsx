@@ -769,13 +769,15 @@ const CreateRental = () => {
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Phụ phí Cuối tuần / Lễ tết (%)</label>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                    <input type="checkbox" checked={isWeekend} onChange={e => setIsWeekend(e.target.checked)} disabled style={{ width: '18px', height: '18px' }} />
+                    <input type="checkbox" checked={isWeekend} onChange={e => setIsWeekend(e.target.checked)} style={{ width: '18px', height: '18px' }} />
                     Áp dụng phụ phí
                   </label>
                   {isWeekend && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <input 
                         type="number" 
+                        min="0"
+                        max="100"
                         value={weekendSurchargePercent} 
                         onChange={e => setWeekendSurchargePercent(e.target.value)}
                         style={{ width: '80px', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', fontSize: '14px', textAlign: 'center' }} 

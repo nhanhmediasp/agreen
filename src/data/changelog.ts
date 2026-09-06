@@ -25,6 +25,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'fixed', text: 'Tạo khách hàng mới cùng đơn thuê trong một giao dịch; đơn lỗi sẽ không để lại khách hàng rác.' },
       { kind: 'fixed', text: 'Tạo chủ xe mới cùng xe trong một giao dịch tại màn hình tạo đơn và quản lý đội xe.' },
       { kind: 'fixed', text: 'Admin có thể nhập thủ công tiền chi trả chủ xe; số tiền được giữ nguyên khi cập nhật, trả xe và lập báo cáo.' },
+      { kind: 'fixed', text: 'Mở lại tùy chọn áp dụng phụ phí cuối tuần/lễ tết và giới hạn tỷ lệ nhập từ 0 đến 100%.' },
       { kind: 'improved', text: 'Bổ sung đầy đủ email, CCCD và thông tin ngân hàng trong hồ sơ chủ xe.' },
       { kind: 'improved', text: 'Chuẩn hóa tạo payout theo hợp đồng đủ điều kiện, tránh lập phiếu chi lặp cho cùng đơn thuê.' },
     ],
